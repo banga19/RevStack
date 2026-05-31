@@ -7,6 +7,85 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id             String   @id @default(cuid())
+  name           String
+  email          String   @unique
+  password       String   // hashed with bcryptjs
+  role           String   @default("user") // user, admin
+  image          String?  // profile image from Google SSO
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  onboardingResponses  OnboardingResponse[]
+  preAuthQuestionnaires PreAuthQuestionnaire[]
+}
+
+// Pre-authentication needs assessment - collected BEFORE user signs up
+// This helps personalize the experience based on user goals
+model PreAuthQuestionnaire {
+  id          String   @id @default(cuid())
+  tempId      String   @unique // temporary ID used before auth
+  userId      String?  // linked after successful authentication
+
+  // What brings you here
+  whatBringsYou    String?  // generate-leads, automate-followups, qualify-leads, improve-outreach, scale-ops, reduce-costs, content-marketing, other
+
+  // Business info
+  businessType     String?  // solo, small-agency, ecommerce, trading-wholesale, professional-services, other
+  industry         String?
+  companySize      String?
+  role             String?  // founder-ceo, sales-marketing, operations, other
+
+  // Goals & challenges
+  primaryGoal      String
+  biggestChallenge String?
+  servicesInterest String?  // comma-separated list of services
+
+  // Timeline & budget
+  timeline         String?  // asap, 1-3-months, 3-6-months, exploring
+  budgetRange      String?  // under-1000, 1000-2500, 2500-5000, not-sure
+
+  // Source & context
+  howDidYouHear    String?
+
+  // Status
+  completed        Boolean  @default(false)
+  linkedAfterAuth  Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model OnboardingResponse {
+  id          String   @id @default(cuid())
+  userId      String
+  // Business info
+  businessName    String
+  industry        String
+  companySize     String?
+  // Goals & challenges
+  primaryGoal     String
+  secondaryGoals  String?
+  currentChallenges String?
+  // Target audience & services
+  targetAudience  String?
+  servicesNeeded  String?
+  // Budget & timeline
+  budgetRange     String?
+  timeline        String?
+  // How they found us
+  referralSource  String?
+  // Additional info
+  additionalNotes String?
+  completed       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 model Client {
   id        String   @id @default(cuid())
   name      String
@@ -75,6 +154,8 @@ model OutreachCampaign {
   sentCount  Int      @default(0)
   replyCount Int      @default(0)
   bookedCount Int     @default(0)
+  convertedToClientName String?  // name of client they converted to
+  convertedAt DateTime?          // when this lead converted to a client
   startedAt  DateTime?
   completedAt DateTime?
   createdAt  DateTime @default(now())

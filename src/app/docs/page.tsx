@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import {
   FileText,
@@ -12,10 +13,9 @@ import {
   Code,
   Megaphone,
   Palette,
-  Download,
   Eye,
-  ExternalLink,
   Search,
+  Loader2,
 } from "lucide-react"
 
 type Document = {
@@ -25,6 +25,10 @@ type Document = {
   description: string | null
   category: string
   pages: number | null
+}
+
+type DocumentDetail = Document & {
+  content: string
 }
 
 const categoryIcons: Record<string, React.ReactNode> = {
@@ -48,6 +52,9 @@ export default function DocsPage() {
   const [loading, setLoading] = useState(true)
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
+  const [previewDoc, setPreviewDoc] = useState<DocumentDetail | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
 
   useEffect(() => {
     fetch("/api/documents")
@@ -58,6 +65,20 @@ export default function DocsPage() {
       })
       .catch(() => setLoading(false))
   }, [])
+
+  const openPreview = async (doc: Document) => {
+    setPreviewOpen(true)
+    setPreviewLoading(true)
+    try {
+      const res = await fetch(`/api/documents/${doc.id}`)
+      const data = await res.json()
+      setPreviewDoc(data)
+    } catch (e) {
+      console.error("Preview failed", e)
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
 
   const categories = Array.from(new Set(documents.map((d) => d.category)))
 
@@ -121,7 +142,7 @@ export default function DocsPage() {
       {/* Document Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filtered.map((doc) => (
-          <Card key={doc.id} className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
+          <Card key={doc.id} className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 cursor-pointer" onClick={() => openPreview(doc)}>
             <CardContent className="p-5">
               <div className="flex items-start justify-between mb-3">
                 <div className={cn(
@@ -142,7 +163,7 @@ export default function DocsPage() {
                 <span className="text-xs text-muted-foreground">
                   {doc.pages ? `~${doc.pages} pages` : "Document"}
                 </span>
-                <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); openPreview(doc) }}>
                   <Eye className="h-4 w-4 mr-1" /> View
                 </Button>
               </div>
@@ -158,6 +179,39 @@ export default function DocsPage() {
           <p className="text-sm">Try adjusting your search or filter</p>
         </div>
       )}
+
+      {/* Document Preview Dialog */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <div className="flex items-center gap-2 pr-8">
+              <DialogTitle className="text-lg">{previewDoc?.title || "Document"}</DialogTitle>
+              {previewDoc && (
+                <Badge variant="outline" className={cn("capitalize", categoryColors[previewDoc.category])}>
+                  {previewDoc.category}
+                </Badge>
+              )}
+            </div>
+            {previewDoc?.description && (
+              <DialogDescription>{previewDoc.description}</DialogDescription>
+            )}
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto p-4 rounded-lg bg-muted/20 border">
+            {previewLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : previewDoc?.content ? (
+              <pre className="text-sm whitespace-pre-wrap font-mono leading-relaxed">{previewDoc.content}</pre>
+            ) : (
+              <div className="text-center py-16 text-muted-foreground">
+                <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p>No content available for this document.</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client"
+import bcrypt from "bcryptjs"
 import { planTasks, clients, revenueEntries, contentArticles, documents, financialSnapshots } from "../src/lib/seed-data"
 
 const prisma = new PrismaClient()
@@ -11,10 +12,24 @@ async function main() {
   await prisma.revenueEntry.deleteMany()
   await prisma.outreachCampaign.deleteMany()
   await prisma.contentArticle.deleteMany()
+  await prisma.onboardingResponse.deleteMany()
+  await prisma.user.deleteMany()
   await prisma.document.deleteMany()
   await prisma.financialSnapshot.deleteMany()
   await prisma.planTask.deleteMany()
   await prisma.client.deleteMany()
+
+  // Seed admin user (password: admin123)
+  const hashedPassword = await bcrypt.hash("admin123", 12)
+  await prisma.user.create({
+    data: {
+      name: "Admin",
+      email: "admin@aibusinessos.com",
+      password: hashedPassword,
+      role: "admin",
+    },
+  })
+  console.log("Seeded admin user: admin@aibusinessos.com / admin123")
 
   // Seed plan tasks
   for (const task of planTasks) {

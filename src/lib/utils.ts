@@ -56,6 +56,15 @@ export function getStatusColor(status: string): string {
   return colors[status] || "bg-gray-500/10 text-gray-600 border-gray-200"
 }
 
+export function getInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2)
+}
+
 export function daysBetween(date1: Date, date2: Date): number {
   const diff = Math.abs(date2.getTime() - date1.getTime())
   return Math.ceil(diff / (1000 * 60 * 60 * 24))

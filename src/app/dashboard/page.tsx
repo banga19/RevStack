@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -52,8 +54,23 @@ type DashboardData = {
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
+  const { data: session } = useSession()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // Check if onboarding is completed
+  useEffect(() => {
+    if (!session?.user) return
+    fetch("/api/onboarding")
+      .then((r) => r.json())
+      .then((res) => {
+        if (!res.completed && !res.id) {
+          router.push("/onboarding")
+        }
+      })
+      .catch(() => {})
+  }, [session, router])
 
   useEffect(() => {
     fetch("/api/dashboard")
@@ -112,7 +129,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground mt-1">
-            Your AI business operating system — {stats.activeClients} active client{stats.activeClients !== 1 ? "s" : ""}
+            Your revenue automation system — {stats.activeClients} active client{stats.activeClients !== 1 ? "s" : ""}
           </p>
         </div>
         <div className="flex items-center gap-2">

@@ -4,18 +4,30 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog"
 import { cn, formatCurrency } from "@/lib/utils"
 import {
   DollarSign,
   TrendingUp,
-  TrendingDown,
   PiggyBank,
   BarChart3,
-  PieChart,
   Target,
-  CalendarCheck,
-  ArrowUpRight,
+  Plus,
+  Trash2,
+  Loader2,
+  Receipt,
 } from "lucide-react"
 import {
   BarChart,
@@ -25,7 +37,6 @@ import {
   CartesianGrid,
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
-  LineChart,
   Line,
   AreaChart,
   Area,
@@ -54,18 +65,32 @@ type FinancialSnapshot = {
 
 type Client = {
   id: string
+  name: string
   tier: string | null
   monthlyRetainer: number | null
   status: string
 }
 
-const MONTHLY_COSTS = 560 // Total tool costs
+const MONTHLY_COSTS = 560
+
+const defaultRevenueForm = {
+  clientName: "",
+  amount: "",
+  type: "retainer",
+  category: "growth",
+  date: new Date().toISOString().split("T")[0],
+  note: "",
+}
 
 export default function FinancialPage() {
   const [data, setData] = useState<{ revenue: RevenueEntry[]; snapshots: FinancialSnapshot[]; clients: Client[] } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [form, setForm] = useState(defaultRevenueForm)
+  const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  useEffect(() => {
+  const loadData = () => {
     fetch("/api/revenue")
       .then((r) => r.json())
       .then((d) => {
@@ -73,7 +98,47 @@ export default function FinancialPage() {
         setLoading(false)
       })
       .catch(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(() => { loadData() }, [])
+
+  const openAddForm = () => {
+    setForm(defaultRevenueForm)
+    setDialogOpen(true)
+  }
+
+  const saveEntry = async () => {
+    setSaving(true)
+    try {
+      const res = await fetch("/api/revenue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      })
+      if (res.ok) {
+        setDialogOpen(false)
+        loadData()
+      }
+    } catch (e) {
+      console.error("Save failed", e)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const deleteEntry = async (id: string) => {
+    setDeletingId(id)
+    try {
+      const res = await fetch(`/api/revenue/${id}`, { method: "DELETE" })
+      if (res.ok) {
+        loadData()
+      }
+    } catch (e) {
+      console.error("Delete failed", e)
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   if (loading) {
     return (
@@ -101,7 +166,6 @@ export default function FinancialPage() {
 
   const { revenue: revenueEntries, snapshots, clients } = data
 
-  // Calculate metrics
   const totalRevenue = revenueEntries.reduce((sum, e) => sum + e.amount, 0)
   const totalCosts = snapshots.length * MONTHLY_COSTS
   const totalProfit = totalRevenue - totalCosts
@@ -109,9 +173,7 @@ export default function FinancialPage() {
   const monthlyMRR = clients
     .filter((c) => c.status === "active")
     .reduce((sum, c) => sum + (c.monthlyRetainer || 0), 0)
-  const churnRate = 0.05 // assumed 5% monthly
 
-  // Projections
   const projectionMonths = ["M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12"]
   const projections = projectionMonths.map((m, i) => {
     const snap = snapshots[i]
@@ -126,14 +188,13 @@ export default function FinancialPage() {
     }
   })
 
-  // Revenue by type
   const revenueByType: Record<string, number> = {}
   for (const r of revenueEntries) {
     revenueByType[r.type] = (revenueByType[r.type] || 0) + r.amount
   }
 
   const revenueByTypeData = Object.entries(revenueByType).map(([type, value]) => ({
-    type: type.replace("-", " "),
+    type: type.replace("retainer", "Retainer").replace("setup-fee", "Setup Fee").replace("performance", "Performance").replace("referral", "Referral"),
     value,
   }))
 
@@ -147,10 +208,15 @@ export default function FinancialPage() {
           <h1 className="text-3xl font-bold tracking-tight">Financial Model</h1>
           <p className="text-muted-foreground mt-1">Track revenue, costs, and projections to $22,500/mo</p>
         </div>
-        <Badge variant="success" className="text-sm px-3 py-1">
-          <Target className="h-3.5 w-3.5 mr-1" />
-          {((totalRevenue / 22500) * 100).toFixed(0)}% of target
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="success" className="text-sm px-3 py-1">
+            <Target className="h-3.5 w-3.5 mr-1" />
+            {((monthlyMRR / 22500) * 100).toFixed(0)}% of target
+          </Badge>
+          <Button size="sm" onClick={openAddForm}>
+            <Plus className="h-4 w-4 mr-1" /> Add Revenue
+          </Button>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -164,7 +230,7 @@ export default function FinancialPage() {
             <div className="text-3xl font-bold">{formatCurrency(monthlyMRR)}</div>
             <div className="flex items-center mt-2 text-sm">
               <TrendingUp className="h-4 w-4 text-emerald-500 mr-1" />
-              <span className="text-emerald-500 font-medium">{activeClients} active</span>
+              <span className="text-emerald-500 font-medium">{activeClients} active clients</span>
             </div>
           </CardContent>
         </Card>
@@ -197,7 +263,7 @@ export default function FinancialPage() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium text-muted-foreground">Target Distance</span>
+              <span className="text-sm font-medium text-muted-foreground">Target Gap</span>
               <div className="p-2 rounded-lg bg-amber-500/10"><Target className="h-4 w-4 text-amber-500" /></div>
             </div>
             <div className="text-3xl font-bold">{formatCurrency(22500 - monthlyMRR)}</div>
@@ -209,7 +275,6 @@ export default function FinancialPage() {
 
       {/* Charts */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Revenue Growth */}
         <Card>
           <CardHeader>
             <CardTitle>Revenue Growth</CardTitle>
@@ -238,7 +303,6 @@ export default function FinancialPage() {
           </CardContent>
         </Card>
 
-        {/* Profit & Clients */}
         <Card>
           <CardHeader>
             <CardTitle>Profit & Client Growth</CardTitle>
@@ -265,44 +329,134 @@ export default function FinancialPage() {
         </Card>
       </div>
 
-      {/* Monthly Projection Table */}
+      {/* Revenue Entries Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>12-Month Projection</CardTitle>
-          <CardDescription>Conservative growth estimate to $22,500/mo</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 px-2 font-medium text-muted-foreground">Month</th>
-                  <th className="text-right py-3 px-2 font-medium text-muted-foreground">Revenue</th>
-                  <th className="text-right py-3 px-2 font-medium text-muted-foreground">Costs</th>
-                  <th className="text-right py-3 px-2 font-medium text-muted-foreground">Profit</th>
-                  <th className="text-right py-3 px-2 font-medium text-muted-foreground">Clients</th>
-                  <th className="text-right py-3 px-2 font-medium text-muted-foreground">Margin</th>
-                </tr>
-              </thead>
-              <tbody>
-                {projections.map((p, i) => {
-                  const margin = p.revenue > 0 ? ((p.profit / p.revenue) * 100).toFixed(0) : "0"
-                  return (
-                    <tr key={i} className={cn("border-b last:border-0 hover:bg-muted/30 transition-colors", i === projections.length - 1 && "font-semibold bg-primary/5")}>
-                      <td className="py-3 px-2">{p.month}</td>
-                      <td className="text-right py-3 px-2">{formatCurrency(p.revenue)}</td>
-                      <td className="text-right py-3 px-2 text-muted-foreground">{formatCurrency(p.costs)}</td>
-                      <td className={cn("text-right py-3 px-2", p.profit > 0 ? "text-emerald-500" : "text-red-500")}>{formatCurrency(p.profit)}</td>
-                      <td className="text-right py-3 px-2">{p.clients}</td>
-                      <td className="text-right py-3 px-2">{margin}%</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Revenue Entries</CardTitle>
+            <CardDescription>{revenueEntries.length} transactions recorded</CardDescription>
           </div>
+          <Button size="sm" variant="outline" onClick={openAddForm}>
+            <Plus className="h-4 w-4 mr-1" /> Add Entry
+          </Button>
+        </CardHeader>
+        <CardContent className="p-0">
+          {revenueEntries.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <Receipt className="h-12 w-12 mb-3 opacity-50" />
+              <p>No revenue entries yet.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/20">
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Date</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Client</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Type</th>
+                    <th className="text-right py-3 px-4 font-medium text-muted-foreground">Amount</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Note</th>
+                    <th className="py-3 px-4 w-10"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {revenueEntries.map((entry) => (
+                    <tr key={entry.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors group">
+                      <td className="py-3 px-4 whitespace-nowrap">{new Date(entry.date).toLocaleDateString()}</td>
+                      <td className="py-3 px-4 font-medium">{entry.clientName || "—"}</td>
+                      <td className="py-3 px-4">
+                        <Badge variant="outline" className="text-[10px] capitalize">
+                          {entry.type.replace("setup-fee", "Setup Fee").replace("retainer", "Retainer")}
+                        </Badge>
+                      </td>
+                      <td className="text-right py-3 px-4 font-semibold">{formatCurrency(entry.amount)}</td>
+                      <td className="py-3 px-4 text-muted-foreground text-xs hidden md:table-cell max-w-[200px] truncate">{entry.note || "—"}</td>
+                      <td className="py-3 px-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                          onClick={() => deleteEntry(entry.id)}
+                          disabled={deletingId === entry.id}
+                        >
+                          {deletingId === entry.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Revenue by Type */}
+      {revenueByTypeData.length > 0 && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Revenue Breakdown</CardTitle>
+              <CardDescription>By revenue type</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={revenueByTypeData} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(v) => `$${v}`} />
+                    <YAxis type="category" dataKey="type" stroke="hsl(var(--muted-foreground))" fontSize={12} width={100} />
+                    <RechartsTooltip
+                      contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
+                      formatter={(value: number) => [formatCurrency(value), undefined]}
+                    />
+                    <Bar dataKey="value" fill="hsl(var(--chart-1))" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Monthly Projection Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>12-Month Projection</CardTitle>
+              <CardDescription>Conservative growth estimate to $22,500/mo</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-3 px-2 font-medium text-muted-foreground">Month</th>
+                      <th className="text-right py-3 px-2 font-medium text-muted-foreground">Revenue</th>
+                      <th className="text-right py-3 px-2 font-medium text-muted-foreground">Costs</th>
+                      <th className="text-right py-3 px-2 font-medium text-muted-foreground">Profit</th>
+                      <th className="text-right py-3 px-2 font-medium text-muted-foreground">Clients</th>
+                      <th className="text-right py-3 px-2 font-medium text-muted-foreground">Margin</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {projections.map((p, i) => {
+                      const margin = p.revenue > 0 ? ((p.profit / p.revenue) * 100).toFixed(0) : "0"
+                      return (
+                        <tr key={i} className={cn("border-b last:border-0 hover:bg-muted/30 transition-colors", i === projections.length - 1 && "font-semibold bg-primary/5")}>
+                          <td className="py-3 px-2">{p.month}</td>
+                          <td className="text-right py-3 px-2">{formatCurrency(p.revenue)}</td>
+                          <td className="text-right py-3 px-2 text-muted-foreground">{formatCurrency(p.costs)}</td>
+                          <td className={cn("text-right py-3 px-2", p.profit > 0 ? "text-emerald-500" : "text-red-500")}>{formatCurrency(p.profit)}</td>
+                          <td className="text-right py-3 px-2">{p.clients}</td>
+                          <td className="text-right py-3 px-2">{margin}%</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Monthly Costs Breakdown */}
       <Card>
@@ -345,6 +499,67 @@ export default function FinancialPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Add Revenue Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Revenue Entry</DialogTitle>
+            <DialogDescription>Record a new revenue transaction.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="rev-date">Date</Label>
+                <Input id="rev-date" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="rev-amount">Amount ($)</Label>
+                <Input id="rev-amount" type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="2500" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="rev-client">Client Name</Label>
+              <Input id="rev-client" value={form.clientName} onChange={(e) => setForm({ ...form, clientName: e.target.value })} placeholder="e.g. Ultimo Trading or Sokogate" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="rev-type">Type</Label>
+                <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
+                  <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="retainer">Retainer</SelectItem>
+                    <SelectItem value="setup-fee">Setup Fee</SelectItem>
+                    <SelectItem value="performance">Performance</SelectItem>
+                    <SelectItem value="referral">Referral</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="rev-category">Category</Label>
+                <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+                  <SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="enterprise">Enterprise</SelectItem>
+                    <SelectItem value="growth">Growth</SelectItem>
+                    <SelectItem value="starter">Starter</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="rev-note">Note</Label>
+              <Input id="rev-note" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="e.g. Month 1 retainer" />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button onClick={saveEntry} disabled={saving || !form.amount || !form.clientName}>
+              {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : "Add Entry"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
