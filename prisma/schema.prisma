@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Client {
+  id        String   @id @default(cuid())
+  name      String
+  company   String
+  email     String
+  phone     String?
+  status    String   @default("lead") // lead, qualified, proposal, active, onboarding, done
+  tier      String?  // enterprise, growth, starter
+  monthlyRetainer Float?
+  setupFee  Float?
+  source    String?  // referral, cold-outreach, seo, website
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pipelineActions   PipelineAction[]
+  outreachCampaigns OutreachCampaign[]
+}
+
+model PipelineAction {
+  id          String   @id @default(cuid())
+  clientId    String
+  type        String   // email-sent, call-held, proposal-sent, demo-done, follow-up
+  note        String?
+  status      String   @default("pending") // pending, completed, cancelled
+  dueDate     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+model PlanTask {
+  id          String   @id @default(cuid())
+  day         Int
+  title       String
+  description String?
+  phase       String   // foundation, anchor, growth, scale
+  category    String   // outreach, build, content, admin
+  status      String   @default("pending") // pending, in-progress, completed, skipped
+  priority    String   @default("medium") // low, medium, high, critical
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+}
+
+model RevenueEntry {
+  id        String   @id @default(cuid())
+  date      DateTime
+  clientId  String?
+  clientName String?
+  amount    Float
+  type      String   // retainer, setup-fee, performance, referral
+  category  String?  // enterprise, growth, starter
+  note      String?
+  createdAt DateTime @default(now())
+}
+
+model OutreachCampaign {
+  id         String   @id @default(cuid())
+  clientId   String?
+  clientName String?
+  channel    String   // whatsapp, email, linkedin
+  type       String   // cold, warm, follow-up, re-engagement
+  status     String   @default("draft") // draft, active, paused, completed
+  templateId String?
+  sentCount  Int      @default(0)
+  replyCount Int      @default(0)
+  bookedCount Int     @default(0)
+  startedAt  DateTime?
+  completedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  client Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+}
+
+model ContentArticle {
+  id           String   @id @default(cuid())
+  title        String
+  keyword      String?
+  description  String?
+  status       String   @default("idea") // idea, drafting, scheduled, published
+  publishDate  DateTime?
+  wordCount    Int?
+  url          String?
+  views        Int      @default(0)
+  leadsGenerated Int   @default(0)
+  week         Int?
+  month        Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  filename    String
+  title       String
+  description String?
+  category    String   // plan, pitch, technical, financial, marketing
+  pages       Int?
+  content     String?
+  createdAt   DateTime @default(now())
+}
+
+model FinancialSnapshot {
+  id        String   @id @default(cuid())
+  month     Int
+  year      Int      @default(2026)
+  revenue   Float    @default(0)
+  costs     Float    @default(0)
+  profit    Float    @default(0)
+  clients   Int      @default(0)
+  pipelineValue Float @default(0)
+  createdAt DateTime @default(now())
+}
