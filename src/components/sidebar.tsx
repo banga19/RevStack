@@ -15,6 +15,7 @@ import {
   Send,
   FileText,
   Newspaper,
+  Globe,
   ChevronLeft,
   ChevronRight,
   Menu,
@@ -32,6 +33,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/plan", label: "75-Day Plan", icon: CalendarCheck },
   { href: "/pipeline", label: "Pipeline CRM", icon: Users },
+  { href: "/trade", label: "Trade & Export", icon: Globe },
   { href: "/financial", label: "Financial Model", icon: DollarSign },
   { href: "/outreach", label: "Outreach", icon: Send },
   { href: "/content", label: "Content Calendar", icon: Newspaper },
@@ -39,7 +41,7 @@ const navItems = [
 ]
 
 // Auth pages where sidebar should be hidden
-const authPages = ["/login", "/signup", "/onboarding"]
+const authPages = ["/login", "/signup", "/onboarding", "/needs-assessment"]
 
 export function Sidebar() {
   const pathname = usePathname()

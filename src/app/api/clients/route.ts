@@ -25,6 +25,9 @@ export async function POST(req: NextRequest) {
         setupFee: body.setupFee ? parseFloat(body.setupFee) : null,
         source: body.source || null,
         notes: body.notes || null,
+        ersScore: body.ersScore ? parseInt(body.ersScore) : null,
+        ersBreakdown: body.ersBreakdown || null,
+        corridor: body.corridor || null,
       },
     })
     return NextResponse.json(client, { status: 201 })

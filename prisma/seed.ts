@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client"
 import bcrypt from "bcryptjs"
-import { planTasks, clients, revenueEntries, contentArticles, documents, financialSnapshots } from "../src/lib/seed-data"
+import { planTasks, clients, revenueEntries, contentArticles, documents, financialSnapshots, clientProducts, complianceRecords, tradeFinanceApps } from "../src/lib/seed-data"
 
 const prisma = new PrismaClient()
 
@@ -8,6 +8,9 @@ async function main() {
   console.log("Seeding database...")
 
   // Clear existing data
+  await prisma.tradeFinanceApplication.deleteMany()
+  await prisma.clientCompliance.deleteMany()
+  await prisma.clientProduct.deleteMany()
   await prisma.pipelineAction.deleteMany()
   await prisma.revenueEntry.deleteMany()
   await prisma.outreachCampaign.deleteMany()
@@ -42,6 +45,72 @@ async function main() {
     await prisma.client.create({ data: client })
   }
   console.log(`Seeded ${clients.length} clients`)
+
+  // Seed client products
+  const clientMap = new Map<string, string>()
+  const seededClients = await prisma.client.findMany()
+  for (const c of seededClients) {
+    clientMap.set(c.name, c.id)
+  }
+
+  for (const prod of clientProducts) {
+    const clientId = clientMap.get(prod.clientName)
+    if (clientId) {
+      const { clientName, ...productData } = prod
+      await prisma.clientProduct.create({
+        data: { ...productData, clientId },
+      })
+    }
+  }
+  console.log(`Seeded ${clientProducts.length} client products`)
+
+  // Seed compliance records
+  const productMap = new Map<string, string>()
+  const seededProducts = await prisma.clientProduct.findMany()
+  for (const p of seededProducts) {
+    productMap.set(`${p.clientId}-${p.name}`, p.id)
+  }
+
+  for (const rec of complianceRecords) {
+    const clientId = clientMap.get(rec.clientName)
+    if (clientId) {
+      let productId: string | undefined
+      if (rec.productName) {
+        productId = productMap.get(`${clientId}-${rec.productName}`)
+      }
+      const { clientName, productName, ...complianceData } = rec
+      await prisma.clientCompliance.create({
+        data: {
+          ...complianceData,
+          clientId,
+          productId: productId || null,
+          appliedAt: complianceData.appliedAt ? new Date(complianceData.appliedAt) : null,
+          obtainedAt: complianceData.obtainedAt ? new Date(complianceData.obtainedAt) : null,
+          expiresAt: complianceData.expiresAt ? new Date(complianceData.expiresAt) : null,
+        },
+      })
+    }
+  }
+  console.log(`Seeded ${complianceRecords.length} compliance records`)
+
+  // Seed trade finance applications
+  for (const app of tradeFinanceApps) {
+    const clientId = clientMap.get(app.clientName)
+    if (clientId) {
+      const { clientName, ...appData } = app
+      await prisma.tradeFinanceApplication.create({
+        data: {
+          ...appData,
+          clientId,
+          amount: appData.amount || null,
+          appliedAt: appData.appliedAt ? new Date(appData.appliedAt) : null,
+          approvedAt: appData.approvedAt ? new Date(appData.approvedAt) : null,
+          disbursedAt: appData.disbursedAt ? new Date(appData.disbursedAt) : null,
+        },
+      })
+    }
+  }
+  console.log(`Seeded ${tradeFinanceApps.length} trade finance applications`)
 
   // Seed revenue entries
   for (const entry of revenueEntries) {

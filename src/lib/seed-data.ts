@@ -59,6 +59,9 @@ export const clients = [
     monthlyRetainer: 0,
     setupFee: 0,
     source: "targeted-outreach",
+    corridor: "china-africa",
+    ersScore: 95,
+    ersBreakdown: JSON.stringify({ documentation: 25, compliance: 25, exportHistory: 25, capacityVerified: 20 }),
     notes: "Bulk product sourcing marketplace connecting Kenyan wholesalers to global suppliers. Platform partner for sourcing products via sokogate.com."
   },
   {
@@ -71,7 +74,10 @@ export const clients = [
     monthlyRetainer: 2500,
     setupFee: 3000,
     source: "targeted-outreach",
-    notes: "Anchor client. Running full lead qualification, capture, and follow-up automation via email & WhatsApp. Voiceflow chatbot + Make.com workflows + Wati.io sequences."
+    corridor: "korea-africa",
+    ersScore: 82,
+    ersBreakdown: JSON.stringify({ documentation: 20, compliance: 18, exportHistory: 22, capacityVerified: 22 }),
+    notes: "Anchor client. Running full lead qualification, capture, and follow-up automation via email & WhatsApp. Targeting Korea market via Sokogate 2026 AfCFTA program."
   },
   {
     name: "Prospect 1",
@@ -81,6 +87,9 @@ export const clients = [
     tier: "growth",
     monthlyRetainer: 1150,
     source: "cold-outreach",
+    corridor: "africa-africa",
+    ersScore: 45,
+    ersBreakdown: JSON.stringify({ documentation: 10, compliance: 5, exportHistory: 15, capacityVerified: 15 }),
     notes: "Import/export company using Sokogate for sourcing. Initial contact made, awaiting discovery call."
   },
   {
@@ -91,7 +100,10 @@ export const clients = [
     tier: "growth",
     monthlyRetainer: 1150,
     source: "cold-outreach",
-    notes: "Logistics company interested in WhatsApp automation for shipment notifications & lead follow-up."
+    corridor: "korea-africa",
+    ersScore: 58,
+    ersBreakdown: JSON.stringify({ documentation: 15, compliance: 8, exportHistory: 15, capacityVerified: 20 }),
+    notes: "Logistics company interested in WhatsApp automation for shipment notifications & lead follow-up. Potential Korea corridor partner."
   },
   {
     name: "Prospect 3",
@@ -101,7 +113,10 @@ export const clients = [
     tier: "starter",
     monthlyRetainer: 385,
     source: "seo",
-    notes: "Found through website. Small import/export consultancy using Sokogate sourcing."
+    corridor: "korea-africa",
+    ersScore: 32,
+    ersBreakdown: JSON.stringify({ documentation: 8, compliance: 2, exportHistory: 12, capacityVerified: 10 }),
+    notes: "Found through website. Small import/export consultancy using Sokogate sourcing. Low ERS — needs compliance support for Korea."
   },
   {
     name: "TechRetail Kenya",
@@ -112,8 +127,37 @@ export const clients = [
     monthlyRetainer: 1150,
     setupFee: 1500,
     source: "referral",
+    corridor: "africa-africa",
+    ersScore: 40,
+    ersBreakdown: JSON.stringify({ documentation: 10, compliance: 5, exportHistory: 10, capacityVerified: 15 }),
     notes: "Referral from Ultimo via Sokogate network. Electronics distributor needing lead qualification automation."
   },
+]
+
+export const clientProducts = [
+  { clientName: "Ultimo Trading Ltd", name: "Kenyan Arabica Coffee", category: "agriculture", description: "Single-origin specialty coffee beans, Grade AA", certifications: "HACCP, Organic", exportVolume: "2000", unit: "kg/month", pricing: "$8.50/kg FOB Mombasa" },
+  { clientName: "Ultimo Trading Ltd", name: "Kenyan Black Tea", category: "agriculture", description: "Premium CTC black tea, orthodox grade", certifications: "HACCP, Halal", exportVolume: "5000", unit: "kg/month", pricing: "$3.20/kg FOB Mombasa" },
+  { clientName: "Sokogate", name: "Bulk Sourcing Platform", category: "technology", description: "B2B marketplace connecting African wholesalers to global suppliers", certifications: "", exportVolume: "", unit: "", pricing: "Subscription / Commission" },
+  { clientName: "East African Wholesalers", name: "Macadamia Nuts", category: "agriculture", description: "Raw and roasted macadamia nuts, Grade 1", certifications: "HACCP", exportVolume: "1000", unit: "kg/month", pricing: "$12.00/kg FOB" },
+  { clientName: "East African Wholesalers", name: "Shea Butter", category: "agriculture", description: "Unrefined shea butter, food grade", certifications: "", exportVolume: "3000", unit: "kg/month", pricing: "$4.50/kg FOB" },
+]
+
+export const complianceRecords = [
+  { clientName: "Ultimo Trading Ltd", productName: "Kenyan Arabica Coffee", certificationType: "haccp", status: "obtained", issuer: "KEBS", appliedAt: "2025-11-01", obtainedAt: "2026-01-15", expiresAt: "2027-01-15" },
+  { clientName: "Ultimo Trading Ltd", productName: "Kenyan Arabica Coffee", certificationType: "organic", status: "obtained", issuer: "Ecocert", notes: "Organic certification for coffee export", appliedAt: "2025-10-01", obtainedAt: "2026-02-01", expiresAt: "2027-02-01" },
+  { clientName: "Ultimo Trading Ltd", productName: "Kenyan Black Tea", certificationType: "haccp", status: "obtained", issuer: "KEBS", appliedAt: "2025-11-01", obtainedAt: "2026-01-15", expiresAt: "2027-01-15" },
+  { clientName: "Ultimo Trading Ltd", productName: "Kenyan Black Tea", certificationType: "halal", status: "obtained", issuer: "Halal Authority Kenya", appliedAt: "2025-12-01", obtainedAt: "2026-02-15", expiresAt: "2027-02-15" },
+  { clientName: "Ultimo Trading Ltd", certificationType: "korean-import", status: "in-progress", issuer: "Korea FDA", notes: "Korean phytosanitary compliance for coffee & tea — documentation submitted", appliedAt: "2026-03-01" },
+  { clientName: "Sokogate", certificationType: "haccp", status: "obtained", issuer: "KEBS", notes: "Platform-level HACCP compliance for listed food products", obtainedAt: "2025-06-01", expiresAt: "2027-06-01" },
+  { clientName: "East African Wholesalers", productName: "Macadamia Nuts", certificationType: "haccp", status: "in-progress", issuer: "KEBS", notes: "Application submitted, awaiting inspection", appliedAt: "2026-02-15" },
+  { clientName: "East African Wholesalers", productName: "Shea Butter", certificationType: "halal", status: "not-started", notes: "Needed for Middle East / Korea market entry" },
+]
+
+export const tradeFinanceApps = [
+  { clientName: "Ultimo Trading Ltd", program: "afdb-afawa", amount: 50000, currency: "USD", status: "under-review", notes: "Working capital for Korea-bound coffee & tea shipment", appliedAt: "2026-03-15" },
+  { clientName: "Ultimo Trading Ltd", program: "sokogate-pay-escrow", amount: 15000, currency: "USD", status: "approved", notes: "Escrow facility for Korea trade corridor test transaction", appliedAt: "2026-02-01", approvedAt: "2026-03-01" },
+  { clientName: "Sokogate", program: "sokogate-pay-escrow", amount: 100000, currency: "USD", status: "approved", notes: "Platform-level escrow facility for B2B transactions", appliedAt: "2025-06-01", approvedAt: "2025-07-01", disbursedAt: "2025-08-01" },
+  { clientName: "East African Wholesalers", program: "letter-of-credit", amount: 25000, currency: "USD", status: "draft", notes: "LC for macadamia nuts export to Korea" },
 ]
 
 export const revenueEntries = [

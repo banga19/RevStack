@@ -98,11 +98,74 @@ model Client {
   setupFee  Float?
   source    String?  // referral, cold-outreach, seo, website
   notes     String?
+  // Export Readiness Score (0-100) — aligns with Sokogate ERS framework
+  ersScore      Int?
+  ersBreakdown  String?  // JSON: { documentation, compliance, exportHistory, capacityVerified }
+  // Trade corridor — which international trade route this client targets
+  corridor      String?  // china-africa, korea-africa, africa-africa
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   pipelineActions   PipelineAction[]
   outreachCampaigns OutreachCampaign[]
+  products          ClientProduct[]
+  complianceRecords ClientCompliance[]
+  tradeFinanceApps  TradeFinanceApplication[]
+}
+
+// Products/services a client offers for export/trade — enables B2B matching
+model ClientProduct {
+  id          String   @id @default(cuid())
+  clientId    String
+  name        String
+  category    String?  // agriculture, manufactured-goods, technology, services
+  description String?
+  certifications String? // comma-separated: HACCP, Halal, Organic, etc.
+  exportVolume String?  // e.g. "5000 kg/month"
+  unit        String?   // kg, tons, units, etc.
+  pricing     String?   // e.g. "$2.50/kg FOB Mombasa"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  complianceRecords ClientCompliance[]
+}
+
+// Compliance and certification tracking for Korean/AfCFTA market access
+model ClientCompliance {
+  id              String   @id @default(cuid())
+  clientId        String
+  productId       String?  // optional — can be company-level or product-level
+  certificationType String  // haccp, halal, phytosanitary, organic, fda, korean-import, etc.
+  status          String   @default("not-started") // not-started, in-progress, obtained, expired
+  issuer          String?  // e.g. "KEBS", "Korea FDA", "Halal Authority"
+  notes           String?
+  appliedAt       DateTime?
+  obtainedAt      DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  client  Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  product ClientProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+}
+
+// Trade finance applications — AfDB/AFAWA, Sokogate Pay, Letters of Credit
+model TradeFinanceApplication {
+  id          String   @id @default(cuid())
+  clientId    String
+  program     String   // afdb-afawa, sokogate-pay-escrow, letter-of-credit, export-credit, other
+  amount      Float?
+  currency    String   @default("USD")
+  status      String   @default("draft") // draft, submitted, under-review, approved, disbursed, rejected
+  appliedAt   DateTime?
+  approvedAt  DateTime?
+  disbursedAt DateTime?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }
 
 model PipelineAction {

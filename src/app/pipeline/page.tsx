@@ -40,8 +40,32 @@ type Client = {
   setupFee: number | null
   source: string | null
   notes: string | null
+  corridor: string | null
+  ersScore: number | null
+  ersBreakdown: string | null
   createdAt: string
   updatedAt: string
+  products?: ClientProduct[]
+  complianceRecords?: ComplianceRecord[]
+}
+
+type ClientProduct = {
+  id: string
+  name: string
+  category: string | null
+  description: string | null
+  certifications: string | null
+  exportVolume: string | null
+  unit: string | null
+  pricing: string | null
+}
+
+type ComplianceRecord = {
+  id: string
+  certificationType: string
+  status: string
+  issuer: string | null
+  expiresAt: string | null
 }
 
 type PipelineAction = {
@@ -360,9 +384,34 @@ export default function PipelinePage() {
     }
   }
 
+  const [corridorFilter, setCorridorFilter] = useState<string>("all")
+
+  const filteredClients = corridorFilter === "all"
+    ? clients
+    : clients.filter((c) => c.corridor === corridorFilter)
+
   const stages = ["lead", "qualified", "proposal", "active", "onboarding", "done"]
   const statusLabels: Record<string, string> = { lead: "Lead", qualified: "Qualified", proposal: "Proposal", active: "Active", onboarding: "Onboarding", done: "Completed" }
   const statusIcons: Record<string, string> = { lead: "bg-blue-500", qualified: "bg-indigo-500", proposal: "bg-purple-500", active: "bg-emerald-500", onboarding: "bg-cyan-500", done: "bg-gray-500" }
+
+  const getErsColor = (score: number | null) => {
+    if (score === null) return "bg-muted text-muted-foreground"
+    if (score >= 80) return "bg-emerald-500/15 text-emerald-600 border-emerald-200"
+    if (score >= 50) return "bg-amber-500/15 text-amber-600 border-amber-200"
+    return "bg-red-500/15 text-red-600 border-red-200"
+  }
+
+  const corridorLabels: Record<string, string> = {
+    "china-africa": "China→Africa",
+    "korea-africa": "Korea→Africa",
+    "africa-africa": "Africa↔Africa",
+  }
+
+  const corridorColors: Record<string, string> = {
+    "china-africa": "bg-red-500/10 text-red-600 border-red-200",
+    "korea-africa": "bg-blue-500/10 text-blue-600 border-blue-200",
+    "africa-africa": "bg-emerald-500/10 text-emerald-600 border-emerald-200",
+  }
 
   const onDragEnd = useCallback(async (result: DropResult) => {
     const { draggableId, destination, source } = result
@@ -424,9 +473,26 @@ export default function PipelinePage() {
       </div>
 
       {/* Stats */}
+      {/* Corridor Filter */}
+      <div className="flex gap-2 flex-wrap">
+        <Button variant={corridorFilter === "all" ? "default" : "outline"} size="sm" onClick={() => setCorridorFilter("all")}>All Corridors</Button>
+        {["china-africa", "korea-africa", "africa-africa"].map((cor) => (
+          <Button
+            key={cor}
+            variant={corridorFilter === cor ? "default" : "outline"}
+            size="sm"
+            onClick={() => setCorridorFilter(cor)}
+            className="capitalize"
+          >
+            {corridorLabels[cor] || cor}
+          </Button>
+        ))}
+      </div>
+
       <div className="grid gap-3 grid-cols-2 md:grid-cols-6">
         {stages.map((stage) => {
-          const count = clients.filter((c) => c.status === stage).length
+          const stageClients = corridorFilter === "all" ? clients : clients.filter((c) => c.corridor === corridorFilter)
+          const count = stageClients.filter((c) => c.status === stage).length
           const rev = clients.filter((c) => c.status === stage).reduce((s, c) => s + (c.monthlyRetainer || 0), 0)
           return <Card key={stage} className="relative overflow-hidden">
             <div className={cn("absolute top-0 left-0 w-full h-1", statusIcons[stage])} />
@@ -455,7 +521,7 @@ export default function PipelinePage() {
         <DragDropContext onDragEnd={onDragEnd}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             {stages.map((stage) => {
-              const stageClients = clients.filter((c) => c.status === stage)
+              const stageClients = filteredClients.filter((c) => c.status === stage)
               return (
                 <div key={stage} className="flex flex-col">
                   <div className="flex items-center gap-2 mb-3 px-1">
@@ -503,10 +569,24 @@ export default function PipelinePage() {
                                         <p className="text-xs text-muted-foreground truncate">{client.company}</p>
                                       </div>
                                     </div>
-                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0 capitalize">{client.tier || "tbd"}</Badge>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      {client.ersScore !== null && (
+                                        <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded border", getErsColor(client.ersScore))}>
+                                          ERS {client.ersScore}
+                                        </span>
+                                      )}
+                                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize">{client.tier || "tbd"}</Badge>
+                                    </div>
                                   </div>
-                                  {client.monthlyRetainer && <div className="flex items-center gap-1 text-sm font-semibold text-primary"><DollarSign className="h-3 w-3" />{formatCurrency(client.monthlyRetainer)}/mo</div>}
-                                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground"><Mail className="h-3 w-3" /><span className="truncate">{client.email}</span></div>
+                                  <div className="flex items-center gap-2 mb-1.5">
+                                    {client.monthlyRetainer ? <div className="flex items-center gap-1 text-sm font-semibold text-primary"><DollarSign className="h-3 w-3" />{formatCurrency(client.monthlyRetainer)}/mo</div> : null}
+                                    {client.corridor && (
+                                      <span className={cn("text-[10px] px-1.5 py-0.5 rounded border", corridorColors[client.corridor])}>
+                                        {corridorLabels[client.corridor]}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground"><Mail className="h-3 w-3" /><span className="truncate">{client.email}</span></div>
 
                                   <ClientActions client={client} {...sharedActionsProps} />
 
