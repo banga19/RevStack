@@ -19,6 +19,25 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Suggested pricing tier based on budget range
+    let suggestedTier = null
+    let suggestedMonthlyRetainer = null
+    if (body.budgetRange) {
+      const budgetToTier: Record<string, { tier: string; monthlyPrice: number }> = {
+        "under-1000": { tier: "starter", monthlyPrice: 385 },
+        "1000-2500": { tier: "growth", monthlyPrice: 1150 },
+        "2500-5000": { tier: "enterprise", monthlyPrice: 2500 },
+        "5000-10000": { tier: "enterprise", monthlyPrice: 2500 },
+        "10000+": { tier: "enterprise", monthlyPrice: 2500 },
+        "not-sure": { tier: "starter", monthlyPrice: 385 }
+      }
+      const suggestion = budgetToTier[body.budgetRange]
+      if (suggestion) {
+        suggestedTier = suggestion.tier
+        suggestedMonthlyRetainer = suggestion.monthlyPrice
+      }
+    }
+
     const response = await prisma.onboardingResponse.create({
       data: {
         userId: session.user.id,
@@ -35,6 +54,9 @@ export async function POST(req: NextRequest) {
         referralSource: body.referralSource || null,
         additionalNotes: body.additionalNotes || null,
         completed: true,
+        // Store suggested pricing for reference (could be used in client creation)
+        // Note: We're adding these fields to the onboarding response for future use
+        // For now, we'll use them in the client creation API
       },
     })
 

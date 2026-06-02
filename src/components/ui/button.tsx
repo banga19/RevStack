@@ -2,6 +2,7 @@ import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
+import { useButtonSync } from "@/lib/button-sync-manager"
 
 const buttonVariants = cva(
   "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.97]",
@@ -33,15 +34,75 @@ export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean
+  /** Optional element ID for tracking */
+  elementId?: string
+  /** Custom action type for button sync */
+  actionType?: string
+  /** Custom target for button sync */
+  target?: string
+  /** Custom parameters for button sync */
+  parameters?: Record<string, any>
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
+  ({
+    className,
+    variant,
+    size,
+    asChild = false,
+    elementId,
+    actionType,
+    target,
+    parameters,
+    ...props
+  }, ref) => {
+    const { handleButtonClick, updateContext } = useButtonSync()
+
+    // Generate element ID if not provided
+    const finalElementId = elementId || `btn-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+
+    // Update context with button info on mount
+    React.useEffect(() => {
+      updateContext({
+        registeredButtons: [
+          ...(JSON.parse(localStorage.getItem('registeredButtons') || '[]') as string[]),
+          finalElementId
+        ].filter((id, index, self) => self.indexOf(id) === index) // Remove duplicates
+      })
+      localStorage.setItem('registeredButtons', JSON.stringify([
+        ...(JSON.parse(localStorage.getItem('registeredButtons') || '[]') as string[]),
+        finalElementId
+      ]))
+    }, [finalElementId, updateContext])
+
+    const handleClick = async (event: React.MouseEvent<HTMLButtonElement>) => {
+      // Call original onClick handler if provided
+      if (props.onClick) {
+        await Promise.resolve(props.onClick(event))
+      }
+
+      // Handle button sync
+      try {
+        await handleButtonClick(
+          finalElementId,
+          props.type || "button",
+          typeof window !== 'undefined' ? window.location.pathname : "/",
+          actionType || props.type || "button",
+          target || "#",
+          parameters || {},
+          "user"
+        )
+      } catch (error) {
+        console.error("Button sync error:", error)
+      }
+    }
+
     const Comp = asChild ? Slot : "button"
     return (
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
+        onClick={handleClick}
         {...props}
       />
     )

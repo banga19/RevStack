@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Progress } from "@/components/ui/progress"
 import { Brain, Loader2, CheckCircle2, ArrowRight, ArrowLeft, Sparkles, BarChart3, Target, Users, DollarSign, Clock, MessageSquare } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { formatCurrency } from "@/lib/utils"
 
 const steps = [
   { id: "welcome", title: "Welcome", icon: Brain },
@@ -21,6 +22,31 @@ const steps = [
   { id: "budget", title: "Budget", icon: DollarSign },
   { id: "complete", title: "Complete", icon: CheckCircle2 },
 ]
+
+// Helper functions to get suggested tier and price based on budget range
+const getSuggestedTier = (budgetRange: string): string => {
+  const budgetToTier: Record<string, string> = {
+    "under-1000": "Starter",
+    "1000-2500": "Growth",
+    "2500-5000": "Enterprise",
+    "5000-10000": "Enterprise",
+    "10000+": "Enterprise",
+    "not-sure": "Starter"
+  }
+  return budgetToTier[budgetRange] || "Starter"
+}
+
+const getSuggestedPrice = (budgetRange: string): number => {
+  const budgetToPrice: Record<string, number> = {
+    "under-1000": 385,
+    "1000-2500": 1150,
+    "2500-5000": 2500,
+    "5000-10000": 2500,
+    "10000+": 2500,
+    "not-sure": 385
+  }
+  return budgetToPrice[budgetRange] || 385
+}
 
 export default function OnboardingPage() {
   const router = useRouter()
@@ -181,7 +207,7 @@ export default function OnboardingPage() {
                 <div>
                   <h2 className="text-2xl font-bold mb-2">Let&apos;s get to know you</h2>
                   <p className="text-muted-foreground">
-                    We&apos;ll ask a few questions to tailor your RevStack experience.
+                    We&apos;ll ask a few questions to tailor your Mapato experience.
                     This helps us understand your goals and set you up for success.
                   </p>
                 </div>
@@ -445,6 +471,20 @@ export default function OnboardingPage() {
                       </div>
                     </div>
                   ))}
+
+                  {/* Suggested pricing tier */}
+                  {formData.budgetRange && (
+                    <div className="mt-4 p-4 rounded-lg bg-primary/5">
+                      <p className="text-sm font-medium mb-2">Based on your budget, we recommend:</p>
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-white">
+                        <div className="flex-1">
+                          <p className="text-xs text-muted-foreground uppercase tracking-wider">Recommended Plan</p>
+                          <p className="text-lg font-bold">{getSuggestedTier(formData.budgetRange)}</p>
+                          <p className="text-xs text-muted-foreground mt-1">${formatCurrency(getSuggestedPrice(formData.budgetRange))}/mo</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-3 p-4 rounded-lg bg-primary/5 border border-primary/10">
                   <Sparkles className="h-5 w-5 text-primary shrink-0" />

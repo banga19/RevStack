@@ -86,18 +86,18 @@ export default function NeedsAssessmentPage() {
   // Initialize temp ID on mount
   useEffect(() => {
     setMounted(true)
-    const stored = sessionStorage.getItem("revstack-needs-temp-id")
+    const stored = sessionStorage.getItem("mapato-needs-temp-id")
     if (stored) {
       setTempId(stored)
     } else {
       const id = generateTempId()
       setTempId(id)
-      sessionStorage.setItem("revstack-needs-temp-id", id)
+      sessionStorage.setItem("mapato-needs-temp-id", id)
     }
 
     // Restore saved form data from sessionStorage
     try {
-      const saved = sessionStorage.getItem("revstack-needs-data")
+      const saved = sessionStorage.getItem("mapato-needs-data")
       if (saved) {
         const parsed = JSON.parse(saved)
         setFormData((prev) => ({ ...prev, ...parsed }))
@@ -108,7 +108,7 @@ export default function NeedsAssessmentPage() {
   // Persist form data to sessionStorage whenever it changes
   useEffect(() => {
     if (mounted) {
-      sessionStorage.setItem("revstack-needs-data", JSON.stringify(formData))
+      sessionStorage.setItem("mapato-needs-data", JSON.stringify(formData))
     }
   }, [formData, mounted])
 
@@ -144,8 +144,8 @@ export default function NeedsAssessmentPage() {
         body: JSON.stringify({ tempId }),
       })
       // Clear session storage
-      sessionStorage.removeItem("revstack-needs-data")
-      sessionStorage.removeItem("revstack-needs-temp-id")
+      sessionStorage.removeItem("mapato-needs-data")
+      sessionStorage.removeItem("mapato-needs-temp-id")
       // Redirect to dashboard
       router.push("/dashboard")
       router.refresh()

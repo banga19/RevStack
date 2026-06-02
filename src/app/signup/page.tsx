@@ -6,10 +6,16 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
-import { Brain, Loader2, Eye, EyeOff, AlertCircle, Sparkles, CheckCircle2 } from "lucide-react"
+import { Brain, Loader2, Eye, EyeOff, AlertCircle, Sparkles, CheckCircle2, FileText, MessageSquare } from "lucide-react"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { LanguageToggle } from "@/components/language-toggle"
+import { ContactBar } from "@/components/contact-bar"
+import { CONTACT_INFO } from "@/lib/contact-info"
 
 export default function SignupPage() {
+  const { t, lang } = useTranslation()
   const router = useRouter()
 
   const [name, setName] = useState("")
@@ -17,6 +23,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
+  const [termsAccepted, setTermsAccepted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -35,6 +42,11 @@ export default function SignupPage() {
     e.preventDefault()
     setError(null)
 
+    if (!termsAccepted) {
+      setError("You must accept the Terms & Conditions to create an account")
+      return
+    }
+
     if (password !== confirmPassword) {
       setError("Passwords do not match")
       return
@@ -51,7 +63,7 @@ export default function SignupPage() {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, termsAccepted }),
       })
 
       const data = await res.json()
@@ -89,10 +101,10 @@ export default function SignupPage() {
                 <CheckCircle2 className="h-12 w-12 text-emerald-500" />
               </div>
             </div>
-            <h2 className="text-2xl font-bold mb-2">Account created!</h2>
-            <p className="text-muted-foreground mb-4">Redirecting you to sign in...</p>
+            <h2 className="text-2xl font-bold mb-2">{t("signup.success")}</h2>
+            <p className="text-muted-foreground mb-4">{t("signup.redirecting")}</p>
             <Link href="/login">
-              <Button variant="outline">Sign in now</Button>
+              <Button variant="outline">{t("signup.signInNow")}</Button>
             </Link>
           </CardContent>
         </Card>
@@ -116,9 +128,9 @@ export default function SignupPage() {
               <Brain className="h-8 w-8 text-white" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">Create your account</CardTitle>
+          <CardTitle className="text-2xl font-bold">{t("form.createAccount")}</CardTitle>
           <CardDescription>
-            Get started with your RevStack journey
+            {t("auth.signInTitle")}
           </CardDescription>
         </CardHeader>
 
@@ -132,7 +144,7 @@ export default function SignupPage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-sm font-medium">Full name</Label>
+              <Label htmlFor="name" className="text-sm font-medium">{t("form.fullName")}</Label>
               <Input
                 id="name"
                 type="text"
@@ -146,7 +158,7 @@ export default function SignupPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">Email address</Label>
+              <Label htmlFor="email" className="text-sm font-medium">{t("form.email")}</Label>
               <Input
                 id="email"
                 type="email"
@@ -160,7 +172,7 @@ export default function SignupPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+              <Label htmlFor="password" className="text-sm font-medium">{t("form.password")}</Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -196,7 +208,7 @@ export default function SignupPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-sm font-medium">Confirm password</Label>
+              <Label htmlFor="confirmPassword" className="text-sm font-medium">{t("form.confirmPassword")}</Label>
               <Input
                 id="confirmPassword"
                 type="password"
@@ -211,15 +223,36 @@ export default function SignupPage() {
               )}
             </div>
 
+            {/* Terms & Conditions */}
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/50">
+              <Checkbox
+                id="terms"
+                checked={termsAccepted}
+                onCheckedChange={(checked) => setTermsAccepted(checked === true)}
+                className="mt-0.5"
+              />
+              <label htmlFor="terms" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
+                {t("form.agreeTerms")}{" "}
+                <Link href="/terms" target="_blank" className="text-primary hover:underline font-medium">
+                  {t("form.termsConditions")}
+                </Link>{" "}
+                {t("form.and")}{" "}
+                <Link href="/privacy" className="text-primary hover:underline font-medium">
+                  {t("form.privacyPolicy")}
+                </Link>
+                . {t("form.understand")}
+              </label>
+            </div>
+
             <Button
               type="submit"
               className="w-full h-11 text-base"
-              disabled={loading || !name || !email || !password || !passwordsMatch}
+              disabled={loading || !name || !email || !password || !passwordsMatch || !termsAccepted}
             >
               {loading ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Creating account...</>
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {t("form.creatingAccount")}</>
               ) : (
-                <><Sparkles className="h-4 w-4 mr-2" /> Create account</>
+                <><Sparkles className="h-4 w-4 mr-2" /> {t("form.createAccount")}</>
               )}
             </Button>
           </form>
@@ -227,13 +260,16 @@ export default function SignupPage() {
 
         <CardFooter className="flex justify-center pb-6">
           <p className="text-sm text-muted-foreground">
-            Already have an account?{" "}
+            {t("form.alreadyHaveAccount")}{" "}
             <Link href="/login" className="font-medium text-primary hover:text-primary/80 transition-colors">
-              Sign in
+              {t("form.signIn")}
             </Link>
           </p>
         </CardFooter>
       </Card>
+
+      {/* Contact Bar */}
+      <ContactBar />
     </div>
   )
 }

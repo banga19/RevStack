@@ -187,19 +187,7 @@ export const contentArticles = [
   { title: "Automated Lead Qualification: A Practical Guide", keyword: "automated lead qualification", status: "idea", week: 7, month: 2 },
 ]
 
-export const documents = [
-  { filename: "75-DAY-AI-BUSINESS-PLAN.md", title: "75-Day AI Business Plan", description: "Master strategy to $22,500/mo with phases, revenue math, tool costs", category: "plan", pages: 15 },
-  { filename: "DAY-1-PLAYBOOK.md", title: "Day 1 Playbook", description: "Pitch script, 30-min call structure, data checklist", category: "pitch", pages: 12 },
-  { filename: "PIPELINE-AUDIT-REPORT-TEMPLATE.md", title: "Pipeline Audit Report Template", description: "5-slide fill-in-the-blank report for client presentations", category: "pitch", pages: 10 },
-  { filename: "DAYS-2-5-TECHNICAL-BUILD.md", title: "Days 2-5 Technical Build", description: "Full build sequence for Voiceflow, Make, QMe, Wati, Instantly", category: "technical", pages: 20 },
-  { filename: "FALLBACK-PITCH-ALTERNATIVE-TARGETS.md", title: "Fallback Pitch & Alternative Targets", description: "4 sectors, objection scripts, follow-up sequence", category: "pitch", pages: 14 },
-  { filename: "FINANCIAL-MODEL-SPREADSHEET.md", title: "Financial Model Spreadsheet", description: "8-tab Google Sheets model with formulas and scenarios", category: "financial", pages: 12 },
-  { filename: "VOICEFLOW-CHATBOT-NODE-MAP.md", title: "Voiceflow Chatbot Node Map", description: "Every block, button, variable, JSON export for lead qualification bot", category: "technical", pages: 18 },
-  { filename: "CANVA-TEMPLATE-BRIEFS.md", title: "Canva Template Briefs", description: "One-pager, proposal deck, and case study specs featuring Ultimo & Sokogate", category: "marketing", pages: 8 },
-  { filename: "MAKE-DOT-COM-SCENARIO-BLUEPRINTS.md", title: "Make.com Scenario Blueprints", description: "5 scenarios module-by-module with error handling for lead qualification", category: "technical", pages: 16 },
-  { filename: "WATI-DOT-IO-SEQUENCES-SETUP.md", title: "Wati.io Sequences Setup", description: "10 templates, Meta approval, branching logic, auto-reply flows for WhatsApp lead capture", category: "technical", pages: 14 },
-  { filename: "SEO-CONTENT-CALENDAR-90-DAY.md", title: "SEO Content Calendar 90-Day", description: "32 articles with outlines, keyword mapping, promotion plan targeting sourcing & lead gen", category: "marketing", pages: 16 },
-]
+export const documents = []
 
 export const financialSnapshots = [
   { month: 1, year: 2026, revenue: 3000, costs: 312, profit: 2688, clients: 1, pipelineValue: 5000 },

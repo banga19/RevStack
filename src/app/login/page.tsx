@@ -9,9 +9,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
-import { Brain, Loader2, Eye, EyeOff, AlertCircle, Sparkles, ArrowRight } from "lucide-react"
+import { Brain, Loader2, Eye, EyeOff, AlertCircle, Sparkles, ArrowRight, MessageSquare, Mail } from "lucide-react"
+import { useTranslation } from "@/lib/i18n/use-translation"
+import { LanguageToggle } from "@/components/language-toggle"
+import { ContactBar } from "@/components/contact-bar"
+import { CONTACT_INFO } from "@/lib/contact-info"
 
 function LoginForm() {
+  const { t } = useTranslation()
   const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get("callbackUrl") || "/dashboard"
@@ -67,15 +72,18 @@ function LoginForm() {
       </div>
 
       <Card className="w-full max-w-md relative backdrop-blur-sm bg-card/95 border-primary/10 shadow-2xl">
+        <div className="absolute top-3 right-3 z-10">
+          <LanguageToggle variant="header" />
+        </div>
         <CardHeader className="text-center pb-6">
           <div className="flex justify-center mb-4">
             <div className="p-3 rounded-2xl bg-gradient-to-br from-primary to-primary/60 shadow-lg shadow-primary/20">
               <Brain className="h-8 w-8 text-white" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
+          <CardTitle className="text-2xl font-bold">{t("auth.welcomeBack")}</CardTitle>
           <CardDescription>
-            Sign in to your RevStack account
+            {t("auth.signInTitle")}
           </CardDescription>
         </CardHeader>
 
@@ -90,8 +98,8 @@ function LoginForm() {
                 <Brain className="h-5 w-5 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">New to RevStack?</p>
-                <p className="text-xs text-muted-foreground">Take our 2-min needs assessment to personalize your experience</p>
+                <p className="text-sm font-medium">{t("auth.newHere")}</p>
+                <p className="text-xs text-muted-foreground">{t("auth.takeAssessment")}</p>
               </div>
               <ArrowRight className="h-5 w-5 text-primary shrink-0 group-hover:translate-x-0.5 transition-transform" />
             </Link>
@@ -110,7 +118,7 @@ function LoginForm() {
               <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
             </svg>
-            Sign in with Google
+            {t("nav.signIn")} Google
           </Button>
 
           <div className="relative">
@@ -118,7 +126,7 @@ function LoginForm() {
               <span className="w-full border-t" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">Or continue with email</span>
+              <span className="bg-card px-2 text-muted-foreground">{t("form.email")}</span>
             </div>
           </div>
 
@@ -131,7 +139,7 @@ function LoginForm() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">Email address</Label>
+              <Label htmlFor="email" className="text-sm font-medium">{t("form.email")}</Label>
               <Input
                 id="email"
                 type="email"
@@ -146,7 +154,7 @@ function LoginForm() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+              <Label htmlFor="password" className="text-sm font-medium">{t("form.password")}</Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -171,9 +179,9 @@ function LoginForm() {
 
             <Button type="submit" className="w-full h-11 text-base" disabled={loading}>
               {loading ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Signing in...</>
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {t("nav.signIn")}...</>
               ) : (
-                <><Sparkles className="h-4 w-4 mr-2" /> Sign in with email</>
+                <><Sparkles className="h-4 w-4 mr-2" /> {t("form.signIn")}</>
               )}
             </Button>
           </form>
@@ -181,9 +189,9 @@ function LoginForm() {
 
         <CardFooter className="flex flex-col gap-3 pb-6">
           <p className="text-sm text-muted-foreground">
-            Don&apos;t have an account?{" "}
+            {t("auth.dontHaveAccount")}{" "}
             <Link href="/signup" className="font-medium text-primary hover:text-primary/80 transition-colors">
-              Create one
+              {t("auth.createOne")}
             </Link>
           </p>
           <Link
@@ -194,6 +202,7 @@ function LoginForm() {
           </Link>
         </CardFooter>
       </Card>
+      <ContactBar />
     </div>
   )
 }

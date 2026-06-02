@@ -7,6 +7,8 @@ import { signOut, useSession } from "next-auth/react"
 import { cn, getInitials } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useTheme } from "@/lib/theme-provider"
+import { useLanguage } from "@/lib/i18n/language-context"
+import { LanguageToggle } from "@/components/language-toggle"
 import {
   LayoutDashboard,
   CalendarCheck,
@@ -27,6 +29,7 @@ import {
   User,
   Settings,
   Shield,
+  Languages,
 } from "lucide-react"
 
 const navItems = [
@@ -41,7 +44,7 @@ const navItems = [
 ]
 
 // Auth pages where sidebar should be hidden
-const authPages = ["/login", "/signup", "/onboarding", "/needs-assessment"]
+const authPages = ["/login", "/signup", "/onboarding", "/needs-assessment", "/terms", "/privacy"]
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -89,7 +92,7 @@ export function Sidebar() {
         )}>
           <Brain className="h-7 w-7 text-primary shrink-0" />
           {!collapsed && (
-            <span className="ml-3 font-bold text-lg whitespace-nowrap">RevStack</span>
+            <span className="ml-3 font-bold text-lg whitespace-nowrap">Mapato</span>
           )}
         </div>
 
@@ -195,6 +198,9 @@ export function Sidebar() {
 
         {/* Bottom controls */}
         <div className="p-2 border-t border-sidebar-border space-y-1">
+          {/* Language toggle */}
+          <LanguageToggle collapsed={collapsed} />
+
           {/* Theme toggle */}
           <Button
             variant="ghost"

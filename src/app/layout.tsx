@@ -2,15 +2,17 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { Sidebar } from "@/components/sidebar"
+import { PageWrapper } from "@/components/page-wrapper"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { ThemeProvider } from "@/lib/theme-provider"
 import { AuthProvider } from "@/components/auth-provider"
+import { LanguageProvider } from "@/lib/i18n/language-context"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "RevStack — Automated Revenue Operations for Solo Businesses",
-  description: "CRM, outreach, content, and financial tracking — one system to manage every deal, every client, every dollar.",
+  title: "Mapato — AI-Powered Revenue Operations for B2B Trading Companies",
+  description: "Automate lead qualification, client onboarding, and follow-ups across WhatsApp & email. sokogateOS — your AI operating system for B2B trade growth.",
 }
 
 export default function RootLayout({
@@ -32,12 +34,10 @@ export default function RootLayout({
         <ThemeProvider>
           <TooltipProvider>
             <AuthProvider>
-              <Sidebar />
-              <main className="lg:pl-64 min-h-screen transition-all duration-300">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-20 lg:pt-8">
-                  {children}
-                </div>
-              </main>
+              <LanguageProvider>
+                <Sidebar />
+                <PageWrapper>{children}</PageWrapper>
+              </LanguageProvider>
             </AuthProvider>
           </TooltipProvider>
         </ThemeProvider>

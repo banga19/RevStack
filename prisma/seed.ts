@@ -24,7 +24,7 @@ async function main() {
 
   // Seed admin user (password: admin123)
   const hashedPassword = await bcrypt.hash("admin123", 12)
-  await prisma.user.create({
+  const adminUser = await prisma.user.create({
     data: {
       name: "Admin",
       email: "admin@aibusinessos.com",
@@ -34,17 +34,25 @@ async function main() {
   })
   console.log("Seeded admin user: admin@aibusinessos.com / admin123")
 
-  // Seed plan tasks
+  // Seed plan tasks FIRST (independent)
   for (const task of planTasks) {
     await prisma.planTask.create({ data: task })
   }
   console.log(`Seeded ${planTasks.length} plan tasks`)
 
-  // Seed clients
-  for (const client of clients) {
-    await prisma.client.create({ data: client })
+  // Seed clients ONLY for admin user for demonstration/reference
+  // New users will NOT get any demo data - their dashboard will be empty until they add data
+  if (adminUser.id) {
+    for (const client of clients) {
+      await prisma.client.create({
+        data: {
+          ...client,
+          userId: adminUser.id,
+        }
+      })
+    }
+    console.log(`Seeded ${clients.length} clients (owned by admin only)`)
   }
-  console.log(`Seeded ${clients.length} clients`)
 
   // Seed client products
   const clientMap = new Map<string, string>()

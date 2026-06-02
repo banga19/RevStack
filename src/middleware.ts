@@ -7,8 +7,13 @@ export default auth((req) => {
   const role = req.auth?.user?.role
 
   // Public routes — auth pages, needs-assessment, and API routes (which handle their own auth)
-  const publicRoutes = ["/login", "/signup", "/needs-assessment", "/api"]
+  const publicRoutes = ["/login", "/signup", "/needs-assessment", "/api", "/terms", "/privacy"]
   const isPublicRoute = publicRoutes.some((route) => nextUrl.pathname.startsWith(route))
+  
+  // Landing page is always public
+  if (nextUrl.pathname === "/") {
+    return NextResponse.next()
+  }
 
   if (!isLoggedIn && !isPublicRoute) {
     // Redirect to login with callback URL

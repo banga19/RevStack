@@ -1,13 +1,46 @@
 import { NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 
 export async function GET() {
   try {
-    // Stats
-    const revenueEntries = await prisma.revenueEntry.findMany({ orderBy: { date: "asc" } })
-    const clients = await prisma.client.findMany()
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        {
+          stats: {
+            totalRevenue: 0,
+            monthlyRevenue: 0,
+            activeClients: 0,
+            totalClients: 0,
+            pipelineValue: 0,
+            planProgress: 0,
+            totalTasks: 0,
+            completedTasks: 0,
+            leadsGenerated: 0,
+            outreachSent: 0,
+          },
+          revenueHistory: [],
+          pipelineByTier: [],
+          recentActivity: [],
+        },
+        { status: 200 } // Return empty data for unauthenticated users instead of error
+      )
+    }
+
+    // Stats - filtered by userId
+    const clients = await prisma.client.findMany({
+      where: { userId: session.user.id }
+    })
+    const clientIds = clients.map(c => c.id)
+    const revenueEntries = await prisma.revenueEntry.findMany({
+      where: { clientId: { in: clientIds } },
+      orderBy: { date: "asc" }
+    })
     const tasks = await prisma.planTask.findMany()
-    const financialSnapshots = await prisma.financialSnapshot.findMany({ orderBy: { month: "asc" } })
+    const financialSnapshots = await prisma.financialSnapshot.findMany({
+      orderBy: { month: "asc" }
+    })
 
     const totalRevenue = revenueEntries.reduce((sum, e) => sum + e.amount, 0)
     const lastMonthRevenue = revenueEntries
@@ -21,7 +54,10 @@ export async function GET() {
     const completedTasks = tasks.filter((t) => t.status === "completed").length
     const planProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
     const leadsGenerated = clients.filter((c) => c.status === "lead").length
-    const outreachSent = await prisma.outreachCampaign.aggregate({ _sum: { sentCount: true } })
+    const outreachSent = await prisma.outreachCampaign.aggregate({
+      _sum: { sentCount: true },
+      where: { clientId: { in: clientIds } }
+    })
 
     // Revenue history from financial snapshots
     const revenueHistory = financialSnapshots.map((s) => ({
@@ -30,7 +66,7 @@ export async function GET() {
       costs: s.costs,
     }))
 
-    // Pipeline by tier
+    // Pipeline by tier - only for user's clients
     const tierMap = new Map<string, { value: number; count: number }>()
     for (const c of clients) {
       const tier = c.tier || "unknown"
@@ -42,7 +78,7 @@ export async function GET() {
     }
     const pipelineByTier = Array.from(tierMap.entries()).map(([tier, data]) => ({ tier, ...data }))
 
-    // Recent activity
+    // Recent activity - only for user's data
     const recentActivity: { id: string; type: string; message: string; time: string }[] = []
 
     const recentRevenue = revenueEntries.slice(-3).reverse()
