@@ -9,12 +9,12 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm",
+        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm hover:shadow-orange-500/20 hover:shadow-md transition-all duration-300",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm",
-        outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+        outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground hover:border-orange-500/30 hover:shadow-orange-500/10 transition-all duration-300",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+        link: "text-primary underline-offset-4 hover:underline link-hover-orange",
       },
       size: {
         default: "h-10 px-4 py-2",
@@ -57,6 +57,12 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ...props
   }, ref) => {
     const { handleButtonClick, updateContext } = useButtonSync()
+    const buttonRef = React.useRef<HTMLButtonElement | null>(null)
+    const [ripples, setRipples] = React.useState<{ id: number; style: React.CSSProperties }[]>([])
+    const rippleCounter = React.useRef(0)
+
+    // Combine refs
+    React.useImperativeHandle(ref, () => buttonRef.current!)
 
     // Generate element ID if not provided
     const finalElementId = elementId || `btn-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
@@ -75,7 +81,40 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       ]))
     }, [finalElementId, updateContext])
 
+    const createRipple = (event: React.MouseEvent<HTMLButtonElement>) => {
+      const btn = buttonRef.current
+      if (!btn) return
+
+      const rect = btn.getBoundingClientRect()
+      const size = Math.max(rect.width, rect.height) * 2
+      const x = event.clientX - rect.left - size / 2
+      const y = event.clientY - rect.top - size / 2
+      const id = ++rippleCounter.current
+
+      const style: React.CSSProperties = {
+        position: 'absolute',
+        left: x,
+        top: y,
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        background: 'linear-gradient(135deg, hsl(var(--primary) / 0.25), hsl(var(--orange) / 0.25))',
+        transform: 'scale(0)',
+        animation: 'ripple-expand 0.5s ease-out forwards',
+        pointerEvents: 'none',
+      }
+
+      setRipples((prev) => [...prev, { id, style }])
+
+      // Remove ripple after animation completes
+      setTimeout(() => {
+        setRipples((prev) => prev.filter((r) => r.id !== id))
+      }, 600)
+    }
+
     const handleClick = async (event: React.MouseEvent<HTMLButtonElement>) => {
+      createRipple(event)
+
       // Call original onClick handler if provided
       if (props.onClick) {
         await Promise.resolve(props.onClick(event))
@@ -100,11 +139,19 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const Comp = asChild ? Slot : "button"
     return (
       <Comp
-        className={cn(buttonVariants({ variant, size, className }))}
-        ref={ref}
+        className={cn(
+          buttonVariants({ variant, size, className }),
+          "relative overflow-hidden"
+        )}
+        ref={buttonRef}
         onClick={handleClick}
         {...props}
-      />
+      >
+        {ripples.map((ripple) => (
+          <span key={ripple.id} style={ripple.style} />
+        ))}
+        {props.children}
+      </Comp>
     )
   }
 )

@@ -19,7 +19,7 @@ function LoginForm() {
   const { t } = useTranslation()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard"
+  const callbackUrl = searchParams.get("callbackUrl") || searchParams.get("returnTo") || "/dashboard"
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -107,7 +107,14 @@ function LoginForm() {
 
           {/* Google SSO */}
           <Button
-            onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+            onClick={() => {
+              const fromAssessment = searchParams.get("needsAssessment") === "true"
+              signIn("google", {
+                callbackUrl: fromAssessment
+                  ? "/needs-assessment"
+                  : "/dashboard",
+              })
+            }}
             className="w-full h-12 text-base relative overflow-hidden group"
             variant="outline"
           >
@@ -189,14 +196,13 @@ function LoginForm() {
 
         <CardFooter className="flex flex-col gap-3 pb-6">
           <p className="text-sm text-muted-foreground">
-            {t("auth.dontHaveAccount")}{" "}
-            <Link href="/signup" className="font-medium text-primary hover:text-primary/80 transition-colors">
+            {t("auth.dontHaveAccount")}{" "}              <Link href="/signup" className="font-medium link-hover-orange">
               {t("auth.createOne")}
             </Link>
           </p>
           <Link
             href="/needs-assessment"
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4"
+            className="text-xs text-muted-foreground link-hover-orange underline underline-offset-4"
           >
             Take our needs assessment first
           </Link>

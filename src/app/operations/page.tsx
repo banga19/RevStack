@@ -149,7 +149,7 @@ export default function OperationsPage() {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current)
     }
-  }, [])
+  }, [loadSessions])
 
   useEffect(() => {
     if (hasRunningSessions && !pollRef.current) {
@@ -157,6 +157,12 @@ export default function OperationsPage() {
     } else if (!hasRunningSessions && pollRef.current) {
       clearInterval(pollRef.current)
       pollRef.current = null
+    }
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current)
+        pollRef.current = null
+      }
     }
   }, [hasRunningSessions, loadSessions])
 

@@ -1,9 +1,18 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Handle Node.js built-in modules for langchain packages
+  /*
+   * ── Webpack config (Node.js polyfills for client-side) ──────────
+   *
+   * Turbopack does not support `resolve.fallback`, so we keep the
+   * `--webpack` flag in the dev script. The polyfills below prevent
+   * client-side bundling errors when a server-only package (langchain)
+   * is inadvertently pulled into browser bundles.
+   *
+   * When/if Turbopack gains native support for Node.js module stubs,
+   * this webpack block and the `--webpack` flag can be removed.
+   */
   webpack: (config, { isServer }) => {
     if (!isServer) {
-      // Don't attempt to resolve these node modules on the client side
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,
@@ -45,6 +54,48 @@ const nextConfig = {
     }
     return config
   },
+
+  /*
+   * ── Turbopack config (used only when running without --webpack) ─
+   *
+   * Empty config signals to Next.js 16 that we acknowledge Turbopack,
+   * preventing the build error about a missing turbopack config.
+   * The webpack block above is still the primary bundler (via --webpack).
+   */
+  turbopack: {},
+
+  // PWA: Service Worker must be served with correct Content-Type
+  async headers() {
+    return [
+      {
+        source: "/sw.js",
+        headers: [
+          {
+            key: "Content-Type",
+            value: "application/javascript; charset=utf-8",
+          },
+          {
+            key: "Cache-Control",
+            value: "no-cache, no-store, must-revalidate",
+          },
+          {
+            key: "Service-Worker-Allowed",
+            value: "/",
+          },
+        ],
+      },
+      {
+        source: "/manifest.json",
+        headers: [
+          {
+            key: "Content-Type",
+            value: "application/json; charset=utf-8",
+          },
+        ],
+      },
+    ]
+  },
+
   // Ensure langchain packages run only on server
   serverExternalPackages: [
     "langchain",

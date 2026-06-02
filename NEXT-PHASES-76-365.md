@@ -180,7 +180,15 @@ Transform Mapato into an ecosystem — partner marketplace, white-label offering
 - Rules of origin checker: Verify products qualify for preferential treatment
 - Documentation generator: Auto-fill certificates of origin, export declarations
 
-#### 5. West Africa Expansion (Days 330–365)
+#### 5. Korean Corporate Corridor (Days 140–365)
+- **Target**: 10 Korean mid-sized manufacturers & chaebol procurement teams seeking supply chain diversification
+- **Pilot Program**: 20 African exporters on 3-month free Sokogate Platform trials (4 cohorts of 5 companies)
+- **Korean Procurement Funnel**: Supplier discovery → ERS compliance dashboard → pilot transaction → corporate retainer ($1,500–$3,000/mo)
+- **Revenue Target**: $22,500/mo from Korean corridor by Month 10
+- **Key Partnerships**: Korean trading houses (Sangsa), Sokogate Korea corridor team
+- **Full strategy**: See `KOREA-CORPORATE-STRATEGY.md`
+
+#### 6. West Africa Expansion (Days 330–365)
 - **Nigeria**: Lagos hub, partnership with Lagos Chamber of Commerce
 - **Ghana**: Accra hub, partnership with Ghana Export Promotion Authority
 - **Senegal**: Dakar hub, French-language platform version

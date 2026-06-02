@@ -1,5 +1,5 @@
 /**
- * Translation dictionaries for Mapato / sokogateOS
+ * Translation dictionaries for Mapato
  * English (en) and KiSwahili (sw)
  */
 
@@ -15,12 +15,13 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.signIn": "Sign in",
     "nav.getStarted": "Get started",
     "nav.signOut": "Sign out",
+    "nav.guides": "Guides",
 
     // Hero
-    "hero.badge": "AI-Powered Revenue Operations for B2B Trading Companies",
+    "hero.badge": "AI-Powered Revenue Operations for B2B Trading Companies — Like Polsia.com, but for B2B trade",
     "hero.title": "Your AI Operating System for",
     "hero.titleHighlight": "B2B Trade Growth",
-    "hero.subtitle": "Automate lead qualification, client onboarding, and follow-ups across WhatsApp & email. One platform to capture every lead, close every deal, and scale your trading business — with or without a team.",
+    "hero.subtitle": "A seamless, everlasting, and euphoric AI experience that generates revenue for your trading business — just like polsia.com does for e-commerce, but purpose-built for B2B trade at a fraction of the cost. Automate lead qualification, client onboarding, and follow-ups across WhatsApp & email.",
     "hero.cta": "Start Free",
     "hero.seeHow": "See how it works",
     "hero.trustedBy": "Trusted by trading companies in 7+ African markets",
@@ -40,7 +41,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Features
     "features.badge": "The Solution",
     "features.title": "Everything you need to automate B2B trade operations",
-    "features.subtitle": "sokogateOS combines lead qualification, WhatsApp automation, client onboarding, and trade finance into one AI-powered platform.",
+    "features.subtitle": "Mapato combines lead qualification, WhatsApp automation, client onboarding, and trade finance into one AI-powered platform.",
     "features.aiQual": "AI Lead Qualification",
     "features.aiQualDesc": "Voiceflow chatbot qualifies leads 24/7 via WhatsApp & web. Scores leads by intent, budget, and readiness.",
     "features.whatsapp": "WhatsApp Automation",
@@ -87,7 +88,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Pricing
     "pricing.badge": "Pricing",
     "pricing.title": "Pay as you grow. We win when you win.",
-    "pricing.subtitle": "Low monthly base fee plus a success-based share on revenue generated through the platform. Inspired by the autonomous business model.",
+    "pricing.subtitle": "Low monthly base fee plus a success-based share on revenue generated through the platform. Inspired by the Polsia autonomous business model — at half the success fee. While Polsia charges 20% revenue share, Mapato starts at just 10%.",
     "pricing.starter": "Starter",
     "pricing.starterDesc": "For solo traders and small teams getting started",
     "pricing.growth": "Growth",
@@ -105,7 +106,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     // Stats
     "stats.badge": "Real Results",
-    "stats.title": "Trading companies are scaling with sokogateOS",
+    "stats.title": "Trading companies are scaling with Mapato",
     "stats.qualified": "More qualified leads",
     "stats.qualifiedDesc": "AI lead qualification triples the number of sales-ready conversations.",
     "stats.responseTime": "Faster response time",
@@ -114,7 +115,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "stats.reductionDesc": "Automation handles follow-ups, data entry, and reporting.",
 
     // Testimonial
-    "testimonial.text": "\"sokogateOS automated our entire lead qualification process via WhatsApp. We went from 20 leads/month to 85 qualified conversations — and closed 3x more deals. The Korea corridor access through Sokogate is opening doors we couldn't reach before.\"",
+    "testimonial.text": "\"Mapato automated our entire lead qualification process via WhatsApp. We went from 20 leads/month to 85 qualified conversations — and closed 3x more deals. The Korea corridor access through Sokogate is opening doors we couldn't reach before.\"",
     "testimonial.name": "Bangaly Fofana",
     "testimonial.role": "Operations Director, Ultimo Trading Ltd",
 
@@ -139,15 +140,15 @@ export const translations: Record<Language, Record<string, string>> = {
 
     // CTA
     "cta.badge": "Get Started Today",
-    "cta.title": "Ready to automate your B2B trade operations?",
-    "cta.subtitle": "Join trading companies already using sokogateOS to qualify leads, close deals, and scale across African and international trade corridors.",
+    "cta.title": "Ready to generate revenue like Polsia — but for B2B trade?",
+    "cta.subtitle": "Join trading companies already using Mapato to qualify leads, close deals, and scale across African and international trade corridors. The same autonomous AI model that powers polsia.com — adapted for B2B trade at an affordable rate.",
     "cta.emailPlaceholder": "Enter your work email",
     "cta.getAccess": "Get early access",
     "cta.subscribed": "You're on the list! We'll be in touch soon.",
     "cta.terms": "Terms & Conditions",
 
     // Footer
-    "footer.tagline": "AI-powered B2B trade automation for Africa.",
+    "footer.tagline": "Seamless, everlasting, euphoric AI-powered revenue operations for B2B trade.",
     "footer.terms": "Terms",
     "footer.privacy": "Privacy",
     "footer.contact": "Contact",
@@ -182,6 +183,19 @@ export const translations: Record<Language, Record<string, string>> = {
     "auth.dontHaveAccount": "Don't have an account?",
     "auth.createOne": "Create one",
 
+    // Korea corridor
+    "korea.title": "Korea Corridor",
+    "korea.targets": "Corporate targets",
+    "korea.hotLeads": "Hot / Warm leads",
+    "korea.pilot": "Pilot enrollment",
+    "korea.pipelineValue": "Pipeline value/mo",
+    "korea.pipeline": "Deal Pipeline",
+    "korea.pilotProgram": "Sokogate Platform Pilot",
+    "korea.addTarget": "Add Target",
+    "korea.addCohort": "New Cohort",
+    "korea.addParticipant": "Add Participant",
+    "korea.strategy": "Strategy",
+
     // Language
     "lang.switchTo": "Kiswahili",
     "lang.current": "English",
@@ -206,6 +220,38 @@ export const translations: Record<Language, Record<string, string>> = {
 
     // Logo cloud
     "logoCloud.title": "Integrated with leading platforms",
+
+    // Polsia Comparison Table
+    "compare.title": "Mapato vs Polsia: Built for B2B Trade",
+    "compare.subtitle": "While Polsia is the AI co-founder for e-commerce businesses, Mapato is purpose-built for B2B trading companies — with half the success fee and trade-specific features.",
+    "compare.feature": "Feature",
+    "compare.polsia": "Polsia",
+    "compare.mapato": "Mapato",
+    "compare.target": "Target Market",
+    "compare.targetP": "E-commerce & Online Businesses",
+    "compare.targetM": "B2B Trading Companies",
+    "compare.monthly": "Monthly Subscription",
+    "compare.monthlyP": "$49/mo",
+    "compare.monthlyM": "Starting at $50/mo",
+    "compare.successFee": "Success Fee",
+    "compare.successFeeP": "20% of revenue",
+    "compare.successFeeM": "From 10% of revenue",
+    "compare.leadQual": "AI Lead Qualification",
+    "compare.whatsapp": "WhatsApp Automation",
+    "compare.email": "Email Outreach",
+    "compare.crm": "CRM Pipeline",
+    "compare.forecasting": "Revenue Forecasting",
+    "compare.trade": "Trade Corridor Matching",
+    "compare.ers": "Export Readiness Scoring",
+    "compare.finance": "Trade Finance Integration",
+    "compare.compliance": "Compliance Tracking",
+    "compare.freeTrial": "Free Trial",
+    "compare.check": "✅",
+    "compare.cross": "❌",
+    "compare.trialDays": "14-day free trial",
+    "compare.polsiaDesc": "Your AI Co-Founder for e-commerce",
+    "compare.mapatoDesc": "Your AI Revenue Operations for B2B Trade",
+    "compare.cta": "See how Mapato compares →",
   },
 
   sw: {
@@ -217,9 +263,10 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.signIn": "Ingia",
     "nav.getStarted": "Anza",
     "nav.signOut": "Toka",
+    "nav.guides": "Miongozo",
 
     // Hero
-    "hero.badge": "Shughuli za Mapato Zinazoendeshwa na AI kwa Kampuni za Biashara za B2B",
+    "hero.badge": "Shughuli za Mapato Zinazoendeshwa na AI kwa Kampuni za Biashara za B2B — Kama Polsia.com, lakini kwa biashara ya B2B",
     "hero.title": "Mfumo Wako wa Uendeshaji wa AI kwa",
     "hero.titleHighlight": "Ukuaji wa Biashara ya B2B",
     "hero.subtitle": "Automatishe uhakiki wa wateja, uingizaji wa wateja wapya, na ufuatiliaji kwa njia ya WhatsApp & barua pepe. Jukwaa moja la kukamata kila kiongozi, kufunga kila mpango, na kukuza biashara yako — na au bila timu.",
@@ -242,7 +289,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Features
     "features.badge": "Suluhisho",
     "features.title": "Kila kitu unachohitaji kuautomatishe shughuli za biashara ya B2B",
-    "features.subtitle": "sokogateOS inachanganya uhakiki wa wateja, automatishe ya WhatsApp, uingizaji wa wateja, na fedha za biashara katika jukwaa moja linaloendeshwa na AI.",
+    "features.subtitle": "Mapato inachanganya uhakiki wa wateja, automatishe ya WhatsApp, uingizaji wa wateja, na fedha za biashara katika jukwaa moja linaloendeshwa na AI.",
     "features.aiQual": "Uhakiki wa Wateja kwa AI",
     "features.aiQualDesc": "Chatbot ya Voiceflow inahakiki wateja 24/7 kupitia WhatsApp & wavuti. Inakadiria wateja kwa nia, bajeti, na utayari.",
     "features.whatsapp": "Automatishe ya WhatsApp",
@@ -307,7 +354,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     // Stats
     "stats.badge": "Matokeo Halisi",
-    "stats.title": "Kampuni za biashara zinakua na sokogateOS",
+    "stats.title": "Kampuni za biashara zinakua na Mapato",
     "stats.qualified": "Wateja waliohitimu zaidi",
     "stats.qualifiedDesc": "Uhakiki wa wateja kwa AI unazidisha mara tatu idadi ya mazungumzo tayari kwa mauzo.",
     "stats.responseTime": "Muda wa kujibu haraka",
@@ -316,7 +363,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "stats.reductionDesc": "Automatishe inashughulikia ufuatiliaji, uingizaji wa data, na kuripoti.",
 
     // Testimonial
-    "testimonial.text": "\"sokogateOS iliautomatishe mchakato wetu wote wa uhakiki wa wateja kupitia WhatsApp. Tulitoka wateja 20/mwezi hadi mazungumzo 85 yaliyohitimu — na tukafunga mipango mara 3 zaidi. Upatikanaji wa njia ya Korea kupitia Sokogate unafungua milango ambayo hatukuweza kufikia hapo awali.\"",
+    "testimonial.text": "\"Mapato iliautomatishe mchakato wetu wote wa uhakiki wa wateja kupitia WhatsApp. Tulitoka wateja 20/mwezi hadi mazungumzo 85 yaliyohitimu — na tukafunga mipango mara 3 zaidi. Upatikanaji wa njia ya Korea kupitia Sokogate unafungua milango ambayo hatukuweza kufikia hapo awali.\"",
     "testimonial.name": "Bangaly Fofana",
     "testimonial.role": "Mkurugenzi wa Uendeshaji, Ultimo Trading Ltd",
 
@@ -342,7 +389,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // CTA
     "cta.badge": "Anza Leo",
     "cta.title": "Uko tayari kuautomatishe shughuli zako za biashara za B2B?",
-    "cta.subtitle": "Jiunge na kampuni za biashara tayari zinazotumia sokogateOS kuhakiki wateja, kufunga mipango, na kukua katika njia za biashara za Afrika na kimataifa.",
+    "cta.subtitle": "Jiunge na kampuni za biashara tayari zinazotumia Mapato kuhakiki wateja, kufunga mipango, na kukua katika njia za biashara za Afrika na kimataifa.",
     "cta.emailPlaceholder": "Ingiza barua pepe yako ya kazi",
     "cta.getAccess": "Pata ufikiaji wa mapema",
     "cta.subscribed": "Uko kwenye orodha! Tutawasiliana hivi karibuni.",
@@ -384,6 +431,19 @@ export const translations: Record<Language, Record<string, string>> = {
     "auth.dontHaveAccount": "Huna akaunti?",
     "auth.createOne": "Unda moja",
 
+    // Korea corridor
+    "korea.title": "Korea Corridor",
+    "korea.targets": "Malengo ya ushirika",
+    "korea.hotLeads": "Wateja moto / wa joto",
+    "korea.pilot": "Uandikishaji wa majaribio",
+    "korea.pipelineValue": "Thamani ya bomba/mwezi",
+    "korea.pipeline": "Bomba la Mipango",
+    "korea.pilotProgram": "Majaribio ya Jukwaa la Sokogate",
+    "korea.addTarget": "Ongeza Lengo",
+    "korea.addCohort": "Kundi Jipya la Majaribio",
+    "korea.addParticipant": "Ongeza Mshiriki",
+    "korea.strategy": "Mkakati",
+
     // Language
     "lang.switchTo": "English",
     "lang.current": "Kiswahili",
@@ -408,6 +468,38 @@ export const translations: Record<Language, Record<string, string>> = {
 
     // Logo cloud
     "logoCloud.title": "Imeunganishwa na majukwaa yanayoongoza",
+
+    // Polsia Comparison Table
+    "compare.title": "Mapato dhidi ya Polsia: Imejengwa kwa Biashara ya B2B",
+    "compare.subtitle": "Wakati Polsia ni mwanzilishi mwenza wa AI kwa biashara za e-commerce, Mapato imejengwa kwa ajili ya kampuni za biashara za B2B — kwa nusu ya ada ya mafanikio na vipengele maalum vya biashara.",
+    "compare.feature": "Kipengele",
+    "compare.polsia": "Polsia",
+    "compare.mapato": "Mapato",
+    "compare.target": "Soko Lengwa",
+    "compare.targetP": "Biashara za E-commerce & Mtandaoni",
+    "compare.targetM": "Kampuni za Biashara za B2B",
+    "compare.monthly": "Ada ya Kila Mwezi",
+    "compare.monthlyP": "$49/mwezi",
+    "compare.monthlyM": "Kuanzia $50/mwezi",
+    "compare.successFee": "Ada ya Mafanikio",
+    "compare.successFeeP": "20% ya mapato",
+    "compare.successFeeM": "Kuanzia 10% ya mapato",
+    "compare.leadQual": "Uhakiki wa Wateja kwa AI",
+    "compare.whatsapp": "Automatishe ya WhatsApp",
+    "compare.email": "Ufikiaji kwa Barua Pepe",
+    "compare.crm": "CRM ya Bomba la Mauzo",
+    "compare.forecasting": "Utabiri wa Mapato",
+    "compare.trade": "Ulinganishaji wa Njia za Biashara",
+    "compare.ers": "Ukadiriaji wa Utayari wa Kuuza Nje",
+    "compare.finance": "Muunganisho wa Fedha za Biashara",
+    "compare.compliance": "Ufuatiliaji wa Utiifu",
+    "compare.freeTrial": "Jaribio Bure",
+    "compare.check": "✅",
+    "compare.cross": "❌",
+    "compare.trialDays": "Jaribio la siku 14 bure",
+    "compare.polsiaDesc": "Mwanzilishi Mwenza wako wa AI kwa e-commerce",
+    "compare.mapatoDesc": "Shughuli zako za Mapato za AI kwa Biashara ya B2B",
+    "compare.cta": "Tazama jinsi Mapato inavyolinganishwa →",
   },
 }
 

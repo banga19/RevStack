@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, useCallback, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { signIn, useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,6 +33,7 @@ import {
   CalendarDays,
 } from "lucide-react"
 
+
 // Available services for multi-select
 const servicesOptions = [
   { id: "lead-generation", label: "Lead Generation & Outreach" },
@@ -57,8 +58,9 @@ function generateTempId(): string {
   return `preauth-${crypto.randomUUID?.() || Math.random().toString(36).slice(2, 15)}`
 }
 
-export default function NeedsAssessmentPage() {
+function NeedsAssessmentForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { data: session, status: authStatus } = useSession()
   const [step, setStep] = useState(0)
   const [submitting, setSubmitting] = useState(false)
@@ -127,16 +129,9 @@ export default function NeedsAssessmentPage() {
           // No saved questionnaire — user starts fresh
         })
     }
-  }, [authStatus, tempId])
+  }, [authStatus, tempId, completed])
 
-  // Handle auth completion - link questionnaire to user
-  useEffect(() => {
-    if (authStatus === "authenticated" && completed && tempId) {
-      linkQuestionnaireToUser()
-    }
-  }, [authStatus, completed, tempId])
-
-  const linkQuestionnaireToUser = async () => {
+  const linkQuestionnaireToUser = useCallback(async () => {
     try {
       await fetch("/api/auth/questionnaire", {
         method: "PUT",
@@ -154,7 +149,14 @@ export default function NeedsAssessmentPage() {
       // Still redirect
       router.push("/dashboard")
     }
-  }
+  }, [tempId, router])
+
+  // Handle auth completion - link questionnaire to user
+  useEffect(() => {
+    if (authStatus === "authenticated" && completed && tempId) {
+      linkQuestionnaireToUser()
+    }
+  }, [authStatus, completed, tempId, linkQuestionnaireToUser])
 
   const updateField = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -233,8 +235,12 @@ export default function NeedsAssessmentPage() {
     try {
       // First save the questionnaire
       await saveQuestionnaire()
-      // Then sign in with Google
-      await signIn("google", { callbackUrl: window.location.href })
+      // Then sign in with Google — preserve any email param in callback URL
+      const email = searchParams.get("email")
+      const callbackUrl = email
+        ? `${window.location.pathname}?email=${encodeURIComponent(email)}`
+        : window.location.href
+      await signIn("google", { callbackUrl })
     } catch (e) {
       setAuthError("Failed to sign in with Google. Please try again.")
       setAuthLoading(null)
@@ -246,7 +252,10 @@ export default function NeedsAssessmentPage() {
     setAuthError(null)
     try {
       await saveQuestionnaire()
-      router.push("/login?needsAssessment=true")
+      const email = searchParams.get("email")
+      const params = new URLSearchParams({ needsAssessment: "true" })
+      if (email) params.set("email", email)
+      router.push(`/signup?${params.toString()}`)
     } catch (e) {
       setAuthError("Failed to proceed. Please try again.")
       setAuthLoading(null)
@@ -805,17 +814,37 @@ export default function NeedsAssessmentPage() {
         </Card>
 
         {/* Skip link */}
-        <div className="text-center mt-4">
-          <button
-            onClick={() => router.push("/login")}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4"
-          >
-            Skip questionnaire and sign in directly
-          </button>
+        <div className="text-center mt-6 space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Skip questionnaire and{" "}
+            <button
+              onClick={() => router.push("/login")}
+              className="text-xs text-muted-foreground link-hover-orange underline underline-offset-4"
+            >
+              sign in
+            </button>
+            {" or "}
+            <button
+              onClick={() => router.push("/signup")}
+              className="text-xs text-muted-foreground link-hover-orange underline underline-offset-4"
+            >
+              create an account
+            </button>
+          </p>
         </div>
       </div>
     </div>
   )
 }
 
-
+export default function NeedsAssessmentPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    }>
+      <NeedsAssessmentForm />
+    </Suspense>
+  )
+}

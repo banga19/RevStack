@@ -26,12 +26,11 @@ export default function PrivacyPage() {
             <Link href="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors">
               <ArrowLeft className="h-4 w-4 mr-1" /> {t("back.home")}
             </Link>
-            <div className="flex items-center gap-3">
-              <a href={`https://wa.me/${CONTACT_INFO.whatsapp.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-emerald-500 transition-colors flex items-center gap-1">
+            <div className="flex items-center gap-3">                <a href={`https://wa.me/${CONTACT_INFO.whatsapp.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-emerald-500 transition-colors flex items-center gap-1 link-hover-orange">
                 <MessageSquare className="h-3 w-3" />
                 <span className="hidden sm:inline">{t("contact.phone")}</span>
               </a>
-              <a href={`mailto:${CONTACT_INFO.email}`} className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1">
+              <a href={`mailto:${CONTACT_INFO.email}`} className="link-hover-orange text-xs text-muted-foreground flex items-center gap-1">
                 <Mail className="h-3 w-3" />
                 <span className="hidden sm:inline">{CONTACT_INFO.email}</span>
               </a>
@@ -47,7 +46,7 @@ export default function PrivacyPage() {
                 <h1 className="text-3xl font-bold">Privacy Policy</h1>
                 <Badge variant="outline" className="text-xs">v1.0</Badge>
               </div>
-              <p className="text-sm text-muted-foreground">Mapato / sokogateOS</p>
+              <p className="text-sm text-muted-foreground">Mapato</p>
             </div>
           </div>
           <p className="text-sm text-muted-foreground">Last updated: June 1, 2026</p>
@@ -59,10 +58,10 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-xl font-bold mb-4">1. Introduction</h2>
             <p className="text-muted-foreground leading-relaxed mb-3">
-              Mapato ("Company," "We," "Us," or "Our") is committed to protecting the privacy of individuals 
-              who use our platform, website, and services (collectively, the "Service"). This Privacy Policy 
+              Mapato (&ldquo;Company,&rdquo; &ldquo;We,&rdquo; &ldquo;Us,&rdquo; or &ldquo;Our&rdquo;) is committed to protecting the privacy of individuals 
+              who use our platform, website, and services (collectively, the &ldquo;Service&rdquo;). This Privacy Policy 
               explains how we collect, use, disclose, and safeguard your information when you use Mapato and 
-              the sokogateOS platform.
+              the Mapato platform.
             </p>
             <p className="text-muted-foreground leading-relaxed mb-3">
               By accessing or using the Service, you acknowledge that you have read, understood, and agree to 
@@ -115,7 +114,7 @@ export default function PrivacyPage() {
               We use the information we collect for the following purposes:
             </p>
             <ul className="list-disc pl-6 text-muted-foreground leading-relaxed space-y-2">
-              <li><strong>To Provide and Maintain the Service:</strong> Operate, maintain, and improve the Mapato platform and sokogateOS features.</li>
+              <li><strong>To Provide and Maintain the Service:</strong> Operate, maintain, and improve the Mapato platform and its features.</li>
               <li><strong>To Automate Business Processes:</strong> Process and analyze data to power lead qualification, client onboarding, follow-up sequences, and trade operations as requested by you.</li>
               <li><strong>To Communicate with You:</strong> Send administrative information, service updates, security alerts, and support communications.</li>
               <li><strong>To Send Marketing Communications:</strong> With your consent, send newsletters, product updates, and promotional materials. You may opt out at any time.</li>
@@ -220,7 +219,7 @@ export default function PrivacyPage() {
             <h2 className="text-xl font-bold mb-4">9. WhatsApp & Communication Data</h2>
             <p className="text-muted-foreground leading-relaxed mb-3">
               When you use our WhatsApp integration (powered by WATI.io), messages and contact information 
-              are processed in accordance with Meta's WhatsApp Business Messaging Policy and this Privacy Policy. 
+              are processed in accordance with Meta&apos;s WhatsApp Business Messaging Policy and this Privacy Policy. 
               We store message logs and contact information solely for the purpose of providing the Service.
             </p>
             <p className="text-muted-foreground leading-relaxed mb-3">
@@ -251,7 +250,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-bold mb-4">12. Children's Privacy</h2>
+            <h2 className="text-xl font-bold mb-4">12. Children&apos;s Privacy</h2>
             <p className="text-muted-foreground leading-relaxed mb-3">
               The Service is not directed to individuals under the age of 18. We do not knowingly collect personal 
               information from children. If we become aware that a child has provided us with personal information, 
@@ -297,14 +296,13 @@ export default function PrivacyPage() {
           </section>
         </div>
 
-        <div className="mt-12 flex items-center justify-between">
-          <Link href="/terms">
-            <Button variant="outline">
+        <div className="mt-12 flex items-center justify-between">              <Link href="/terms">
+            <Button variant="outline" className="hover:border-orange-500/30 transition-all duration-300">
               <ArrowLeft className="h-4 w-4 mr-2" /> View Terms & Conditions
             </Button>
           </Link>
           <Link href="/signup">
-            <Button>
+            <Button className="transition-all duration-300">
               I Understand — Create Account <Shield className="ml-2 h-4 w-4" />
             </Button>
           </Link>

@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { Suspense, useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { useCsrf } from "@/lib/use-csrf"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -14,12 +15,15 @@ import { LanguageToggle } from "@/components/language-toggle"
 import { ContactBar } from "@/components/contact-bar"
 import { CONTACT_INFO } from "@/lib/contact-info"
 
-export default function SignupPage() {
+function SignupForm() {
   const { t, lang } = useTranslation()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [name, setName] = useState("")
-  const [email, setEmail] = useState("")
+  const [email, setEmail] = useState(searchParams.get("email") || "")
+  const [phone, setPhone] = useState("")
+  const fromNeedsAssessment = searchParams.get("needsAssessment") === "true"
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -28,6 +32,7 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const { csrfToken, loading: csrfLoading } = useCsrf()
 
   useEffect(() => { setMounted(true) }, [])
 
@@ -62,8 +67,11 @@ export default function SignupPage() {
     try {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, termsAccepted }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(csrfToken ? { "x-csrf-token": csrfToken } : {}),
+        },
+        body: JSON.stringify({ name, email, password, phone: phone || undefined, termsAccepted }),
       })
 
       const data = await res.json()
@@ -75,8 +83,18 @@ export default function SignupPage() {
 
       setSuccess(true)
       // Auto-redirect to login after a moment
+      // Preserve params so login page knows where to redirect back
       setTimeout(() => {
-        router.push("/login")
+        const params = new URLSearchParams()
+        if (fromNeedsAssessment) {
+          params.set("needsAssessment", "true")
+        }
+        const returnTo = searchParams.get("returnTo")
+        if (returnTo) {
+          params.set("callbackUrl", returnTo)
+        }
+        const qs = params.toString()
+        router.push(`/login${qs ? `?${qs}` : ""}`)
       }, 2000)
     } catch (err) {
       setError("An unexpected error occurred. Please try again.")
@@ -172,6 +190,24 @@ export default function SignupPage() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="phone" className="text-sm font-medium">
+                Phone <span className="text-muted-foreground font-normal">(optional — for WhatsApp updates)</span>
+              </Label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="2547XXXXXXXX"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 15))}
+                autoComplete="tel"
+                className="h-11"
+              />
+              <p className="text-xs text-muted-foreground">
+                Include country code. Used for M-Pesa payments and WhatsApp follow-up reminders about your trial.
+              </p>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="password" className="text-sm font-medium">{t("form.password")}</Label>
               <div className="relative">
                 <Input
@@ -233,12 +269,16 @@ export default function SignupPage() {
               />
               <label htmlFor="terms" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
                 {t("form.agreeTerms")}{" "}
-                <Link href="/terms" target="_blank" className="text-primary hover:underline font-medium">
+                <Link href="/terms" target="_blank" className="link-hover-orange font-medium">
                   {t("form.termsConditions")}
                 </Link>{" "}
                 {t("form.and")}{" "}
-                <Link href="/privacy" className="text-primary hover:underline font-medium">
+                <Link href="/privacy" className="link-hover-orange font-medium">
                   {t("form.privacyPolicy")}
+                </Link>
+                . I confirm I have read and agree to the{" "}
+                <Link href="/privacy#cookies" target="_blank" className="link-hover-orange font-medium">
+                  Cookie Policy
                 </Link>
                 . {t("form.understand")}
               </label>
@@ -247,7 +287,7 @@ export default function SignupPage() {
             <Button
               type="submit"
               className="w-full h-11 text-base"
-              disabled={loading || !name || !email || !password || !passwordsMatch || !termsAccepted}
+              disabled={loading || csrfLoading || !name || !email || !password || !passwordsMatch || !termsAccepted}
             >
               {loading ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {t("form.creatingAccount")}</>
@@ -261,9 +301,8 @@ export default function SignupPage() {
         <CardFooter className="flex justify-center pb-6">
           <p className="text-sm text-muted-foreground">
             {t("form.alreadyHaveAccount")}{" "}
-            <Link href="/login" className="font-medium text-primary hover:text-primary/80 transition-colors">
-              {t("form.signIn")}
-            </Link>
+            <Link href="/login" className="font-medium link-hover-orange">
+              {t("form.signIn")}        </Link>
           </p>
         </CardFooter>
       </Card>
@@ -273,3 +312,17 @@ export default function SignupPage() {
     </div>
   )
 }
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    }>
+      <SignupForm />
+    </Suspense>
+  )
+}
+
+

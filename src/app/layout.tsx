@@ -7,12 +7,32 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { ThemeProvider } from "@/lib/theme-provider"
 import { AuthProvider } from "@/components/auth-provider"
 import { LanguageProvider } from "@/lib/i18n/language-context"
+import { CookieConsent } from "@/components/cookie-consent"
+import { PushNotificationManager } from "@/components/push-notification-manager"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Mapato — AI-Powered Revenue Operations for B2B Trading Companies",
-  description: "Automate lead qualification, client onboarding, and follow-ups across WhatsApp & email. sokogateOS — your AI operating system for B2B trade growth.",
+  title: "Mapato — AI-Powered Revenue Operations for B2B Trading Companies — Like Polsia.com, but for B2B Trade",
+  description: "A seamless, everlasting, and euphoric AI experience that generates revenue for your trading business. Like polsia.com for e-commerce, but purpose-built for B2B trade at half the success fee. Built in collaboration with Sokogate.com and UltimoTradingLtd.co.ke.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    title: "Mapato",
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    icon: [
+      { url: "/icons/icon.svg", type: "image/svg+xml" },
+    ],
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-title": "Mapato",
+    "msapplication-TileColor": "#7C3AED",
+    "msapplication-TileImage": "/icons/icon.svg",
+    "theme-color": "#7C3AED",
+  },
 }
 
 export default function RootLayout({
@@ -37,6 +57,8 @@ export default function RootLayout({
               <LanguageProvider>
                 <Sidebar />
                 <PageWrapper>{children}</PageWrapper>
+                <CookieConsent />
+                <PushNotificationManager />
               </LanguageProvider>
             </AuthProvider>
           </TooltipProvider>

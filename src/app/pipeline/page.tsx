@@ -26,6 +26,7 @@ import {
   ChevronDown,
   ChevronUp,
   GripVertical,
+  Flag,
 } from "lucide-react"
 
 type Client = {
@@ -464,6 +465,25 @@ export default function PipelinePage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Pipeline CRM</h1>
           <p className="text-muted-foreground mt-1">{clients.length} client{clients.length !== 1 ? "s" : ""} in your pipeline</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {(() => {
+            const koreaCount = clients.filter((c) => c.corridor === "korea-africa").length
+            const koreaFiltered = corridorFilter === "korea-africa"
+            return koreaCount > 0 ? (
+              <Badge
+                variant="outline"
+                className={cn(
+                  "cursor-pointer select-none",
+                  koreaFiltered ? "bg-blue-500/10 text-blue-600 border-blue-200" : "hover:bg-muted/50"
+                )}
+                onClick={() => setCorridorFilter(koreaFiltered ? "all" : "korea-africa")}
+              >
+                <Flag className="h-3 w-3 mr-1" />
+                Korea corridor: {koreaCount}
+              </Badge>
+            ) : null
+          })()}
         </div>
         <div className="flex items-center gap-2">
           <Button variant={viewMode === "kanban" ? "default" : "outline"} size="sm" onClick={() => setViewMode("kanban")}>Kanban</Button>

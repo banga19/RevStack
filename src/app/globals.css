@@ -34,6 +34,8 @@
     --chart-3: 24.6 95% 53.1%;
     --chart-4: 262.1 83.3% 57.8%;
     --chart-5: 0 84.2% 60.2%;
+    --orange: 24.6 95% 53.1%;
+    --orange-foreground: 210 40% 98%;
   }
 
   .dark {
@@ -61,6 +63,8 @@
     --sidebar-border: 217.2 32.6% 17.5%;
     --sidebar-accent: 217.2 32.6% 17.5%;
     --sidebar-accent-foreground: 210 40% 98%;
+    --orange: 24.6 95% 53.1%;
+    --orange-foreground: 210 40% 98%;
   }
 }
 
@@ -71,6 +75,62 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Orange gradient accent utilities */
+@layer components {
+  .link-hover-orange {
+    @apply text-primary;
+    position: relative;
+    transition: color 0.2s ease;
+  }
+  .link-hover-orange::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--orange)));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+  }
+  .link-hover-orange:hover {
+    color: transparent;
+  }
+  .link-hover-orange:hover::after {
+    opacity: 1;
+  }
+
+  .input-orange-focus {
+    @apply transition-all duration-200;
+  }
+  .input-orange-focus:focus-within {
+    box-shadow: 0 0 0 2px hsl(var(--primary) / 0.3), 0 0 0 4px hsl(var(--orange) / 0.15);
+  }
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-gradient-shift {
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+}
+
+@keyframes ripple-expand {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
   }
 }
 

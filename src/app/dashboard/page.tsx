@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -16,12 +17,15 @@ import {
   Target,
   CalendarCheck,
   ArrowUpRight,
+  ArrowRight,
   ArrowDownRight,
   RefreshCw,
   BarChart3,
   Activity,
   Send,
   FileText,
+  Sparkles,
+  Clock,
 } from "lucide-react"
 import {
   BarChart,
@@ -58,6 +62,12 @@ export default function DashboardPage() {
   const { data: session } = useSession()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [trialStatus, setTrialStatus] = useState<{
+    daysRemaining: number
+    isExpired: boolean
+    isActive: boolean
+    tier: string
+  } | null>(null)
 
   // Check if onboarding is completed
   useEffect(() => {
@@ -80,6 +90,23 @@ export default function DashboardPage() {
         setLoading(false)
       })
       .catch(() => setLoading(false))
+  }, [])
+
+  // Fetch trial status
+  useEffect(() => {
+    fetch("/api/subscription")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.trial) {
+          setTrialStatus({
+            daysRemaining: d.trial.daysRemaining,
+            isExpired: d.trial.isExpired,
+            isActive: d.trial.isActive,
+            tier: d.suggestedTier?.name || "Starter",
+          })
+        }
+      })
+      .catch(() => {})
   }, [])
 
   if (loading) {
@@ -124,6 +151,57 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Trial Banner */}
+      {trialStatus && trialStatus.isActive && (
+        <div className="p-4 rounded-xl bg-gradient-to-r from-primary/10 via-primary/5 to-emerald-500/10 border border-primary/20">
+          <div className="flex items-start sm:items-center gap-4 flex-col sm:flex-row">
+            <div className="p-2 rounded-lg bg-primary/10 shrink-0">
+              <Sparkles className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0"><p className="text-sm font-semibold">You&apos;re on a <span className="text-primary">14-day free trial</span>
+                {trialStatus.daysRemaining > 0 && (
+                  <span> — <span className="font-bold">{trialStatus.daysRemaining} day{trialStatus.daysRemaining !== 1 ? "s" : ""} remaining</span></span>
+                )}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Enjoy full access to all Mapato features. No credit card required.
+                We&apos;ll recommend the <strong>{trialStatus.tier}</strong> plan based on your needs when the trial ends.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Badge variant="outline" className="text-xs border-primary/30 text-primary">
+                <Clock className="h-3 w-3 mr-1" />
+                {trialStatus.daysRemaining} days left
+              </Badge>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Expired Trial Banner */}
+      {trialStatus && trialStatus.isExpired && (
+        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
+          <div className="flex items-start sm:items-center gap-4 flex-col sm:flex-row">
+            <div className="p-2 rounded-lg bg-amber-500/10 shrink-0">
+              <Clock className="h-5 w-5 text-amber-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
+                Your free trial has ended
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Subscribe to continue using Mapato. We recommend the <strong>{trialStatus.tier}</strong> plan.
+              </p>
+            </div>
+            <Link href="/pricing">
+              <Button size="sm" className="shrink-0">
+                View Plans <ArrowRight className="h-3.5 w-3.5 ml-1" />
+              </Button>
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -351,7 +429,7 @@ export default function DashboardPage() {
               { label: "Publish next article", desc: "WhatsApp Business API guide", icon: FileText, color: "text-purple-500", href: "/content" },
               { label: "Check financial model", desc: "Track to $22,500/mo target", icon: DollarSign, color: "text-emerald-500", href: "/financial" },
             ].map((action, i) => (
-              <a
+              <Link
                 key={i}
                 href={action.href}
                 className="flex items-center gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors group cursor-pointer"
@@ -364,7 +442,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-muted-foreground">{action.desc}</p>
                 </div>
                 <ArrowUpRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-              </a>
+              </Link>
             ))}
           </CardContent>
         </Card>

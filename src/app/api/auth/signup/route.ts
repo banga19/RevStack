@@ -2,10 +2,17 @@ import { NextRequest, NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/db"
 import { sendWelcomeEmail } from "@/lib/email"
+import { validateCsrf } from "@/lib/csrf"
 
 export async function POST(req: NextRequest) {
+  // Validate CSRF token
+  const csrfCheck = await validateCsrf(req)
+  if (!csrfCheck.valid) {
+    return NextResponse.json({ error: "Invalid or missing security token. Please refresh the page and try again." }, { status: 403 })
+  }
+
   try {
-    const { name, email, password, termsAccepted } = await req.json()
+    const { name, email, password, phone, termsAccepted } = await req.json()
 
     if (!name || !email || !password) {
       return NextResponse.json(
@@ -40,18 +47,28 @@ export async function POST(req: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 12)
 
+    // Auto-start 14-day free trial on signup
+    const now = new Date()
+    const trialEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000)
+
     const user = await prisma.user.create({
       data: {
         name,
         email,
         password: hashedPassword,
+        phone: phone || null,
         termsAccepted: true,
         termsAcceptedAt: new Date(),
         termsVersion: "1.0",
+        // Start free trial immediately
+        trialStartsAt: now,
+        trialEndsAt: trialEnd,
+        subscriptionStatus: "trial",
+        subscriptionPlan: "monthly",
       },
     })
 
-    // Send welcome email
+    // Send welcome email with trial info
     await sendWelcomeEmail(user.email, user.name)
 
     return NextResponse.json(
@@ -61,6 +78,11 @@ export async function POST(req: NextRequest) {
         email: user.email,
         termsAccepted: true,
         termsVersion: "1.0",
+        trial: {
+          startedAt: now.toISOString(),
+          endsAt: trialEnd.toISOString(),
+          daysRemaining: 14,
+        },
       },
       { status: 201 }
     )

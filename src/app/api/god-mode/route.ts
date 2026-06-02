@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
 import { agentOrchestrator } from "@/lib/agent-orchestrator"
 import { agentMemory } from "@/lib/agent-memory"
 
 // POST /api/god-mode — Start a new God Mode session
 export async function POST(req: NextRequest) {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
   try {
     const body = await req.json()
     const { duration, objective, agents } = body
@@ -36,6 +41,10 @@ export async function POST(req: NextRequest) {
 
 // GET /api/god-mode — Get all sessions
 export async function GET() {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
   try {
     const sessions = agentOrchestrator.getAllSessions()
     const allReports = agentMemory.getAllReports()
@@ -57,6 +66,10 @@ export async function GET() {
 
 // PATCH /api/god-mode — Control a session (pause/resume/stop)
 export async function PATCH(req: NextRequest) {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
   try {
     const body = await req.json()
     const { sessionId, action } = body

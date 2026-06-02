@@ -15,7 +15,6 @@ import {
   Users,
   DollarSign,
   Send,
-  FileText,
   Newspaper,
   Globe,
   ChevronLeft,
@@ -23,6 +22,9 @@ import {
   Menu,
   X,
   Brain,
+  BookOpen,
+  Flag,
+  Mail,
   Sun,
   Moon,
   LogOut,
@@ -37,11 +39,13 @@ const navItems = [
   { href: "/operations", label: "Operations Center", icon: Brain },
   { href: "/plan", label: "75-Day Plan", icon: CalendarCheck },
   { href: "/pipeline", label: "Pipeline CRM", icon: Users },
+  { href: "/korea", label: "Korea Corridor", icon: Flag },
+  { href: "/korea/inquiries", label: "Buyer Inquiries", icon: Mail },
   { href: "/trade", label: "Trade & Export", icon: Globe },
   { href: "/financial", label: "Financial Model", icon: DollarSign },
   { href: "/outreach", label: "Outreach", icon: Send },
   { href: "/content", label: "Content Calendar", icon: Newspaper },
-  { href: "/docs", label: "Documents", icon: FileText },
+  { href: "/docs", label: "Platform Guides", icon: BookOpen },
 ]
 
 // Auth pages where sidebar should be hidden

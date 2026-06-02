@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
+import { auth } from "@/lib/auth"
 import fs from "fs"
 import path from "path"
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
   try {
     const { id } = await params
     const doc = await prisma.document.findUnique({ where: { id } })

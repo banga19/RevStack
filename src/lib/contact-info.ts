@@ -1,5 +1,5 @@
 /**
- * Shared contact information for Mapato / sokogateOS
+ * Shared contact information for Mapato
  * Update these values to change contact details site-wide.
  */
 

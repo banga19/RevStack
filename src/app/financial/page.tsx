@@ -28,6 +28,7 @@ import {
   Trash2,
   Loader2,
   Receipt,
+  Flag,
 } from "lucide-react"
 import {
   BarChart,
@@ -457,6 +458,94 @@ export default function FinancialPage() {
           </Card>
         </div>
       )}
+
+      {/* Korea Corridor Revenue Projection */}
+      <Card className="bg-gradient-to-br from-rose-500/5 to-amber-500/5 border-rose-500/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Flag className="h-5 w-5 text-rose-500" /> Korea Corridor Revenue Projection
+          </CardTitle>
+          <CardDescription>
+            Target: 10 Korean corporate customers + 20-company Sokogate pilot. Source:
+            <a href="/KOREA-CORPORATE-STRATEGY.md" target="_blank" className="text-primary hover:underline ml-1">
+              KOREA-CORPORATE-STRATEGY.md
+            </a>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-4 mb-6">
+            {[
+              { label: "Target Customers", value: "10", sub: "Korean procurement teams", color: "text-rose-500" },
+              { label: "Target MRR", value: "$22,500", sub: "From retainers alone", color: "text-amber-500" },
+              { label: "With Success Fees", value: "$27,500", sub: "+2-5% per transaction", color: "text-emerald-500" },
+              { label: "Year 1 Total", value: "$196,500", sub: "Cumulative corridor revenue", color: "text-violet-500" },
+            ].map((kpi) => (
+              <div key={kpi.label} className="p-3 rounded-lg bg-background/80 border">
+                <p className="text-xs text-muted-foreground mb-1">{kpi.label}</p>
+                <p className={cn("text-2xl font-bold", kpi.color)}>{kpi.value}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{kpi.sub}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-2 px-2 font-medium text-muted-foreground">Month</th>
+                  <th className="text-right py-2 px-2 font-medium text-muted-foreground">Customers</th>
+                  <th className="text-right py-2 px-2 font-medium text-muted-foreground">Pilot Active</th>
+                  <th className="text-right py-2 px-2 font-medium text-muted-foreground">Retainers</th>
+                  <th className="text-right py-2 px-2 font-medium text-muted-foreground">Success Fees</th>
+                  <th className="text-right py-2 px-2 font-medium text-muted-foreground">Total Korea</th>
+                  <th className="text-right py-2 px-2 font-medium text-muted-foreground">Cumulative</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { month: "M1", customers: 0, pilots: 5, retainers: 0, fees: 0, total: 0, cumulative: 0 },
+                  { month: "M2", customers: 0, pilots: 10, retainers: 0, fees: 0, total: 0, cumulative: 0 },
+                  { month: "M3", customers: 1, pilots: 15, retainers: 2500, fees: 200, total: 2700, cumulative: 2700 },
+                  { month: "M4", customers: 3, pilots: 18, retainers: 7500, fees: 800, total: 8300, cumulative: 11000 },
+                  { month: "M5", customers: 5, pilots: 16, retainers: 12500, fees: 1500, total: 14000, cumulative: 25000 },
+                  { month: "M6", customers: 7, pilots: 14, retainers: 16500, fees: 2500, total: 19000, cumulative: 44000 },
+                  { month: "M7", customers: 8, pilots: 15, retainers: 18500, fees: 3000, total: 21500, cumulative: 65500 },
+                  { month: "M8", customers: 9, pilots: 15, retainers: 20500, fees: 3500, total: 24000, cumulative: 89500 },
+                  { month: "M9", customers: 9, pilots: 15, retainers: 20500, fees: 4000, total: 24500, cumulative: 114000 },
+                  { month: "M10", customers: 10, pilots: 15, retainers: 22500, fees: 4500, total: 27000, cumulative: 141000 },
+                  { month: "M11", customers: 10, pilots: 15, retainers: 22500, fees: 5000, total: 27500, cumulative: 168500 },
+                  { month: "M12", customers: 10, pilots: 15, retainers: 22500, fees: 5000, total: 27500, cumulative: 196500 },
+                ].map((row, i) => {
+                  return (
+                    <tr key={i} className={cn(
+                      "border-b last:border-0 hover:bg-muted/30 transition-colors text-xs",
+                      row.customers >= 10 && "font-semibold bg-rose-500/5"
+                    )}>
+                      <td className="py-2 px-2">{row.month}</td>
+                      <td className="text-right py-2 px-2">{row.customers}</td>
+                      <td className="text-right py-2 px-2 text-muted-foreground">{row.pilots}</td>
+                      <td className="text-right py-2 px-2">${row.retainers.toLocaleString()}</td>
+                      <td className="text-right py-2 px-2 text-muted-foreground">${row.fees.toLocaleString()}</td>
+                      <td className={cn("text-right py-2 px-2 font-medium", row.total > 0 ? "text-emerald-500" : "")}>
+                        ${row.total.toLocaleString()}
+                      </td>
+                      <td className="text-right py-2 px-2 text-muted-foreground">${row.cumulative.toLocaleString()}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex items-center justify-between mt-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20">
+            <div>
+              <p className="text-sm font-medium">Year 1 Korean Corridor Total</p>
+              <p className="text-xs text-muted-foreground">Retainers + success fees from 10 corporate customers &amp; 20-company pilot program</p>
+            </div>
+            <span className="text-xl font-bold text-rose-500">$196,000</span>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Monthly Costs Breakdown */}
       <Card>

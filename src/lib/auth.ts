@@ -58,7 +58,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         })
 
         if (!existingUser) {
-          // Auto-create account for Google users
+          // Auto-create account for Google users with 14-day trial
+          const now = new Date()
+          const trialEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000)
           await prisma.user.create({
             data: {
               name: user.name || "Google User",
@@ -66,6 +68,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               password: "", // No password for Google-authenticated users
               role: "user",
               image: user.image,
+              // Google SSO users implicitly accept terms by signing in
+              termsAccepted: true,
+              termsAcceptedAt: now,
+              termsVersion: "1.0",
+              // Google users start trial immediately
+              subscriptionStatus: "trial",
+              trialStartsAt: now,
+              trialEndsAt: trialEnd,
             },
           })
         } else if (!existingUser.image && user.image) {

@@ -17,12 +17,60 @@ model User {
   termsAccepted  Boolean  @default(false)
   termsAcceptedAt DateTime?
   termsVersion   String?  @default("1.0")
+
+  // Trial & Subscription fields
+  trialStartsAt  DateTime? // When the 14-day free trial started
+  trialEndsAt    DateTime? // When the trial ends (trialStartsAt + 14 days)
+  subscriptionStatus String @default("trial") // trial, active, past_due, canceled, expired
+  subscriptionTier String?  // starter, growth, enterprise — based on onboarding
+  subscriptionPlan String   @default("monthly") // monthly, yearly
+  subscriptionStartsAt DateTime?
+  subscriptionEndsAt DateTime?
+  phone          String?  // phone number for M-Pesa payments & WhatsApp follow-ups
+  billingEmail   String?  // email for invoices (defaults to user email)
+
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   onboardingResponses  OnboardingResponse[]
   preAuthQuestionnaires PreAuthQuestionnaire[]
   clients              Client[]
+  koreanTargets        KoreanCorporateTarget[]
+  payments             Payment[]
+  followUpLogs         FollowUpLog[]
+}
+
+// Payment transactions — M-Pesa, Mobile Money, Visa/Mastercard
+model Payment {
+  id               String   @id @default(cuid())
+  userId           String
+  amount           Float
+  currency         String   @default("USD")
+  provider         String   @default("flutterwave") // flutterwave
+  paymentMethod    String   // mpesa, mobile_money, card
+  flutterwaveTxRef String?  @unique
+  flutterwaveTxId  Int?     @unique
+  status           String   @default("pending") // pending, success, failed, cancelled
+  tier             String?  // starter, growth, enterprise — what they paid for
+  plan             String?  // monthly, yearly
+  metadata         String?  // JSON: phone number, card details, etc.
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Follow-up log — tracks trial-ending reminder messages sent
+model FollowUpLog {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // email, whatsapp
+  stage     String   // day-10, day-13, day-14, d+3, d+7
+  sentAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, stage, type])
 }
 
 // Pre-authentication needs assessment - collected BEFORE user signs up
@@ -117,6 +165,7 @@ model Client {
   products          ClientProduct[]
   complianceRecords ClientCompliance[]
   tradeFinanceApps  TradeFinanceApplication[]
+  ersSnapshots      ErsSnapshot[]
 }
 
 // Products/services a client offers for export/trade — enables B2B matching
@@ -261,6 +310,18 @@ model Document {
   createdAt   DateTime @default(now())
 }
 
+// ERS Score snapshots for tracking score history over time
+model ErsSnapshot {
+  id              String   @id @default(cuid())
+  clientId        String
+  totalScore      Int
+  breakdown       String   // JSON breakdown
+  readinessLevel  String   // export-ready, developing, needs-work
+  snapshotDate    DateTime @default(now())
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
 model FinancialSnapshot {
   id        String   @id @default(cuid())
   month     Int
@@ -271,4 +332,86 @@ model FinancialSnapshot {
   clients   Int      @default(0)
   pipelineValue Float @default(0)
   createdAt DateTime @default(now())
+}
+
+// Korean corporate procurement targets — 10 target companies
+model KoreanCorporateTarget {
+  id        String   @id @default(cuid())
+  company   String
+  tier      String   // Chaebol Supplier, Trading House, Mid-Sized Manufacturer
+  focus     String   // Procurement focus categories
+  status    String   @default("Identified") // Identified, Outreach Ready, Contact Made, Warm Lead, Hot Lead
+  stage     String   @default("Researching") // Researching, Outreach Ready, Intro Sent, Initial Call, Second Meeting, Demo Scheduled, Proposal, Negotiation, Closed
+  contactName  String?
+  contactTitle String?
+  contactEmail String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+// Sokogate Platform Pilot cohorts — 20 African exporters on 3-month free trials
+model SokogatePilotCohort {
+  id          String   @id @default(cuid())
+  name        String   // Cohort 1: Agriculture, etc.
+  type        String   // Focus commodity type
+  count       Int      @default(5)
+  enrolled    Int      @default(0)
+  startMonth  String   // Month 1, Month 2, etc.
+  startDate   DateTime?
+  endDate     DateTime?
+  status      String   @default("Planning") // Planning, Recruiting, Active, Completed
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  participants SokogatePilotParticipant[]
+}
+
+// Individual companies enrolled in a pilot cohort
+model SokogatePilotParticipant {
+  id          String   @id @default(cuid())
+  cohortId    String
+  companyName String
+  contactName  String?
+  contactEmail String?
+  country     String?  // Kenya, Tanzania, Uganda, etc.
+  commodity   String?  // Primary export commodity
+  trialStartedAt DateTime?
+  trialEndsAt    DateTime?
+  status      String   @default("invited") // invited, active, completed, churned
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  cohort SokogatePilotCohort @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+}
+
+// Email subscribers captured from the landing page newsletter form
+model Subscriber {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  source    String?  // landing-page, needs-assessment, other
+  createdAt DateTime @default(now())
+}
+
+// Korean buyer procurement inquiries — submitted via /korea/buyers registration form
+model KoreanBuyerInquiry {
+  id                String   @id @default(cuid())
+  companyName       String
+  contactName       String
+  email             String
+  phone             String?
+  jobTitle          String?
+  commodityInterest String?  // Commodities they want to source
+  monthlyVolume     String?  // Estimated monthly procurement volume
+  additionalRequests String?
+  status            String   @default("new") // new, contacted, qualified, converted
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }

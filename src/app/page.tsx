@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -38,6 +39,7 @@ import { CONTACT_INFO } from "@/lib/contact-info"
 
 export default function LandingPage() {
   const { t, lang } = useTranslation()
+  const router = useRouter()
   const [mounted, setMounted] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [email, setEmail] = useState("")
@@ -50,10 +52,25 @@ export default function LandingPage() {
     e.preventDefault()
     if (!email) return
     setSubscribing(true)
-    // Simulate subscription
-    await new Promise(r => setTimeout(r, 1000))
-    setSubscribed(true)
-    setSubscribing(false)
+    try {
+      const res = await fetch("/api/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      })
+      if (res.ok) {
+        setSubscribed(true)
+      } else {
+        // API error — fallback: redirect to needs-assessment with email hint
+        // (user fills ICP profile first, then creates account)
+        router.push(`/needs-assessment?email=${encodeURIComponent(email)}`)
+      }
+    } catch {
+      // Network error — fallback: redirect to needs-assessment with email hint
+      router.push(`/needs-assessment?email=${encodeURIComponent(email)}`)
+    } finally {
+      setSubscribing(false)
+    }
   }
 
   if (!mounted) return null
@@ -74,7 +91,7 @@ export default function LandingPage() {
                 <Brain className="h-6 w-6 text-primary" />
               </div>
               <span className="text-xl font-bold">Mapato</span>
-              <Badge variant="outline" className="ml-2 text-[10px] font-mono text-muted-foreground">sokogateOS</Badge>
+              <Badge variant="outline" className="ml-2 text-[10px] font-mono text-muted-foreground">Mapato</Badge>
               <Badge className="ml-2 text-[10px] bg-primary/20 text-primary border-primary/30">God Mode</Badge>
             </div>
 
@@ -91,7 +108,7 @@ export default function LandingPage() {
               <Link href="/login">
                 <Button variant="ghost" size="sm">{t("nav.signIn")}</Button>
               </Link>
-              <Link href="/signup">
+              <Link href="/needs-assessment">
                 <Button size="sm">
                   {t("nav.getStarted")} <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -121,7 +138,7 @@ export default function LandingPage() {
                   <LanguageToggle variant="header" />
                 </div>
                 <Link href="/login" className="flex-1"><Button variant="outline" className="w-full">{t("nav.signIn")}</Button></Link>
-                <Link href="/signup" className="flex-1"><Button className="w-full">{t("nav.getStarted")}</Button></Link>
+                <Link href="/needs-assessment" className="flex-1"><Button className="w-full">{t("nav.getStarted")}</Button></Link>
               </div>
             </div>
           </div>
@@ -144,11 +161,24 @@ export default function LandingPage() {
               <span>{t("hero.badge")}</span>
               <span className="text-muted-foreground mx-1">·</span>
               <span className="text-primary font-semibold">Autonomous AI Agents</span>
+              <span className="text-muted-foreground mx-1">·</span>
+              <span className="text-xs text-muted-foreground">
+                <a href="https://polsia.com" target="_blank" rel="noopener noreferrer" className="link-hover-orange">Polsia.com</a>
+                {" "}inspired — half the success fee
+              </span>
+              <span className="text-muted-foreground mx-1">·</span>
+              <span className="text-xs text-muted-foreground">
+                A{" "}
+                <a href="https://sokogate.com" target="_blank" rel="noopener noreferrer" className="link-hover-orange">Sokogate</a>
+                {" "}×{" "}
+                <a href="https://ultimotradingltd.co.ke" target="_blank" rel="noopener noreferrer" className="link-hover-orange">Ultimo Trading</a>
+                {" "}collaboration
+              </span>
             </div>
 
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 animate-fade-in">
               {t("hero.title")}{" "}
-              <span className="bg-gradient-to-r from-primary via-primary/80 to-emerald-400 text-transparent bg-clip-text">
+              <span className="bg-gradient-to-r from-primary via-primary/80 to-orange-400 text-transparent bg-clip-text">
                 {t("hero.titleHighlight")}
               </span>
             </h1>
@@ -158,7 +188,7 @@ export default function LandingPage() {
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12 animate-fade-in">
-              <Link href="/signup">
+              <Link href="/needs-assessment">
                 <Button size="lg" className="h-12 px-8 text-base">
                   {t("hero.cta")} <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
@@ -321,10 +351,13 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <Badge variant="outline" className="mb-4">Integration Ecosystem</Badge>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Powered by the best automation platforms</h2>
-            <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-              We don't build everything from scratch. We orchestrate the best tools into one seamless system.
-            </p>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Powered by the best automation platforms</h2>              <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+                Mapato was born from a direct collaboration between{" "}
+                <a href="https://sokogate.com" target="_blank" rel="noopener noreferrer" className="link-hover-orange font-medium">Sokogate.com</a>
+                {" "}and{" "}
+                <a href="https://ultimotradingltd.co.ke" target="_blank" rel="noopener noreferrer" className="link-hover-orange font-medium">UltimoTradingLtd.co.ke</a>.
+                We orchestrate the best tools into one seamless system.
+              </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
@@ -334,13 +367,27 @@ export default function LandingPage() {
               { name: "Make.com", role: "Workflow Automation", desc: "Custom automation scenarios connecting CRM, email, WhatsApp, and analytics together.", bg: "from-purple-500/10" },
               { name: "Voiceflow", role: "Conversational AI", desc: "No-code chatbot builder for lead qualification flows with scoring and routing.", bg: "from-amber-500/10" },
               { name: "Instantly.ai", role: "Email Outreach", desc: "Cold email campaigns with auto-warmup, deliverability optimization, and A/B testing.", bg: "from-red-500/10" },
-              { name: "Sokogate", role: "B2B Trade Platform", desc: "Bulk product sourcing, trade corridor matching, and AfCFTA startup program access.", bg: "from-primary/10" },
+              { name: "Sokogate", role: "Co-Creator & Trade Platform", desc: "Mapato was co-built with Sokogate — the B2B wholesale sourcing platform connecting African traders to global markets. Sokogate powers the trade corridor matching layer.", bg: "from-primary/10" },
+            { name: "Ultimo Trading", role: "Co-Creator & Anchor Client", desc: "Mapato was co-built with Ultimo Trading Ltd — the company behind Sokogate. As the anchor client, Ultimo's operations shaped every feature from lead capture to compliance tracking.", bg: "from-amber-500/10" },
             ].map((tool, i) => (
               <div key={i} className="p-6 rounded-xl border border-border/50 bg-gradient-to-br from-card to-muted/50 hover:border-primary/20 transition-all duration-300">
-                <div className={cn("p-3 rounded-lg bg-gradient-to-br mb-4 w-fit", tool.bg, "to-transparent")}>
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-sm font-bold">
-                    {tool.name[0]}
-                  </div>
+                <div className={cn("p-3 rounded-lg bg-gradient-to-br mb-4 w-fit", tool.bg, "to-transparent")}>                      {i === 5 ? (
+                    <a href="https://sokogate.com" target="_blank" rel="noopener noreferrer" className="block">
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-sm font-bold">
+                        {tool.name[0]}
+                      </div>
+                    </a>
+                  ) : i === 6 ? (
+                    <a href="https://ultimotradingltd.co.ke" target="_blank" rel="noopener noreferrer" className="block">
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-sm font-bold">
+                        {tool.name[0]}
+                      </div>
+                    </a>
+                  ) : (
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-sm font-bold">
+                      {tool.name[0]}
+                    </div>
+                  )}
                 </div>
                 <h3 className="font-semibold mb-1">{tool.name}</h3>
                 <p className="text-xs text-primary/70 font-mono mb-2">{tool.role}</p>
@@ -360,6 +407,34 @@ export default function LandingPage() {
             <p className="text-lg text-muted-foreground max-w-3xl mx-auto">{t("pricing.subtitle")}</p>
           </div>
 
+          {/* Free Trial Banner */}
+          <div className="mb-10 p-6 rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-emerald-500/10 border border-primary/20 text-center">
+            <div className="flex justify-center mb-3">
+              <div className="p-3 rounded-full bg-primary/10">
+                <Sparkles className="h-8 w-8 text-primary" />
+              </div>
+            </div>
+            <h3 className="text-2xl font-bold mb-2">14-Day Free Trial. Full Access. No Credit Card.</h3>
+            <p className="text-muted-foreground max-w-xl mx-auto mb-4">
+              Try every Mapato feature — AI agents, God Mode, WhatsApp automation, pipeline CRM, compliance tracking,
+              and trade finance. Your personalized plan is suggested after you complete onboarding.
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3 text-sm">
+              <div className="flex items-center gap-1.5 text-emerald-500">
+                <CheckCircle2 className="h-4 w-4" /> All features unlocked
+              </div>
+              <div className="flex items-center gap-1.5 text-emerald-500">
+                <CheckCircle2 className="h-4 w-4" /> No commitment
+              </div>
+              <div className="flex items-center gap-1.5 text-emerald-500">
+                <CheckCircle2 className="h-4 w-4" /> Cancel anytime
+              </div>
+              <div className="flex items-center gap-1.5 text-emerald-500">
+                <CheckCircle2 className="h-4 w-4" /> Plan tailored to your needs
+              </div>
+            </div>
+          </div>
+
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {/* Starter - Polsia-inspired $50/mo + 10% success fee */}
             <div className="relative p-6 rounded-xl border border-border/50 bg-card hover:border-primary/20 transition-all duration-300 flex flex-col">
@@ -372,7 +447,8 @@ export default function LandingPage() {
                   <span className="text-3xl font-bold">$50</span>
                   <span className="text-muted-foreground">/mo</span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">+ 10% success fee on revenue generated</p>
+                <p className="text-xs text-muted-foreground mt-1">or <strong>$500/year</strong> (save 2 months)</p>
+                <p className="text-xs text-muted-foreground">+ 10% success fee on revenue generated</p>
                 <Badge variant="outline" className="mt-2 text-[10px] font-mono">God Mode: $19/hr</Badge>
               </div>
               <ul className="space-y-3 mb-6 flex-1">
@@ -390,8 +466,10 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <Link href="/signup">
-                <Button variant="outline" className="w-full">Get started</Button>
+              <Link href="/needs-assessment">
+                <Button variant="outline" className="w-full">
+                  <Sparkles className="h-4 w-4 mr-2" /> Start Free Trial
+                </Button>
               </Link>
             </div>
 
@@ -409,7 +487,8 @@ export default function LandingPage() {
                   <span className="text-3xl font-bold">$200</span>
                   <span className="text-muted-foreground">/mo</span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">+ 15% success fee on revenue generated</p>
+                <p className="text-xs text-muted-foreground mt-1">or <strong>$2,000/year</strong> (save 2 months)</p>
+                <p className="text-xs text-muted-foreground">+ 15% success fee on revenue generated</p>
                 <Badge variant="outline" className="mt-2 text-[10px] font-mono">God Mode: $14/hr</Badge>
               </div>
               <ul className="space-y-3 mb-6 flex-1">
@@ -429,8 +508,10 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <Link href="/signup">
-                <Button className="w-full">Get started</Button>
+              <Link href="/needs-assessment">
+                <Button className="w-full">
+                  <Sparkles className="h-4 w-4 mr-2" /> Start Free Trial
+                </Button>
               </Link>
             </div>
 
@@ -445,7 +526,8 @@ export default function LandingPage() {
                   <span className="text-3xl font-bold">$500</span>
                   <span className="text-muted-foreground">/mo</span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">+ 20% success fee on revenue generated</p>
+                <p className="text-xs text-muted-foreground mt-1">or <strong>$5,000/year</strong> (save 2 months)</p>
+                <p className="text-xs text-muted-foreground">+ 20% success fee on revenue generated</p>
                 <Badge className="mt-2 text-[10px] bg-emerald-500/20 text-emerald-500 border-emerald-500/30">God Mode Included</Badge>
               </div>
               <ul className="space-y-3 mb-6 flex-1">
@@ -465,17 +547,126 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <Link href="/signup">
-                <Button variant="outline" className="w-full">Contact sales</Button>
+              <Link href="/needs-assessment">
+                <Button variant="outline" className="w-full">
+                  <Sparkles className="h-4 w-4 mr-2" /> Start Free Trial
+                </Button>
               </Link>
             </div>
           </div>
 
           <div className="text-center mt-8">
             <p className="text-sm text-muted-foreground">
-              All plans include a 14-day free trial. No credit card required.{" "}
-              <Link href="/signup" className="text-primary hover:underline">Start your trial →</Link>
+              All plans include a <strong className="text-primary">14-day free trial</strong> with full access to every feature. No credit card required.{" "}
+              <Link href="/needs-assessment" className="link-hover-orange font-semibold">Start your trial now →</Link>
             </p>
+          </div>
+
+          {/* Polsia Comparison Table */}
+          <div className="mt-16 max-w-4xl mx-auto">
+            <div className="text-center mb-8">
+              <Badge variant="outline" className="mb-4">{t("pricing.badge")}</Badge>
+              <h2 className="text-2xl md:text-3xl font-bold mb-3">{t("compare.title")}</h2>
+              <p className="text-sm text-muted-foreground max-w-2xl mx-auto">{t("compare.subtitle")}</p>
+            </div>
+
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-hidden rounded-xl border border-border/50 bg-card">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border/50 bg-muted/30">
+                    <th className="text-left px-6 py-4 font-semibold">{t("compare.feature")}</th>
+                    <th className="text-center px-6 py-4">
+                      <div>
+                        <span className="font-bold text-foreground">Polsia</span>
+                        <p className="text-[10px] text-muted-foreground font-normal mt-0.5">{t("compare.polsiaDesc")}</p>
+                      </div>
+                    </th>
+                    <th className="text-center px-6 py-4 bg-primary/5">
+                      <div>
+                        <span className="font-bold text-primary">Mapato</span>
+                        <p className="text-[10px] text-muted-foreground font-normal mt-0.5">{t("compare.mapatoDesc")}</p>
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { feature: t("compare.target"), polsia: t("compare.targetP"), mapato: t("compare.targetM"), highlight: true },
+                    { feature: t("compare.monthly"), polsia: t("compare.monthlyP"), mapato: t("compare.monthlyM"), highlight: true },
+                    { feature: t("compare.successFee"), polsia: <span className="text-destructive font-medium">{t("compare.successFeeP")}</span>, mapato: <span className="text-emerald-500 font-bold">{t("compare.successFeeM")}</span>, highlight: true },
+                    { feature: t("compare.leadQual"), polsia: t("compare.check"), mapato: t("compare.check") },
+                    { feature: t("compare.whatsapp"), polsia: t("compare.cross"), mapato: t("compare.check") },
+                    { feature: t("compare.email"), polsia: t("compare.check"), mapato: t("compare.check") },
+                    { feature: t("compare.crm"), polsia: t("compare.check"), mapato: t("compare.check") },
+                    { feature: t("compare.forecasting"), polsia: t("compare.cross"), mapato: <span className="text-emerald-500">{t("compare.check")}</span> },
+                    { feature: t("compare.trade"), polsia: t("compare.cross"), mapato: <span className="text-emerald-500">{t("compare.check")}</span> },
+                    { feature: t("compare.ers"), polsia: t("compare.cross"), mapato: <span className="text-emerald-500">{t("compare.check")}</span> },
+                    { feature: t("compare.finance"), polsia: t("compare.cross"), mapato: <span className="text-emerald-500">{t("compare.check")}</span> },
+                    { feature: t("compare.compliance"), polsia: t("compare.cross"), mapato: <span className="text-emerald-500">{t("compare.check")}</span> },
+                    { feature: t("compare.freeTrial"), polsia: t("compare.cross"), mapato: <span className="text-emerald-500 font-medium">{t("compare.trialDays")}</span> },
+                  ].map((row, i) => (
+                    <tr
+                      key={i}
+                      className={cn(
+                        "border-b border-border/30 transition-colors",
+                        i === 2 ? "bg-primary/[0.02]" : "",
+                        row.highlight ? "hover:bg-muted/20" : "hover:bg-muted/10"
+                      )}
+                    >
+                      <td className="px-6 py-3.5 font-medium text-sm">{row.feature}</td>
+                      <td className="px-6 py-3.5 text-center text-sm text-muted-foreground">{row.polsia}</td>
+                      <td className="px-6 py-3.5 text-center text-sm font-medium bg-primary/5">{row.mapato}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="md:hidden space-y-3">
+              {[
+                { feature: t("compare.target"), polsia: t("compare.targetP"), mapato: t("compare.targetM"), highlight: true },
+                { feature: t("compare.monthly"), polsia: t("compare.monthlyP"), mapato: t("compare.monthlyM"), highlight: true },
+                { feature: t("compare.successFee"), polsia: "20%", mapato: "From 10%", highlight: true },
+                { feature: t("compare.leadQual"), polsia: "✅", mapato: "✅" },
+                { feature: t("compare.whatsapp"), polsia: "❌", mapato: "✅" },
+                { feature: t("compare.email"), polsia: "✅", mapato: "✅" },
+                { feature: t("compare.crm"), polsia: "✅", mapato: "✅" },
+                { feature: t("compare.forecasting"), polsia: "❌", mapato: "✅" },
+                { feature: t("compare.trade"), polsia: "❌", mapato: "✅" },
+                { feature: t("compare.ers"), polsia: "❌", mapato: "✅" },
+                { feature: t("compare.finance"), polsia: "❌", mapato: "✅" },
+                { feature: t("compare.compliance"), polsia: "❌", mapato: "✅" },
+                { feature: t("compare.freeTrial"), polsia: "❌", mapato: "✅ 14-day free trial" },
+              ].map((row, i) => (
+                <div key={i} className={cn(
+                  "p-4 rounded-xl border border-border/50",
+                  i === 2 ? "bg-primary/[0.02] border-primary/20" : "bg-card"
+                )}>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">{row.feature}</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center">
+                      <p className="text-[10px] text-muted-foreground uppercase mb-1">{t("compare.polsia")}</p>
+                      <p className={cn("text-sm", i === 2 && "text-destructive font-medium")}>{row.polsia}</p>
+                    </div>
+                    <div className="text-center bg-primary/5 rounded-lg p-2">
+                      <p className="text-[10px] text-primary uppercase mb-1">{t("compare.mapato")}</p>
+                      <p className={cn("text-sm font-semibold", i === 2 ? "text-emerald-500" : "")}>{row.mapato}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="text-center mt-8">
+              <Link href="/needs-assessment">
+                <Button size="lg" className="h-12 px-8 text-base">
+                  <Sparkles className="h-5 w-5 mr-2" />{t("nav.getStarted")}
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -512,9 +703,9 @@ export default function LandingPage() {
               </div>
               <div>
                 <p className="text-base md:text-lg italic text-muted-foreground mb-4">
-                  "sokogateOS automated our entire lead qualification process via WhatsApp. 
+                  &ldquo;Mapato automated our entire lead qualification process via WhatsApp. 
                   We went from 20 leads/month to 85 qualified conversations — and closed 3x more deals. 
-                  The Korea corridor access through Sokogate is opening doors we couldn't reach before."
+                  The Korea corridor access through Sokogate is opening doors we couldn&apos;t reach before.&rdquo;
                 </p>
                 <div>
                   <p className="font-semibold text-sm">Bangaly Fofana</p>
@@ -612,8 +803,8 @@ export default function LandingPage() {
           )}
 
           <div className="mt-8 flex items-center justify-center gap-6 text-sm text-muted-foreground">
-            <Link href="/terms" className="hover:text-foreground transition-colors">{t("cta.terms")}</Link>
-            <Link href="/login" className="hover:text-foreground transition-colors">{t("nav.signIn")}</Link>
+            <Link href="/terms" className="link-hover-orange">{t("cta.terms")}</Link>
+            <Link href="/login" className="link-hover-orange">{t("nav.signIn")}</Link>
           </div>
         </div>
       </section>
@@ -625,16 +816,25 @@ export default function LandingPage() {
             <div className="flex items-center gap-2">
               <Brain className="h-5 w-5 text-primary" />
               <span className="font-bold">Mapato</span>
-              <span className="text-xs text-muted-foreground font-mono">sokogateOS</span>
+              <span className="text-xs text-muted-foreground font-mono">Mapato</span>
             </div>
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
-              <Link href="/terms" className="hover:text-foreground transition-colors">{t("footer.terms")}</Link>
-              <Link href="/privacy" className="hover:text-foreground transition-colors">{t("footer.privacy")}</Link>
-              <a href={`mailto:${CONTACT_INFO.email}`} className="hover:text-foreground transition-colors">{t("footer.contact")}</a>
+              <Link href="/docs" className="link-hover-orange text-muted-foreground">{t("nav.guides")}</Link>
+              <Link href="/terms" className="link-hover-orange text-muted-foreground">{t("footer.terms")}</Link>
+              <Link href="/privacy" className="link-hover-orange text-muted-foreground">{t("footer.privacy")}</Link>
+              <a href={`mailto:${CONTACT_INFO.email}`} className="link-hover-orange text-muted-foreground">{t("footer.contact")}</a>
             </div>
-            <p className="text-xs text-muted-foreground">
-              © 2026 Mapato. {t("footer.tagline")}
-            </p>
+            <div className="flex flex-col items-center md:items-end gap-1">
+              <p className="text-xs text-muted-foreground">
+                © 2026 Mapato. {t("footer.tagline")}
+              </p>
+              <p className="text-[10px] text-muted-foreground/60">
+                Built in collaboration with{" "}
+                <a href="https://sokogate.com" target="_blank" rel="noopener noreferrer" className="text-primary/60 hover:text-primary transition-colors">Sokogate.com</a>
+                {" "}×{" "}
+                <a href="https://ultimotradingltd.co.ke" target="_blank" rel="noopener noreferrer" className="text-primary/60 hover:text-primary transition-colors">UltimoTradingLtd.co.ke</a>
+              </p>
+            </div>
           </div>
         </div>
       </footer>

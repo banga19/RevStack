@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
+import { auth } from "@/lib/auth"
 import { qmeIntegration } from "@/lib/qme-integration"
 import { ragPipeline } from "@/lib/rag-pipeline"
 
@@ -12,6 +13,10 @@ export const config = {
 }
 
 export async function GET(request: Request) {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
   try {
     const { searchParams } = new URL(request.url)
     const category = searchParams.get('category')
@@ -47,6 +52,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
   try {
     const formData = await request.formData()
     const file = formData.get('file') as File | null
@@ -117,6 +126,10 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
