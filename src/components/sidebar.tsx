@@ -34,6 +34,7 @@ import {
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/operations", label: "Operations Center", icon: Brain },
   { href: "/plan", label: "75-Day Plan", icon: CalendarCheck },
   { href: "/pipeline", label: "Pipeline CRM", icon: Users },
   { href: "/trade", label: "Trade & Export", icon: Globe },

@@ -75,6 +75,7 @@ export default function LandingPage() {
               </div>
               <span className="text-xl font-bold">Mapato</span>
               <Badge variant="outline" className="ml-2 text-[10px] font-mono text-muted-foreground">sokogateOS</Badge>
+              <Badge className="ml-2 text-[10px] bg-primary/20 text-primary border-primary/30">God Mode</Badge>
             </div>
 
             {/* Desktop Nav */}
@@ -141,6 +142,8 @@ export default function LandingPage() {
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-sm text-primary mb-6 animate-fade-in">
               <Sparkles className="h-4 w-4" />
               <span>{t("hero.badge")}</span>
+              <span className="text-muted-foreground mx-1">·</span>
+              <span className="text-primary font-semibold">Autonomous AI Agents</span>
             </div>
 
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 animate-fade-in">
@@ -358,23 +361,24 @@ export default function LandingPage() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {/* Starter */}
+            {/* Starter - Polsia-inspired $50/mo + 10% success fee */}
             <div className="relative p-6 rounded-xl border border-border/50 bg-card hover:border-primary/20 transition-all duration-300 flex flex-col">
               <div className="mb-4">
                 <h3 className="text-lg font-bold">Starter</h3>
                 <p className="text-sm text-muted-foreground mt-1">For solo traders and small teams getting started</p>
               </div>
-              <div className="mb-6">
+              <div className="mb-4">
                 <div className="flex items-baseline gap-1">
                   <span className="text-3xl font-bold">$50</span>
                   <span className="text-muted-foreground">/mo</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">+ 10% success fee on revenue generated</p>
+                <Badge variant="outline" className="mt-2 text-[10px] font-mono">God Mode: $19/hr</Badge>
               </div>
-              <ul className="space-y-3 mb-8 flex-1">
+              <ul className="space-y-3 mb-6 flex-1">
                 {[
-                  "Basic lead qualification bot",
-                  "WhatsApp & email follow-ups",
+                  "Basic lead qualification bot (Voiceflow + WhatsApp)",
+                  "WhatsApp & email follow-up sequences",
                   "Up to 500 contacts",
                   "Pipeline CRM access",
                   "Monthly performance report",
@@ -391,7 +395,7 @@ export default function LandingPage() {
               </Link>
             </div>
 
-            {/* Growth - Recommended */}
+            {/* Growth - Polsia-inspired $200/mo + 15% success fee */}
             <div className="relative p-6 rounded-xl border-2 border-primary/40 bg-card shadow-xl shadow-primary/5 transition-all duration-300 flex flex-col scale-105">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                 <Badge className="bg-primary text-primary-foreground">Most Popular</Badge>
@@ -400,20 +404,22 @@ export default function LandingPage() {
                 <h3 className="text-lg font-bold">Growth</h3>
                 <p className="text-sm text-muted-foreground mt-1">For growing trading companies scaling operations</p>
               </div>
-              <div className="mb-6">
+              <div className="mb-4">
                 <div className="flex items-baseline gap-1">
                   <span className="text-3xl font-bold">$200</span>
                   <span className="text-muted-foreground">/mo</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">+ 15% success fee on revenue generated</p>
+                <Badge variant="outline" className="mt-2 text-[10px] font-mono">God Mode: $14/hr</Badge>
               </div>
-              <ul className="space-y-3 mb-8 flex-1">
+              <ul className="space-y-3 mb-6 flex-1">
                 {[
-                  "Advanced lead scoring & routing",
-                  "Multi-channel automation",
+                  "Advanced lead scoring & routing (AI-powered)",
+                  "Multi-channel automation (WhatsApp, Email, LinkedIn)",
                   "Up to 5,000 contacts",
-                  "Custom workflow builder",
-                  "Revenue forecasting analytics",
+                  "Custom automation workflow builder",
+                  "Revenue forecasting & predictive analytics",
+                  "Trade compliance & certification tracking",
                   "Priority support",
                   "Dedicated account manager",
                 ].map((feature, i) => (
@@ -428,29 +434,30 @@ export default function LandingPage() {
               </Link>
             </div>
 
-            {/* Enterprise */}
+            {/* Enterprise - Polsia-inspired $500/mo + 20% success fee + free God Mode */}
             <div className="relative p-6 rounded-xl border border-border/50 bg-card hover:border-primary/20 transition-all duration-300 flex flex-col">
               <div className="mb-4">
                 <h3 className="text-lg font-bold">Enterprise</h3>
-                <p className="text-sm text-muted-foreground mt-1">For established businesses with complex needs</p>
+                <p className="text-sm text-muted-foreground mt-1">Full-featured solution for established businesses</p>
               </div>
-              <div className="mb-6">
+              <div className="mb-4">
                 <div className="flex items-baseline gap-1">
                   <span className="text-3xl font-bold">$500</span>
                   <span className="text-muted-foreground">/mo</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">+ 20% success fee on revenue generated</p>
+                <Badge className="mt-2 text-[10px] bg-emerald-500/20 text-emerald-500 border-emerald-500/30">God Mode Included</Badge>
               </div>
-              <ul className="space-y-3 mb-8 flex-1">
+              <ul className="space-y-3 mb-6 flex-1">
                 {[
-                  "Enterprise-grade AI automation",
-                  "Omnichannel orchestration",
-                  "Unlimited contacts",
-                  "Custom integrations & API",
-                  "AI-powered predictive analytics",
-                  "24/7 premium support",
-                  "Customer success manager",
-                  "SLA guarantees",
+                  "Enterprise-grade AI automation & orchestration",
+                  "Omnichannel engagement platform",
+                  "Unlimited contacts & workflows",
+                  "Custom integrations & full API access",
+                  "AI-powered predictive trade analytics",
+                  "Trade finance application management",
+                  "Export Readiness Scoring (ERS)",
+                  "24/7 premium support & SLA guarantees",
                 ].map((feature, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm">
                     <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
