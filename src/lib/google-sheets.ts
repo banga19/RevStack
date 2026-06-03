@@ -10,8 +10,8 @@ export interface SignupRow {
   email: string
   phone?: string | null
   termsAccepted: boolean
-  trialStartedAt: string
-  trialEndsAt: string
+  trialStartedAt?: string
+  trialEndsAt?: string
   subscriptionStatus: string
   subscriptionPlan: string
   createdAt: string
@@ -226,8 +226,8 @@ export async function appendSignupRow(row: SignupRow) {
     row.email,
     row.phone ?? "",
     row.termsAccepted ? "Yes" : "No",
-    row.trialStartedAt,
-    row.trialEndsAt,
+    row.trialStartedAt ?? "",
+    row.trialEndsAt ?? "",
     row.subscriptionStatus,
     row.subscriptionPlan,
     row.createdAt,

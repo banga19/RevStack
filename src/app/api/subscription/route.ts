@@ -35,21 +35,16 @@ export async function GET() {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
-    // Calculate trial status
-    const now = new Date()
-    const trialStart = user.trialStartsAt || user.createdAt
-    const trialEnd = user.trialEndsAt || new Date(trialStart.getTime() + 14 * 24 * 60 * 60 * 1000)
-    const daysRemaining = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
-    const isTrialExpired = daysRemaining <= 0 && user.subscriptionStatus === "trial"
+    // All users now have full Enterprise access for free with God Mode included.
+    // The subscription endpoint returns this as the default status.
 
-    // Get onboarding data for plan suggestion
+    // Get onboarding data for plan suggestion (informational only)
     const onboarding = user.onboardingResponses[0]
-    let suggestedTier: TierId = "starter"
-    let suggestionConfidence = "medium"
-    let suggestionReasoning = "Default suggestion"
+    let suggestedTier: TierId = "enterprise"
+    let suggestionConfidence = "high"
+    let suggestionReasoning = "Full Enterprise access — free for all users"
 
     if (onboarding) {
-      // Convert null fields to undefined to match function signature
       const onboardingClean = {
         businessName: onboarding.businessName ?? undefined,
         industry: onboarding.industry ?? undefined,
@@ -64,27 +59,27 @@ export async function GET() {
       suggestionReasoning = suggestion.reasoning
     }
 
+    // Default to active enterprise if user's actual status is trial/expired
+    const effectiveStatus = user.subscriptionStatus === "active" ? user.subscriptionStatus : "active"
+    const effectiveTier = user.subscriptionTier || "enterprise"
+
     return NextResponse.json({
-      // Trial info
       trial: {
-        startedAt: trialStart.toISOString(),
-        endsAt: trialEnd.toISOString(),
-        daysRemaining,
-        isExpired: isTrialExpired,
-        isActive: !isTrialExpired && user.subscriptionStatus === "trial",
+        startedAt: null,
+        endsAt: null,
+        daysRemaining: 365,
+        isExpired: false,
+        isActive: true,
       },
-      // Subscription info
       subscription: {
-        status: user.subscriptionStatus,
-        tier: user.subscriptionTier || suggestedTier,
-        plan: user.subscriptionPlan,
-        startedAt: user.subscriptionStartsAt?.toISOString() || null,
-        endsAt: user.subscriptionEndsAt?.toISOString() || null,
+        status: effectiveStatus,
+        tier: effectiveTier,
+        plan: user.subscriptionPlan || "monthly",
+        startedAt: user.subscriptionStartsAt?.toISOString() || new Date().toISOString(),
+        endsAt: null,
         billingEmail: user.billingEmail || user.email,
       },
-      // Available tiers
       tiers: TIERS,
-      // Suggested plan based on onboarding
       suggestedTier: {
         ...TIERS[suggestedTier],
         confidence: suggestionConfidence,
