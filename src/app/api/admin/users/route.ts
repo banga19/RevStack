@@ -16,6 +16,8 @@ export async function GET() {
       email: true,
       role: true,
       createdAt: true,
+      subscriptionStatus: true,
+      subscriptionTier: true,
       _count: { select: { onboardingResponses: true } },
     },
   })
@@ -31,10 +33,30 @@ export async function PUT(req: Request) {
 
   try {
     const body = await req.json()
-    const { userId, role } = body
+    const { userId, role, grantPermanentAccess } = body
 
-    if (!userId || !role || !["user", "admin"].includes(role)) {
-      return NextResponse.json({ error: "Invalid request" }, { status: 400 })
+    if (!userId) {
+      return NextResponse.json({ error: "userId is required" }, { status: 400 })
+    }
+
+    // Grant Permanent Access — sets the user's subscription to active + enterprise
+    if (grantPermanentAccess) {
+      const updated = await prisma.user.update({
+        where: { id: userId },
+        data: {
+          subscriptionStatus: "active",
+          subscriptionTier: "enterprise",
+          subscriptionPlan: "monthly",
+          subscriptionStartsAt: new Date(),
+        },
+        select: { id: true, name: true, email: true, role: true, subscriptionStatus: true, subscriptionTier: true, createdAt: true },
+      })
+      return NextResponse.json(updated)
+    }
+
+    // Role change
+    if (!role || !["user", "admin"].includes(role)) {
+      return NextResponse.json({ error: "Invalid request: role or grantPermanentAccess required" }, { status: 400 })
     }
 
     // Prevent removing your own admin role

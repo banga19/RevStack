@@ -292,3 +292,60 @@ export async function triggerFollowUpForUser(userId: string, stageId: string): P
     return false
   }
 }
+
+// ---------------------------------------------------------------------------
+// Trial expiry — auto-expire trials when they pass the 14-day mark
+// ---------------------------------------------------------------------------
+
+export interface TrialExpiryResult {
+  expired: number
+  alreadyExpired: number
+  errors: number
+}
+
+/**
+ * Expire trials that have passed their trialEndsAt date.
+ * Sets subscriptionStatus from 'trial' to 'expired'.
+ *
+ * This is called by the daily cron at /api/cron/trial-expiry.
+ * It only affects users whose trialEndsAt is in the past and who still
+ * have subscriptionStatus === 'trial' (i.e., haven't subscribed yet).
+ */
+export async function expireTrials(): Promise<TrialExpiryResult> {
+  const result: TrialExpiryResult = { expired: 0, alreadyExpired: 0, errors: 0 }
+
+  try {
+    const now = new Date()
+
+    const usersToExpire = await prisma.user.findMany({
+      where: {
+        subscriptionStatus: "trial",
+        trialEndsAt: { lte: now },
+      },
+      select: { id: true, email: true, name: true, trialEndsAt: true },
+    })
+
+    for (const user of usersToExpire) {
+      try {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { subscriptionStatus: "expired" },
+        })
+        result.expired++
+      } catch (error) {
+        console.error(`[TrialExpiry] Failed to expire user ${user.id}:`, error)
+        result.errors++
+      }
+    }
+
+    // Count users already expired
+    const alreadyExpiredCount = await prisma.user.count({
+      where: { subscriptionStatus: "expired" },
+    })
+    result.alreadyExpired = alreadyExpiredCount
+  } catch (error: any) {
+    console.error("[TrialExpiry] Error:", error)
+  }
+
+  return result
+}

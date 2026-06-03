@@ -51,6 +51,8 @@ type AdminUser = {
   email: string
   role: string
   createdAt: string
+  subscriptionStatus: string | null
+  subscriptionTier: string | null
   _count: { onboardingResponses: number }
 }
 
@@ -226,6 +228,27 @@ export default function AdminPage() {
     if (session.user.role !== "admin") { router.push("/dashboard"); return }
     loadAll()
   }, [session, router, loadAll])
+
+  // ---- Grant Permanent Access ----
+  const grantPermanentAccess = async (userId: string) => {
+    setUpdating(userId)
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, grantPermanentAccess: true }),
+      })
+      if (!res.ok) { const d = await res.json(); alert(d.error || "Failed"); return }
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === userId
+            ? { ...u, subscriptionStatus: "active", subscriptionTier: "enterprise" }
+            : u
+        )
+      )
+    } catch { alert("Failed to grant permanent access") }
+    finally { setUpdating(null) }
+  }
 
   // ---- User role management ----
   const updateRole = async (userId: string, role: string) => {
@@ -430,55 +453,102 @@ export default function AdminPage() {
       ) : (
         <div className="space-y-2">
           <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            <div className="col-span-4">User</div>
-            <div className="col-span-2">Role</div>
-            <div className="col-span-2">Onboarding</div>
-            <div className="col-span-2">Joined</div>
+            <div className="col-span-3">User</div>
+            <div className="col-span-1">Role</div>
+            <div className="col-span-1.5">Subscription</div>
+            <div className="col-span-1.5">Onboarding</div>
+            <div className="col-span-1.5">Joined</div>
             <div className="col-span-2">Actions</div>
+            <div className="col-span-1.5">Permanent</div>
           </div>
-          {users.map((user) => (
-            <div key={user.id} className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors items-center">
-              <div className="col-span-4 flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/60 text-primary-foreground font-bold text-xs shrink-0">
-                  {user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+          {users.map((user) => {
+            const needsGrant = user.subscriptionStatus === "trial" || user.subscriptionStatus === "expired"
+            return (
+              <div key={user.id} className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors items-center">
+                <div className="col-span-3 flex items-center gap-3">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/60 text-primary-foreground font-bold text-xs shrink-0">
+                    {user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{user.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{user.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                <div className="col-span-1">
+                  <Badge variant={user.role === "admin" ? "default" : "secondary"} className={cn(user.role === "admin" && "bg-primary/10 text-primary")}>
+                    {user.role === "admin" ? <Shield className="h-3 w-3 mr-1" /> : <Users className="h-3 w-3 mr-1" />}
+                    {user.role === "admin" ? "Admin" : "User"}
+                  </Badge>
+                </div>
+                <div className="col-span-1.5">
+                  {user.subscriptionStatus === "active" ? (
+                    <Badge variant="default" className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/30 whitespace-nowrap">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      {user.subscriptionTier === "enterprise" ? "Enterprise" : user.subscriptionTier || "Active"}
+                    </Badge>
+                  ) : user.subscriptionStatus === "trial" ? (
+                    <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-500/30 whitespace-nowrap">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Trial
+                    </Badge>
+                  ) : user.subscriptionStatus === "expired" ? (
+                    <Badge variant="destructive" className="text-[10px] whitespace-nowrap">
+                      <AlertTriangle className="h-3 w-3 mr-1" />
+                      Expired
+                    </Badge>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </div>
+                <div className="col-span-1.5">
+                  <div className="flex items-center gap-1.5">
+                    {user._count.onboardingResponses > 0 ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <XCircle className="h-3.5 w-3.5 text-muted-foreground" />}
+                    <span className="text-sm text-muted-foreground">{user._count.onboardingResponses > 0 ? "Completed" : "Pending"}</span>
+                  </div>
+                </div>
+                <div className="col-span-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">{new Date(user.createdAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
+                <div className="col-span-2">
+                  <div className="flex items-center gap-2">
+                    <Select value={user.role} onValueChange={(v) => updateRole(user.id, v)} disabled={updating === user.id}>
+                      <SelectTrigger className="h-8 w-24 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="user">User</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {updating === user.id && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                  </div>
+                </div>
+                <div className="col-span-1.5">
+                  {needsGrant ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-[10px] whitespace-nowrap"
+                      onClick={() => grantPermanentAccess(user.id)}
+                      disabled={updating === user.id}
+                    >
+                      {updating === user.id ? (
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      ) : (
+                        <><CheckCircle2 className="h-3 w-3 mr-1" /> Grant Permanent</>
+                      )}
+                    </Button>
+                  ) : (
+                    <span className="text-[10px] text-emerald-600 font-medium whitespace-nowrap">
+                      <CheckCircle2 className="h-3 w-3 inline mr-1" />
+                      Active
+                    </span>
+                  )}
                 </div>
               </div>
-              <div className="col-span-2">
-                <Badge variant={user.role === "admin" ? "default" : "secondary"} className={cn(user.role === "admin" && "bg-primary/10 text-primary")}>
-                  {user.role === "admin" ? <Shield className="h-3 w-3 mr-1" /> : <Users className="h-3 w-3 mr-1" />}
-                  {user.role === "admin" ? "Admin" : "User"}
-                </Badge>
-              </div>
-              <div className="col-span-2">
-                <div className="flex items-center gap-1.5">
-                  {user._count.onboardingResponses > 0 ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <XCircle className="h-3.5 w-3.5 text-muted-foreground" />}
-                  <span className="text-sm text-muted-foreground">{user._count.onboardingResponses > 0 ? "Completed" : "Pending"}</span>
-                </div>
-              </div>
-              <div className="col-span-2">
-                <div className="flex items-center gap-1.5">
-                  <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">{new Date(user.createdAt).toLocaleDateString()}</span>
-                </div>
-              </div>
-              <div className="col-span-2">
-                <div className="flex items-center gap-2">
-                  <Select value={user.role} onValueChange={(v) => updateRole(user.id, v)} disabled={updating === user.id}>
-                    <SelectTrigger className="h-8 w-24 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="user">User</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {updating === user.id && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-                </div>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </CardContent>
