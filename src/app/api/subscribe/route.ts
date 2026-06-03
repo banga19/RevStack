@@ -5,8 +5,10 @@ import { appendSubscriberRow } from "@/lib/google-sheets"
 
 export async function POST(req: NextRequest) {
   try {
+    // CSRF is optional for public subscribe (landing page form).
+    // Validate if the cookie exists, but allow anonymous subscriptions.
     const csrfCheck = await validateCsrf(req)
-    if (!csrfCheck.valid) {
+    if (!csrfCheck.valid && csrfCheck.reason !== "Missing CSRF cookie") {
       return NextResponse.json({ error: "Invalid or missing security token" }, { status: 403 })
     }
 
