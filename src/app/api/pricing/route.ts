@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
+import { getTierFromBudget, TIERS } from "@/lib/pricing"
 
 export async function GET() {
   try {
@@ -13,10 +14,10 @@ export async function GET() {
     const pricingTiers = [
       {
         id: "starter",
-        name: "Starter",
+        name: TIERS.starter.name,
         description: "For solo traders and small teams getting started with AI automation",
-        monthlyPrice: 50,
-        successFee: 0.10, // 10% success fee on revenue generated
+        monthlyPrice: TIERS.starter.monthlyPrice,
+        successFee: TIERS.starter.successFee,
         successFeeLabel: "10% success fee",
         features: [
           "Basic lead qualification chatbot (Voiceflow + WhatsApp)",
@@ -34,10 +35,10 @@ export async function GET() {
       },
       {
         id: "growth",
-        name: "Growth",
+        name: TIERS.growth.name,
         description: "For growing trading companies scaling their operations",
-        monthlyPrice: 200,
-        successFee: 0.15, // 15% success fee
+        monthlyPrice: TIERS.growth.monthlyPrice,
+        successFee: TIERS.growth.successFee,
         successFeeLabel: "15% success fee",
         features: [
           "Advanced lead scoring & routing (AI-powered)",
@@ -57,10 +58,10 @@ export async function GET() {
       },
       {
         id: "enterprise",
-        name: "Enterprise",
+        name: TIERS.enterprise.name,
         description: "Full-featured solution for established trading businesses",
-        monthlyPrice: 500,
-        successFee: 0.20, // 20% success fee
+        monthlyPrice: TIERS.enterprise.monthlyPrice,
+        successFee: TIERS.enterprise.successFee,
         successFeeLabel: "20% success fee",
         features: [
           "Enterprise-grade AI automation & orchestration",
@@ -90,19 +91,9 @@ export async function GET() {
       orderBy: { createdAt: "desc" }
     })
 
-    let suggestedTier = "starter" // default
-    if (onboarding?.budgetRange) {
-      // Map budget ranges to suggested tiers
-      const budgetToTier: Record<string, string> = {
-        "under-1000": "starter",
-        "1000-2500": "growth",
-        "2500-5000": "enterprise",
-        "5000-10000": "enterprise",
-        "10000+": "enterprise",
-        "not-sure": "starter"
-      }
-      suggestedTier = budgetToTier[onboarding.budgetRange] || "starter"
-    }
+    const suggestedTier = onboarding?.budgetRange
+      ? getTierFromBudget(onboarding.budgetRange)
+      : "starter"
 
     return NextResponse.json({
       tiers: pricingTiers,

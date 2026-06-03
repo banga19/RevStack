@@ -1,104 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
+import { TIERS, suggestTierFromOnboarding, type TierId } from "@/lib/pricing"
 
-// ============================================================
-// Plan/Tier definitions
-// ============================================================
+// TierId type imported from @/lib/pricing
+// TIERS definitions imported from @/lib/pricing
+// suggestTierFromOnboarding imported from @/lib/pricing
 
-const TIERS = {
-  starter: {
-    id: "starter",
-    name: "Starter",
-    monthlyPrice: 50,
-    yearlyPrice: 500, // 2 months free
-    successFee: 0.10,
-    godModeRate: 19,
-  },
-  growth: {
-    id: "growth",
-    name: "Growth",
-    monthlyPrice: 200,
-    yearlyPrice: 2000, // 2 months free
-    successFee: 0.15,
-    godModeRate: 14,
-  },
-  enterprise: {
-    id: "enterprise",
-    name: "Enterprise",
-    monthlyPrice: 500,
-    yearlyPrice: 5000, // 2 months free
-    successFee: 0.20,
-    godModeRate: 0, // free
-  },
-} as const
-
-type TierId = keyof typeof TIERS
-
-// ============================================================
-// Suggest plan based on onboarding data
-// ============================================================
-
-function suggestTierFromOnboarding(onboarding: {
-  businessName?: string
-  industry?: string
-  companySize?: string
-  primaryGoal?: string
-  servicesNeeded?: string
-  budgetRange?: string
-}): { tierId: TierId; confidence: string; reasoning: string } {
-  const budget = onboarding.budgetRange || ""
-
-  // Budget-based suggestion (primary signal)
-  const budgetToTier: Record<string, TierId> = {
-    "under-1000": "starter",
-    "1000-2500": "growth",
-    "2500-5000": "enterprise",
-    "5000-10000": "enterprise",
-    "10000+": "enterprise",
-    "not-sure": "starter",
-  }
-
-  const budgetTier = budgetToTier[budget] || "starter"
-
-  // Company size signals
-  const sizeSignals: Record<string, TierId> = {
-    "1": "starter",
-    "2-10": "starter",
-    "11-50": "growth",
-    "51-200": "enterprise",
-    "201+": "enterprise",
-  }
-
-  // Tier priority for combining signals
-  const tierPriority: Record<string, number> = { starter: 1, growth: 2, enterprise: 3 }
-
-  // Combine signals
-  let tierId: TierId = budgetTier
-  let reasoning = `Based on your budget range`
-
-  if (onboarding.companySize && sizeSignals[onboarding.companySize]) {
-    const sizeTier = sizeSignals[onboarding.companySize]
-    // Use the higher tier between budget and company size
-    if (tierPriority[sizeTier] > tierPriority[tierId]) {
-      tierId = sizeTier
-      reasoning += ` and company size (${onboarding.companySize} employees)`
-    }
-  }
-
-  // Services signals
-  if (onboarding.servicesNeeded) {
-    const premiumServices = ["full-stack-automation", "consulting"]
-    if (premiumServices.includes(onboarding.servicesNeeded)) {
-      tierId = tierPriority[tierId] < 3 ? "growth" : tierId
-      reasoning += ` and selected service (${onboarding.servicesNeeded.replace(/-/g, " ")})`
-    }
-  }
-
-  const confidence = onboarding.budgetRange ? "high" : "medium"
-
-  return { tierId, confidence, reasoning }
-}
+// suggestTierFromOnboarding is now imported from @/lib/pricing
 
 // ============================================================
 // GET — Get trial/subscription status for current user

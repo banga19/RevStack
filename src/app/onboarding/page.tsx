@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
+import { getTierFromBudget, getPriceFromBudget } from "@/lib/pricing"
 import { Brain, Loader2, CheckCircle2, ArrowRight, ArrowLeft, Sparkles, BarChart3, Target, Users, DollarSign } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
@@ -22,28 +23,15 @@ const steps = [
   { id: "complete", title: "Complete", icon: CheckCircle2 },
 ]
 
+// getTierFromBudget and getPriceFromBudget imported from @/lib/pricing
+// Capitalized names for display
 const getSuggestedTier = (budgetRange: string): string => {
-  const budgetToTier: Record<string, string> = {
-    "under-1000": "Starter",
-    "1000-2500": "Growth",
-    "2500-5000": "Enterprise",
-    "5000-10000": "Enterprise",
-    "10000+": "Enterprise",
-    "not-sure": "Starter",
-  }
-  return budgetToTier[budgetRange] || "Starter"
+  const tierId = getTierFromBudget(budgetRange)
+  return tierId.charAt(0).toUpperCase() + tierId.slice(1)
 }
 
 const getSuggestedPrice = (budgetRange: string): number => {
-  const budgetToPrice: Record<string, number> = {
-    "under-1000": 385,
-    "1000-2500": 1150,
-    "2500-5000": 2500,
-    "5000-10000": 2500,
-    "10000+": 2500,
-    "not-sure": 385,
-  }
-  return budgetToPrice[budgetRange] || 385
+  return getPriceFromBudget(budgetRange)
 }
 
 type FormData = {

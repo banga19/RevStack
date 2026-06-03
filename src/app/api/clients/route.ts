@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
+import { getSuggestionFromBudget } from "@/lib/pricing"
 import { prisma } from "@/lib/db"
 
 export async function GET() {
@@ -38,19 +39,9 @@ export async function POST(req: NextRequest) {
     })
 
     if (onboarding?.budgetRange) {
-      const budgetToTier: Record<string, { tier: string; monthlyPrice: number }> = {
-        "under-1000": { tier: "starter", monthlyPrice: 50 },
-        "1000-2500": { tier: "growth", monthlyPrice: 200 },
-        "2500-5000": { tier: "enterprise", monthlyPrice: 500 },
-        "5000-10000": { tier: "enterprise", monthlyPrice: 500 },
-        "10000+": { tier: "enterprise", monthlyPrice: 500 },
-        "not-sure": { tier: "starter", monthlyPrice: 50 }
-      }
-      const suggestion = budgetToTier[onboarding.budgetRange]
-      if (suggestion) {
-        suggestedTier = suggestion.tier
-        suggestedMonthlyRetainer = suggestion.monthlyPrice
-      }
+      const suggestion = getSuggestionFromBudget(onboarding.budgetRange)
+      suggestedTier = suggestion.tier
+      suggestedMonthlyRetainer = suggestion.monthlyPrice
     }
 
     const client = await prisma.client.create({

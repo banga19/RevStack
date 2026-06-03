@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { appendOnboardingRow } from "@/lib/google-sheets"
+import { getSuggestionFromBudget } from "@/lib/pricing"
 
 export async function POST(req: NextRequest) {
   try {
@@ -32,23 +33,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Suggested pricing tier based on budget range
-    let suggestedTier: string | null = null
-    let suggestedMonthlyRetainer: number | null = null
-    if (body.budgetRange) {
-      const budgetToTier: Record<string, { tier: string; monthlyPrice: number }> = {
-        "under-1000": { tier: "starter", monthlyPrice: 385 },
-        "1000-2500": { tier: "growth", monthlyPrice: 1150 },
-        "2500-5000": { tier: "enterprise", monthlyPrice: 2500 },
-        "5000-10000": { tier: "enterprise", monthlyPrice: 2500 },
-        "10000+": { tier: "enterprise", monthlyPrice: 2500 },
-        "not-sure": { tier: "starter", monthlyPrice: 385 }
-      }
-      const suggestion = budgetToTier[body.budgetRange]
-      if (suggestion) {
-        suggestedTier = suggestion.tier
-        suggestedMonthlyRetainer = suggestion.monthlyPrice
-      }
-    }
+    const suggestion = body.budgetRange ? getSuggestionFromBudget(body.budgetRange) : null
+    const suggestedTier: string | null = suggestion?.tier || null
+    const suggestedMonthlyRetainer: number | null = suggestion?.monthlyPrice || null
 
     const response = await prisma.onboardingResponse.create({
       data: {
