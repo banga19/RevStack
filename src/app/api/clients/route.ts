@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
 
     // Get user's onboarding data to suggest tier and pricing if not provided
     let suggestedTier = "starter"
-    let suggestedMonthlyRetainer = 385 // default starter price
+    let suggestedMonthlyRetainer = 50 // default starter price
 
     const onboarding = await prisma.onboardingResponse.findFirst({
       where: { userId: session.user.id, completed: true },
@@ -39,12 +39,12 @@ export async function POST(req: NextRequest) {
 
     if (onboarding?.budgetRange) {
       const budgetToTier: Record<string, { tier: string; monthlyPrice: number }> = {
-        "under-1000": { tier: "starter", monthlyPrice: 385 },
-        "1000-2500": { tier: "growth", monthlyPrice: 1150 },
-        "2500-5000": { tier: "enterprise", monthlyPrice: 2500 },
-        "5000-10000": { tier: "enterprise", monthlyPrice: 2500 },
-        "10000+": { tier: "enterprise", monthlyPrice: 2500 },
-        "not-sure": { tier: "starter", monthlyPrice: 385 }
+        "under-1000": { tier: "starter", monthlyPrice: 50 },
+        "1000-2500": { tier: "growth", monthlyPrice: 200 },
+        "2500-5000": { tier: "enterprise", monthlyPrice: 500 },
+        "5000-10000": { tier: "enterprise", monthlyPrice: 500 },
+        "10000+": { tier: "enterprise", monthlyPrice: 500 },
+        "not-sure": { tier: "starter", monthlyPrice: 50 }
       }
       const suggestion = budgetToTier[onboarding.budgetRange]
       if (suggestion) {

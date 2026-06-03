@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { useRouter } from "next/navigation"import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Select,
@@ -31,6 +31,12 @@ import {
   BellRing,
   Play,
   Smartphone,
+  Activity,
+  Zap,
+  Brain,
+  Square,
+  Pause,
+  Globe,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -126,6 +132,13 @@ export default function AdminPage() {
   const [runningFollowups, setRunningFollowups] = useState(false)
   const [triggeringUser, setTriggeringUser] = useState<string | null>(null)
 
+  // God Mode state
+  const [godModeSessions, setGodModeSessions] = useState<any[]>([])
+  const [godModeReports, setGodModeReports] = useState<any[]>([])
+  const [godModeStatus, setGodModeStatus] = useState<any>(null)
+  const [godModeLoading, setGodModeLoading] = useState(false)
+  const [startingGodMode, setStartingGodMode] = useState(false)
+
   const loadAll = useCallback(async () => {
     setLoading(true)
     setAdminDataLoading(true)
@@ -155,6 +168,57 @@ export default function AdminPage() {
       setAdminDataLoading(false)
     }
   }, [router])
+
+  // Load God Mode sessions
+  const loadGodMode = useCallback(async () => {
+    setGodModeLoading(true)
+    try {
+      const res = await fetch("/api/god-mode")
+      if (res.ok) {
+        const data = await res.json()
+        setGodModeSessions(data.sessions || [])
+        setGodModeReports(data.reports || [])
+        setGodModeStatus(data.agentStatus || null)
+      }
+    } catch (e) {
+      console.error("Failed to load God Mode:", e)
+    } finally {
+      setGodModeLoading(false)
+    }
+  }, [])
+
+  const handleGodModeControl = async (sessionId: string, action: "pause" | "resume" | "stop") => {
+    try {
+      await fetch("/api/god-mode", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, action }),
+      })
+      loadGodMode()
+    } catch (e) {
+      console.error(`Failed to ${action} God Mode:`, e)
+    }
+  }
+
+  const handleStartGodMode = async () => {
+    setStartingGodMode(true)
+    try {
+      await fetch("/api/god-mode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          duration: 3600000,
+          objective: "Full system sweep — all agents, all pending tasks",
+          agents: ["lead", "trade", "compliance", "onboarding", "revenue"],
+        }),
+      })
+      loadGodMode()
+    } catch (e) {
+      console.error("Failed to start God Mode:", e)
+    } finally {
+      setStartingGodMode(false)
+    }
+  }
 
   useEffect(() => {
     if (!session?.user) return
@@ -327,11 +391,12 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users"><Users className="h-4 w-4 mr-2" /> Users</TabsTrigger>
           <TabsTrigger value="payments"><DollarSign className="h-4 w-4 mr-2" /> Payments</TabsTrigger>
           <TabsTrigger value="trials"><Clock className="h-4 w-4 mr-2" /> Trial Users</TabsTrigger>
           <TabsTrigger value="followups"><BellRing className="h-4 w-4 mr-2" /> Follow-ups</TabsTrigger>
+          <TabsTrigger value="godmode"><Zap className="h-4 w-4 mr-2" /> God Mode</TabsTrigger>
         </TabsList>
 
 {/* ================================================================= */}
@@ -601,6 +666,136 @@ export default function AdminPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+    </CardContent>
+  </Card>
+</TabsContent>
+
+{/* ================================================================= */}
+{/* TAB: God Mode */}
+{/* ================================================================= */}
+<TabsContent value="godmode" className="space-y-4">
+  <Card>
+    <CardHeader className="flex flex-row items-center justify-between">
+      <div>
+        <CardTitle className="flex items-center gap-2"><Zap className="h-5 w-5 text-amber-500" /> God Mode — Autonomous Agents</CardTitle>
+        <CardDescription>Admin super access to the AI agent orchestrator. Start, pause, and monitor autonomous agents.</CardDescription>
+      </div>
+      <Button
+        onClick={() => {
+          handleStartGodMode()
+        }}
+        disabled={startingGodMode || godModeSessions.some((s: any) => s.status === "running")}
+      >
+        {startingGodMode ? (
+          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Starting...</>
+        ) : (
+          <><Zap className="h-4 w-4 mr-2" /> Start Full God Mode</>
+        )}
+      </Button>
+    </CardHeader>
+    <CardContent className="space-y-6">
+      {/* Agent Status Grid */}
+      <div className="grid gap-3 md:grid-cols-5">
+        {[
+          { id: "lead", label: "Lead Agent", icon: <Users className="h-4 w-4" />, color: "text-blue-500 bg-blue-500/10", desc: "Qualifies leads & follow-ups" },
+          { id: "trade", label: "Trade Agent", icon: <Globe className="h-4 w-4" />, color: "text-emerald-500 bg-emerald-500/10", desc: "Corridors & matching" },
+          { id: "compliance", label: "Compliance Agent", icon: <Shield className="h-4 w-4" />, color: "text-amber-500 bg-amber-500/10", desc: "Certifications & expiry" },
+          { id: "onboarding", label: "Onboarding Agent", icon: <Users className="h-4 w-4" />, color: "text-purple-500 bg-purple-500/10", desc: "Client onboarding" },
+          { id: "revenue", label: "Revenue Agent", icon: <DollarSign className="h-4 w-4" />, color: "text-emerald-500 bg-emerald-500/10", desc: "Revenue & invoicing" },
+        ].map((agent: any) => {
+          const isRunning = godModeSessions.some((s: any) => s.status === "running" && s.currentAgent === agent.id)
+          return (
+            <div key={agent.id} className={cn("p-3 rounded-lg border text-center transition-all", isRunning ? "border-primary/40 bg-primary/5" : "border-border/50")}>
+              <div className={cn("p-2 rounded-lg inline-flex mb-2", agent.color)}>
+                {agent.icon}
+              </div>
+              <p className="text-xs font-medium">{agent.label}</p>
+              <p className="text-[10px] text-muted-foreground">{agent.desc}</p>
+              <div className={cn("mt-2 w-2 h-2 rounded-full mx-auto", isRunning ? "bg-emerald-500 animate-pulse" : "bg-muted")} />
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Active Sessions */}
+      {godModeSessions.filter((s: any) => s.status === "running" || s.status === "paused").map((session: any) => (
+        <div key={session.id} className="p-4 rounded-lg border bg-muted/10">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Activity className={cn("h-4 w-4", session.status === "running" ? "text-primary animate-pulse" : "text-amber-500")} />
+              <span className="text-sm font-medium capitalize">{session.status}</span>
+              <span className="text-xs text-muted-foreground">{session.config.objective}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-[10px]">{session.progress}%</Badge>
+              {session.status === "running" ? (
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleGodModeControl(session.id, "pause")}>
+                  <Pause className="h-3 w-3 mr-1" /> Pause
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleGodModeControl(session.id, "resume")}>
+                  <Play className="h-3 w-3 mr-1" /> Resume
+                </Button>
+              )}
+              <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => handleGodModeControl(session.id, "stop")}>
+                <Square className="h-3 w-3 mr-1" /> Stop
+              </Button>
+            </div>
+          </div>
+          <Progress value={session.progress} className="h-1.5" />
+          <div className="mt-3 space-y-1.5">
+            {session.tasks.slice(0, 5).map((task: any) => (
+              <div key={task.id} className="flex items-center gap-2 text-xs">
+                <div className={cn("w-1.5 h-1.5 rounded-full shrink-0",
+                  task.status === "completed" ? "bg-emerald-500" :
+                  task.status === "running" ? "bg-primary animate-pulse" :
+                  task.status === "failed" ? "bg-red-500" : "bg-muted"
+                )} />
+                <span className="text-muted-foreground">{task.action}</span>
+                <Badge variant="outline" className="text-[9px] ml-auto capitalize">{task.status}</Badge>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {/* Reports */}
+      {godModeReports.length > 0 && (
+        <div>
+          <h4 className="text-sm font-medium mb-3">Agent Reports</h4>
+          <div className="space-y-2">
+            {godModeReports.slice(0, 5).map((report: any) => (
+              <div key={report.id} className="p-3 rounded-lg border bg-card/50">
+                <div className="flex items-center gap-2 mb-1">
+                  <Badge variant="outline" className="text-[9px] capitalize">{report.agentType}</Badge>
+                  <span className="text-xs font-medium">{report.title}</span>
+                  <span className="text-[10px] text-muted-foreground ml-auto">{new Date(report.timestamp).toLocaleString()}</span>
+                </div>
+                <p className="text-xs text-muted-foreground line-clamp-2">{report.summary}</p>
+                {report.insights.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {report.insights.slice(0, 3).map((insight: string, i: number) => (
+                      <span key={i} className="text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">{insight}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {godModeSessions.filter((s: any) => s.status === "running" || s.status === "paused").length === 0 && godModeReports.length === 0 && (
+        <div className="text-center py-8">
+          <Brain className="h-12 w-12 text-muted-foreground/50 mx-auto mb-3" />
+          <p className="text-muted-foreground text-sm">No active God Mode sessions. Click "Start Full God Mode" to launch all 5 autonomous agents.</p>
+          <Button variant="outline" className="mt-4" onClick={loadGodMode}>
+            <RefreshCw className={cn("h-4 w-4 mr-2", godModeLoading && "animate-spin")} />
+            Refresh Status
+          </Button>
         </div>
       )}
     </CardContent>
