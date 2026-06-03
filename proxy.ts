@@ -67,7 +67,20 @@ export default async function middleware(req: NextRequest) {
     }
   }
 
+  // Skip static asset files served from public/
+  const staticExtensions = /\.(svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf|eot|css|js|json|xml|webmanifest)$/
+  if (staticExtensions.test(nextUrl.pathname)) {
+    return wrap(NextResponse.next())
+  }
+
   // ═══════════════════════════════════════════════════════════
+  // Auth session endpoint — served even when unauthenticated
+  // ═══════════════════════════════════════════════════════════
+  const isAuthRoute = nextUrl.pathname.startsWith("/api/auth/")
+  if (!isLoggedIn && isAuthRoute) {
+    return wrap(NextResponse.next())
+  }
+
   // Public routes — auth pages, needs-assessment, and API
   // routes (which handle their own auth internally)
   // ═══════════════════════════════════════════════════════════
@@ -75,14 +88,16 @@ export default async function middleware(req: NextRequest) {
     "/login",
     "/signup",
     "/needs-assessment",
-    "/api",
     "/terms",
     "/privacy",
     "/pricing",
   ]
-  const isPublicRoute = publicRoutes.some((route) =>
+  let isPublicRoute = publicRoutes.some((route) =>
     nextUrl.pathname.startsWith(route)
   )
+  if (nextUrl.pathname === "/api" || nextUrl.pathname.startsWith("/api/")) {
+    isPublicRoute = true
+  }
 
   // Landing page is always public
   if (nextUrl.pathname === "/") {
@@ -91,12 +106,9 @@ export default async function middleware(req: NextRequest) {
 
   if (!isLoggedIn && !isPublicRoute) {
     const callbackUrl = nextUrl.pathname + nextUrl.search
-    const encodedCallback = encodeURIComponent(callbackUrl)
-    return wrap(
-      NextResponse.redirect(
-        new URL(`/login?callbackUrl=${encodedCallback}`, nextUrl)
-      )
-    )
+    const loginUrl = new URL("/login", nextUrl)
+    loginUrl.searchParams.set("callbackUrl", callbackUrl)
+    return wrap(NextResponse.redirect(loginUrl))
   }
 
   // If logged in and on login/signup, redirect to dashboard
@@ -123,7 +135,6 @@ export default async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    // Match all routes except static files, _next, and favicon
-    "/((?!_next/static|_next/image|favicon.ico).*)",
+    "/((?!_next/static|_next/image|_next/data|favicon.ico|manifest.json|sw.js).*)",
   ],
 }

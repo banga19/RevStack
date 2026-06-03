@@ -56,17 +56,14 @@ export default function LandingPage() {
       const res = await fetch("/api/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, source: "landing-page" }),
       })
       if (res.ok) {
         setSubscribed(true)
       } else {
-        // API error — fallback: redirect to needs-assessment with email hint
-        // (user fills ICP profile first, then creates account)
         router.push(`/needs-assessment?email=${encodeURIComponent(email)}`)
       }
     } catch {
-      // Network error — fallback: redirect to needs-assessment with email hint
       router.push(`/needs-assessment?email=${encodeURIComponent(email)}`)
     } finally {
       setSubscribing(false)

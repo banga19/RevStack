@@ -20,7 +20,7 @@ export function useCsrf() {
   useEffect(() => {
     let cancelled = false
 
-    fetch("/api/auth/csrf")
+    fetch("/api/csrf")
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch CSRF token")
         return res.json()

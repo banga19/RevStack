@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
+import { appendQuestionnaireRow } from "@/lib/google-sheets"
 
 // Submit a pre-auth questionnaire (before user is authenticated)
 // Uses a tempId to identify the submission; after auth, link to user
@@ -41,6 +42,27 @@ export async function POST(req: NextRequest) {
           completed: questionnaireData.completed || false,
         },
       })
+
+      appendQuestionnaireRow({
+        tempId: updated.tempId,
+        userId: updated.userId ?? undefined,
+        whatBringsYou: updated.whatBringsYou ?? undefined,
+        businessType: updated.businessType ?? undefined,
+        industry: updated.industry ?? undefined,
+        companySize: updated.companySize ?? undefined,
+        role: updated.role ?? undefined,
+        primaryGoal: updated.primaryGoal,
+        biggestChallenge: updated.biggestChallenge ?? undefined,
+        servicesInterest: updated.servicesInterest ?? undefined,
+        timeline: updated.timeline ?? undefined,
+        budgetRange: updated.budgetRange ?? undefined,
+        howDidYouHear: updated.howDidYouHear ?? undefined,
+        completed: updated.completed,
+        createdAt: updated.createdAt.toISOString(),
+      }).catch((err) => {
+        console.error("Google Sheets questionnaire update append error:", err)
+      })
+
       return NextResponse.json({ id: updated.id, tempId }, { status: 200 })
     }
 
@@ -61,6 +83,26 @@ export async function POST(req: NextRequest) {
         howDidYouHear: questionnaireData.howDidYouHear || null,
         completed: questionnaireData.completed || false,
       },
+    })
+
+    appendQuestionnaireRow({
+      tempId: created.tempId,
+      userId: created.userId ?? undefined,
+      whatBringsYou: created.whatBringsYou ?? undefined,
+      businessType: created.businessType ?? undefined,
+      industry: created.industry ?? undefined,
+      companySize: created.companySize ?? undefined,
+      role: created.role ?? undefined,
+      primaryGoal: created.primaryGoal,
+      biggestChallenge: created.biggestChallenge ?? undefined,
+      servicesInterest: created.servicesInterest ?? undefined,
+      timeline: created.timeline ?? undefined,
+      budgetRange: created.budgetRange ?? undefined,
+      howDidYouHear: created.howDidYouHear ?? undefined,
+      completed: created.completed,
+      createdAt: created.createdAt.toISOString(),
+    }).catch((err) => {
+      console.error("Google Sheets questionnaire append error:", err)
     })
 
     return NextResponse.json({ id: created.id, tempId }, { status: 201 })

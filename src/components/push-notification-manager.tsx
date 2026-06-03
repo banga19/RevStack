@@ -39,7 +39,7 @@ export function PushNotificationManager() {
   const [loading, setLoading] = useState(false)
   const [swReady, setSwReady] = useState(false)
 
-  // Check browser support and permission on mount
+  // Register the service worker and check browser support on mount
   useEffect(() => {
     const supported =
       "Notification" in window &&
@@ -50,6 +50,19 @@ export function PushNotificationManager() {
 
     if (supported) {
       setPermission(Notification.permission)
+
+      // Explicitly register the service worker (in addition to manifest registration)
+      // This ensures the SW is available for push notifications
+      navigator.serviceWorker
+        .register("/sw.js", { scope: "/" })
+        .then((reg) => {
+          setSwReady(true)
+          // Check for updates to the service worker
+          reg.update()
+        })
+        .catch((err) => {
+          console.error("Service Worker registration failed:", err)
+        })
     }
   }, [])
 
@@ -236,8 +249,8 @@ async function fetchVapidPublicKey(): Promise<string | null> {
       const data = await res.json()
       return data.publicKey
     }
-    // Fallback: return the hardcoded dev key
-    return "BK_tK35a8U1u8zDXRd43cqh5nBNezL3b8QjlemzuMgH3Z-vnSXBNZIWn4R74gsZgsM01Ye0981uLctkzifT3q0M"
+    // No fallback — if the API fails, return null so the caller can surface the error
+    return null
   } catch {
     return null
   }

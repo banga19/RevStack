@@ -23,16 +23,24 @@ async function main() {
   await prisma.client.deleteMany()
 
   // Seed admin user (password: admin123)
-  const hashedPassword = await bcrypt.hash("admin123", 12)
+  const adminEmail = process.env.ADMIN_EMAIL || "admin@aibusinessos.com"
+  const adminPassword = process.env.ADMIN_PASSWORD || "admin123"
+  const hashedPassword = await bcrypt.hash(adminPassword, 12)
   const adminUser = await prisma.user.create({
     data: {
       name: "Admin",
-      email: "admin@aibusinessos.com",
+      email: adminEmail,
       password: hashedPassword,
       role: "admin",
     },
   })
-  console.log("Seeded admin user: admin@aibusinessos.com / admin123")
+  console.log("\n==============================================================")
+  console.log("  ADMIN ACCOUNT CREATED")
+  console.log("==============================================================")
+  console.log(`  Email:    ${adminEmail}`)
+  console.log(`  Password: ${adminPassword}`)
+  console.log(`  URL:      http://localhost:3000/admin`)
+  console.log("==============================================================\n")
 
   // Seed plan tasks FIRST (independent)
   for (const task of planTasks) {

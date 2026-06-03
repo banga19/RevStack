@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/db"
 import { sendWelcomeEmail } from "@/lib/email"
 import { validateCsrf } from "@/lib/csrf"
+import { appendSignupRow } from "@/lib/google-sheets"
 
 export async function POST(req: NextRequest) {
   // Validate CSRF token
@@ -70,6 +71,22 @@ export async function POST(req: NextRequest) {
 
     // Send welcome email with trial info
     await sendWelcomeEmail(user.email, user.name)
+
+    // Fire-and-forget sheet push (admin review backfill)
+    appendSignupRow({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      termsAccepted: true,
+      trialStartedAt: now.toISOString(),
+      trialEndsAt: trialEnd.toISOString(),
+      subscriptionStatus: "trial",
+      subscriptionPlan: "monthly",
+      createdAt: new Date().toISOString(),
+    }).catch((err) => {
+      console.error("Google Sheets signup append error:", err)
+    })
 
     return NextResponse.json(
       {

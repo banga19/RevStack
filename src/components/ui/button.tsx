@@ -55,17 +55,14 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     target,
     parameters,
     ...props
-  }, ref) => {
+    }, ref) => {
     const { handleButtonClick, updateContext } = useButtonSync()
     const buttonRef = React.useRef<HTMLButtonElement | null>(null)
     const [ripples, setRipples] = React.useState<{ id: number; style: React.CSSProperties }[]>([])
     const rippleCounter = React.useRef(0)
+    const generatedIdRef = React.useRef<string | null>(null)
 
-    // Combine refs
-    React.useImperativeHandle(ref, () => buttonRef.current!)
-
-    // Generate element ID if not provided
-    const finalElementId = elementId || `btn-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+    const finalElementId = elementId || (generatedIdRef.current ||= `btn-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`)
 
     // Update context with button info on mount
     React.useEffect(() => {

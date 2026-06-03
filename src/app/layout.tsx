@@ -1,14 +1,15 @@
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
+import Script from "next/script"
 import "./globals.css"
-import { Sidebar } from "@/components/sidebar"
-import { PageWrapper } from "@/components/page-wrapper"
+import { AuthenticatedShell } from "@/components/authenticated-shell"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { ThemeProvider } from "@/lib/theme-provider"
 import { AuthProvider } from "@/components/auth-provider"
 import { LanguageProvider } from "@/lib/i18n/language-context"
 import { CookieConsent } from "@/components/cookie-consent"
 import { PushNotificationManager } from "@/components/push-notification-manager"
+import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -43,22 +44,24 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: `
-          try {
-            const theme = localStorage.getItem("theme") || "dark";
-            document.documentElement.className = theme;
-          } catch {}
-        `}} />
+        <Script id="theme-init" strategy="beforeInteractive">
+          {`
+            try {
+              const theme = localStorage.getItem("theme") || "dark";
+              document.documentElement.className = theme;
+            } catch {}
+          `}
+        </Script>
       </head>
-      <body className={inter.className}>
+      <body className={inter.className} suppressHydrationWarning>
         <ThemeProvider>
           <TooltipProvider>
             <AuthProvider>
               <LanguageProvider>
-                <Sidebar />
-                <PageWrapper>{children}</PageWrapper>
+                <AuthenticatedShell>{children}</AuthenticatedShell>
                 <CookieConsent />
                 <PushNotificationManager />
+                <PwaInstallPrompt />
               </LanguageProvider>
             </AuthProvider>
           </TooltipProvider>

@@ -48,8 +48,8 @@ const navItems = [
   { href: "/docs", label: "Platform Guides", icon: BookOpen },
 ]
 
-// Auth pages where sidebar should be hidden
-const authPages = ["/login", "/signup", "/onboarding", "/needs-assessment", "/terms", "/privacy"]
+// Auth/public pages where sidebar should be hidden
+const authPages = ["/", "/login", "/signup", "/onboarding", "/needs-assessment", "/terms", "/privacy", "/pricing"]
 
 export function Sidebar() {
   const pathname = usePathname()

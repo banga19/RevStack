@@ -1,6 +1,7 @@
 // Mapato PWA Service Worker
 // Cache name includes version for cache busting
-const CACHE_NAME = "mapato-v1"
+const CACHE_NAME = "mapato-v2"
+const STATIC_CACHE = "mapato-static-v2"
 
 // Resources to pre-cache on install
 const PRECACHE_URLS = [
@@ -8,10 +9,13 @@ const PRECACHE_URLS = [
   "/login",
   "/signup",
   "/needs-assessment",
+  "/pricing",
   "/terms",
   "/privacy",
   "/manifest.json",
   "/icons/icon.svg",
+  "/icons/icon-192x192.png",
+  "/icons/icon-512x512.png",
 ]
 
 // ─────────────────────────────────────────────────────────
@@ -29,11 +33,12 @@ self.addEventListener("install", (event) => {
 // ACTIVATE
 // ─────────────────────────────────────────────────────────
 self.addEventListener("activate", (event) => {
+  // Clean old caches
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames
-          .filter((name) => name !== CACHE_NAME)
+          .filter((name) => name !== CACHE_NAME && name !== STATIC_CACHE)
           .map((name) => caches.delete(name))
       )
     })
@@ -57,7 +62,7 @@ self.addEventListener("fetch", (event) => {
     return
   }
 
-  // Navigation requests — network first, fallback to cached version
+  // Navigation requests — network first, fallback to cache or offline page
   if (event.request.mode === "navigate") {
     event.respondWith(
       fetch(event.request)
@@ -79,23 +84,32 @@ self.addEventListener("fetch", (event) => {
     return
   }
 
-  // Static assets — cache-first strategy
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached
-
-      return fetch(event.request).then((response) => {
-        // Cache non-API responses for offline
-        if (response.ok) {
-          const cloned = response.clone()
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, cloned)
+  // Static assets (JS, CSS, images, fonts) — cache-first strategy
+  if (
+    event.request.destination === "script" ||
+    event.request.destination === "style" ||
+    event.request.destination === "image" ||
+    event.request.destination === "font" ||
+    event.request.url.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff2?|ttf|eot)$/i)
+  ) {
+    event.respondWith(
+      caches.open(STATIC_CACHE).then((cache) => {
+        return cache.match(event.request).then((cached) => {
+          if (cached) return cached
+          return fetch(event.request).then((response) => {
+            if (response.ok) {
+              cache.put(event.request, response.clone())
+            }
+            return response
           })
-        }
-        return response
+        })
       })
-    })
-  )
+    )
+    return
+  }
+
+  // Everything else — network only (no caching for dynamic content)
+  return
 })
 
 // ─────────────────────────────────────────────────────────
