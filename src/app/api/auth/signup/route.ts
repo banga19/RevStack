@@ -48,8 +48,9 @@ export async function POST(req: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 12)
 
-    // All users get full enterprise access for free — no trial gating
+    // Auto-start 14-day free trial on signup — full access to all features
     const now = new Date()
+    const trialEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000)
 
     const user = await prisma.user.create({
       data: {
@@ -60,10 +61,12 @@ export async function POST(req: NextRequest) {
         termsAccepted: true,
         termsAcceptedAt: new Date(),
         termsVersion: "1.0",
-        subscriptionStatus: "active",
+        // 14-day free trial with full access
+        trialStartsAt: now,
+        trialEndsAt: trialEnd,
+        subscriptionStatus: "trial",
         subscriptionTier: "enterprise",
         subscriptionPlan: "monthly",
-        subscriptionStartsAt: now,
       },
     })
 
@@ -77,7 +80,9 @@ export async function POST(req: NextRequest) {
       email: user.email,
       phone: user.phone,
       termsAccepted: true,
-      subscriptionStatus: "active",
+      trialStartedAt: now.toISOString(),
+      trialEndsAt: trialEnd.toISOString(),
+      subscriptionStatus: "trial",
       subscriptionPlan: "monthly",
       createdAt: new Date().toISOString(),
     }).catch((err) => {
@@ -91,8 +96,11 @@ export async function POST(req: NextRequest) {
         email: user.email,
         termsAccepted: true,
         termsVersion: "1.0",
-        access: "full",
-        tier: "enterprise",
+        trial: {
+          startedAt: now.toISOString(),
+          endsAt: trialEnd.toISOString(),
+          daysRemaining: 14,
+        },
       },
       { status: 201 }
     )

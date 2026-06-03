@@ -17,6 +17,7 @@ import {
   Target,
   CalendarCheck,
   ArrowUpRight,
+  ArrowRight,
   ArrowDownRight,
   RefreshCw,
   BarChart3,
@@ -24,6 +25,8 @@ import {
   Send,
   FileText,
   Sparkles,
+  Clock,
+  CreditCard,
 } from "lucide-react"
 import {
   BarChart,
@@ -96,7 +99,7 @@ export default function DashboardPage() {
       .catch(() => setLoading(false))
   }, [])
 
-  // Fetch subscription status (informational only — all features free)
+  // Fetch trial and subscription status
   useEffect(() => {
     fetch("/api/subscription")
       .then((r) => r.json())
@@ -119,6 +122,13 @@ export default function DashboardPage() {
       })
       .catch(() => {})
   }, [])
+
+  // Determine whether user needs a payment
+  const subLoaded = subscriptionStatus !== null || trialStatus !== null
+  const needsPayment =
+    subLoaded &&
+    !trialStatus?.isActive &&
+    (!subscriptionStatus || subscriptionStatus.status !== "active")
 
   if (loading) {
     return (
@@ -178,7 +188,86 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* All features are free — no trial/payment banners needed */}
+      {/* Trial Banner */}
+      {trialStatus && trialStatus.isActive && (
+        <div className="p-6 rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-emerald-500/10 border border-primary/20 mt-10 space-y-1">
+          <div className="flex items-start sm:items-center gap-4 flex-col sm:flex-row">
+            <div className="p-2 rounded-lg bg-primary/10 shrink-0">
+              <Sparkles className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-base font-semibold">You&apos;re on a <span className="text-primary">14-day free trial</span>
+                {trialStatus.daysRemaining > 0 && (
+                  <span> — <span className="font-bold">{trialStatus.daysRemaining} day{trialStatus.daysRemaining !== 1 ? "s" : ""} remaining</span></span>
+                )}
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Enjoy full access to all Mapato features. No credit card required.
+                We&apos;ll recommend the <strong className="font-semibold">{trialStatus.tier}</strong> plan based on your needs when the trial ends.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Badge variant="outline" className="text-xs border-primary/30 text-primary">
+                <Clock className="h-3 w-3 mr-1" />
+                {trialStatus.daysRemaining} days left
+              </Badge>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Expired Trial Banner */}
+      {trialStatus && trialStatus.isExpired && (
+        <div className="p-5 rounded-xl bg-amber-500/10 border border-amber-500/30 mt-8">
+          <div className="flex items-start sm:items-center gap-4 flex-col sm:flex-row">
+            <div className="p-2 rounded-lg bg-amber-500/10 shrink-0">
+              <Clock className="h-5 w-5 text-amber-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
+                Your free trial has ended
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Subscribe to continue using Mapato. We recommend the <strong>{trialStatus.tier}</strong> plan.
+              </p>
+            </div>
+            <Link href="/pricing">
+              <Button size="sm" className="shrink-0">
+                View Plans <ArrowRight className="h-3.5 w-3.5 ml-1" />
+              </Button>
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Payment CTA — shown when no active subscription/trial */}
+      {needsPayment && (
+        <div className="p-5 rounded-xl bg-primary/5 border border-primary/20 mt-8">
+          <div className="flex items-start sm:items-center gap-4 flex-col sm:flex-row">
+            <div className="p-2 rounded-lg bg-primary/10 shrink-0">
+              <Sparkles className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold">
+                {trialStatus?.isExpired
+                  ? "Continue using Mapato — choose a plan below."
+                  : "Unlock full access with a subscription."}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Pay via M-Pesa, Mobile Money, or Visa / Mastercard through Flutterwave.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Link href="/pricing">
+                <Button size="sm" className="shrink-0">
+                  <CreditCard className="h-3.5 w-3.5 mr-1" />
+                  {trialStatus?.isExpired ? "Subscribe Now" : "View Plans & Pay"}
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

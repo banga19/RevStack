@@ -22,21 +22,23 @@ async function main() {
   await prisma.planTask.deleteMany()
   await prisma.client.deleteMany()
 
-  // Seed admin user (password: admin123) with full enterprise access — free, no trial gating
+  // Seed admin user (password: admin123) with 14-day trial for demo
   const adminEmail = process.env.ADMIN_EMAIL || "admin@aibusinessos.com"
   const adminPassword = process.env.ADMIN_PASSWORD || "admin123"
   const hashedPassword = await bcrypt.hash(adminPassword, 12)
   const now = new Date()
+  const trialEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000)
   const adminUser = await prisma.user.create({
     data: {
       name: "Admin",
       email: adminEmail,
       password: hashedPassword,
       role: "admin",
-      subscriptionStatus: "active",
+      trialStartsAt: now,
+      trialEndsAt: trialEnd,
+      subscriptionStatus: "trial",
       subscriptionTier: "enterprise",
       subscriptionPlan: "monthly",
-      subscriptionStartsAt: now,
     },
   })
   console.log("\n==============================================================")
