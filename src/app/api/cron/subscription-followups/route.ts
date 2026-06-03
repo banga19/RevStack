@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { processFollowUps } from "@/lib/subscription-followups"
 
@@ -16,19 +16,26 @@ import { processFollowUps } from "@/lib/subscription-followups"
  *   Schedule: 0 8 * * *  (every day at 8 AM)
  *   URL: https://your-domain.com/api/cron/subscription-followups
  *
- * Security: Requires CRON_SECRET header or admin auth.
+ * Security: Validates via:
+ *   1. x-cron-secret header matching CRON_SECRET env var
+ *   2. Admin session (for manual testing)
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    // Authentication: check for CRON_SECRET or admin session
     const cronSecret = process.env.CRON_SECRET
     const session = await auth()
 
-    const isAuthorized =
-      session?.user?.role === "admin" ||
-      (cronSecret && cronSecret === "cron-trigger-dev") // Dev mode
+    // Check x-cron-secret header (matching server env var)
+    const headerSecret = req.headers.get("x-cron-secret")
+    const headerMatch = cronSecret && headerSecret && cronSecret === headerSecret
 
-    if (!isAuthorized) {
+    // Check admin session (for manual testing)
+    const isAdmin = session?.user?.role === "admin"
+
+    // Dev mode: also allow "cron-trigger-dev" as fallback secret
+    const isDevMode = cronSecret === "cron-trigger-dev"
+
+    if (!headerMatch && !isAdmin && !isDevMode) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

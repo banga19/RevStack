@@ -1,0 +1,19 @@
+name: Subscription Follow-ups
+
+on:
+  schedule:
+    # Every day at 8 AM UTC
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+    # Allow manual trigger from GitHub UI for testing
+
+jobs:
+  trigger-followups:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call subscription follow-up endpoint
+        run: |
+          curl --fail -s -X GET "${{ secrets.APP_URL }}/api/cron/subscription-followups" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -w "\n\nHTTP Status: %{http_code}\n"
+        # --fail ensures the job fails if the endpoint returns a non-200 status
