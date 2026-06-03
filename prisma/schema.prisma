@@ -390,6 +390,18 @@ model SokogatePilotParticipant {
   cohort SokogatePilotCohort @relation(fields: [cohortId], references: [id], onDelete: Cascade)
 }
 
+// Admin audit log — tracks who did what and when (grant access, extend trial, etc.)
+model AdminAuditLog {
+  id        String   @id @default(cuid())
+  adminId   String
+  adminName String?
+  action    String   // grant_permanent_access, extend_trial, change_role, etc.
+  targetUserId String?
+  targetEmail  String?
+  details   String?  // JSON metadata about the action
+  createdAt DateTime @default(now())
+}
+
 // Email subscribers captured from the landing page newsletter form
 model Subscriber {
   id        String   @id @default(cuid())

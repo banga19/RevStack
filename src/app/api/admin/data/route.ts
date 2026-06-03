@@ -58,6 +58,12 @@ export async function GET() {
       },
     })
 
+    // Audit logs (last 100)
+    const auditLogs = await prisma.adminAuditLog.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    })
+
     // Stats
     const totalPayments = await prisma.payment.count()
     const successfulPayments = await prisma.payment.count({ where: { status: "success" } })
@@ -104,6 +110,14 @@ export async function GET() {
         type: l.type,
         stage: l.stage,
         sentAt: l.sentAt.toISOString(),
+      })),
+      auditLogs: auditLogs.map((a) => ({
+        id: a.id,
+        adminName: a.adminName,
+        action: a.action,
+        targetEmail: a.targetEmail,
+        details: a.details,
+        createdAt: a.createdAt.toISOString(),
       })),
     })
   } catch (error: any) {

@@ -104,11 +104,33 @@ interface AdminData {
   payments: AdminPayment[]
   trialUsers: AdminTrialUser[]
   followUpLogs: AdminFollowUp[]
+  auditLogs: AdminAuditLog[]
+}
+
+interface AdminAuditLog {
+  id: string
+  adminName: string | null
+  action: string
+  targetEmail: string | null
+  details: string | null
+  createdAt: string
 }
 
 // ---------------------------------------------------------------------------
 // Follow-up stage display
 // ---------------------------------------------------------------------------
+
+const AUDIT_ACTION_LABELS: Record<string, string> = {
+  grant_permanent_access: "Granted Permanent Access",
+  extend_trial: "Extended Trial (+7d)",
+  change_role: "Changed Role",
+}
+
+const AUDIT_ACTION_ICONS = {
+  grant_permanent_access: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />,
+  extend_trial: <Clock className="h-3.5 w-3.5 text-amber-500" />,
+  change_role: <Shield className="h-3.5 w-3.5 text-blue-500" />,
+}
 
 const STAGE_LABELS: Record<string, string> = {
   "day-10": "Day 10 (4 days left)",
@@ -141,6 +163,16 @@ export default function AdminPage() {
   const [godModeStatus, setGodModeStatus] = useState<any>(null)
   const [godModeLoading, setGodModeLoading] = useState(false)
   const [startingGodMode, setStartingGodMode] = useState(false)
+
+  const loadAdminData = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/data")
+      if (res.ok) {
+        const data = await res.json()
+        setAdminData(data)
+      }
+    } catch { /* silent */ }
+  }, [])
 
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -246,7 +278,23 @@ export default function AdminPage() {
             : u
         )
       )
+      loadAdminData()
     } catch { alert("Failed to grant permanent access") }
+    finally { setUpdating(null) }
+  }
+
+  // ---- Extend Trial ----
+  const extendTrial = async (userId: string) => {
+    setUpdating(userId)
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, extendTrial: true }),
+      })
+      if (!res.ok) { const d = await res.json(); alert(d.error || "Failed"); return }
+      loadAll()
+    } catch { alert("Failed to extend trial") }
     finally { setUpdating(null) }
   }
 
@@ -415,8 +463,9 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="users"><Users className="h-4 w-4 mr-2" /> Users</TabsTrigger>
+          <TabsTrigger value="audit"><Shield className="h-4 w-4 mr-2" /> Audit Log</TabsTrigger>
           <TabsTrigger value="payments"><DollarSign className="h-4 w-4 mr-2" /> Payments</TabsTrigger>
           <TabsTrigger value="trials"><Clock className="h-4 w-4 mr-2" /> Trial Users</TabsTrigger>
           <TabsTrigger value="followups"><BellRing className="h-4 w-4 mr-2" /> Follow-ups</TabsTrigger>
@@ -524,21 +573,38 @@ export default function AdminPage() {
                     {updating === user.id && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
                   </div>
                 </div>
-                <div className="col-span-1.5">
+                <div className="col-span-1.5 flex items-center gap-1">
                   {needsGrant ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-[10px] whitespace-nowrap"
-                      onClick={() => grantPermanentAccess(user.id)}
-                      disabled={updating === user.id}
-                    >
-                      {updating === user.id ? (
-                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                      ) : (
-                        <><CheckCircle2 className="h-3 w-3 mr-1" /> Grant Permanent</>
-                      )}
-                    </Button>
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-[10px] px-1.5"
+                        onClick={() => grantPermanentAccess(user.id)}
+                        disabled={updating === user.id}
+                        title="Set to active enterprise (permanent)"
+                      >
+                        {updating === user.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="h-3 w-3" />
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-[10px] px-1.5"
+                        onClick={() => extendTrial(user.id)}
+                        disabled={updating === user.id}
+                        title="Extend trial by 7 days"
+                      >
+                        {updating === user.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <><Clock className="h-3 w-3" /> +7d</>
+                        )}
+                      </Button>
+                    </>
                   ) : (
                     <span className="text-[10px] text-emerald-600 font-medium whitespace-nowrap">
                       <CheckCircle2 className="h-3 w-3 inline mr-1" />
@@ -546,6 +612,57 @@ export default function AdminPage() {
                     </span>
                   )}
                 </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </CardContent>
+  </Card>
+</TabsContent>
+
+{/* ================================================================= */}
+{/* TAB: Audit Log */}
+{/* ================================================================= */}
+<TabsContent value="audit" className="space-y-4">
+  <Card>
+    <CardHeader>
+      <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5 text-primary" /> Admin Audit Log</CardTitle>
+      <CardDescription>Recent admin actions — grant access, extend trial, role changes</CardDescription>
+    </CardHeader>
+    <CardContent>
+      {adminDataLoading ? (
+        <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="shimmer h-12 w-full rounded" />)}</div>
+      ) : adminData && adminData.auditLogs.length === 0 ? (
+        <div className="text-center py-10"><Shield className="h-12 w-12 text-muted-foreground/50 mx-auto mb-3" /><p className="text-muted-foreground">No admin actions logged yet</p></div>
+      ) : (
+        <div className="space-y-2">
+          <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <div className="col-span-2">Admin</div>
+            <div className="col-span-3">Action</div>
+            <div className="col-span-3">Target / Details</div>
+            <div className="col-span-2">When</div>
+            <div className="col-span-2"></div>
+          </div>
+          {adminData?.auditLogs.map((log) => {
+            let detailsStr = ""
+            try { const d = JSON.parse(log.details || "{}"); detailsStr = Object.values(d).join(", ") } catch { detailsStr = log.details || "" }
+            return (
+              <div key={log.id} className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors items-center">
+                <div className="col-span-2">
+                  <span className="text-sm font-medium">{log.adminName || "Admin"}</span>
+                </div>
+                <div className="col-span-3 flex items-center gap-2">
+                  {AUDIT_ACTION_ICONS[log.action] || <Shield className="h-3.5 w-3.5 text-muted-foreground" />}
+                  <span className="text-sm">{AUDIT_ACTION_LABELS[log.action] || log.action}</span>
+                </div>
+                <div className="col-span-3">
+                  <span className="text-xs text-muted-foreground">{log.targetEmail || detailsStr}</span>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-xs text-muted-foreground">{new Date(log.createdAt).toLocaleString()}</span>
+                </div>
+                <div className="col-span-2"></div>
               </div>
             )
           })}
