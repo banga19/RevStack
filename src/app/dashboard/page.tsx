@@ -76,9 +76,10 @@ export default function DashboardPage() {
     plan: string
   } | null>(null)
 
-  // Check if onboarding is completed
+  // Check if onboarding is completed (admin users skip — they have demo data)
   useEffect(() => {
     if (!session?.user) return
+    if (session.user.role === "admin") return
     fetch("/api/onboarding")
       .then((r) => r.json())
       .then((res) => {

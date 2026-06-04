@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Sparkles, Clock, CreditCard, Crown, AlertTriangle, X } from "lucide-react"
@@ -21,9 +22,13 @@ interface SubscriptionData {
 }
 
 export function SubscriptionBanner() {
+  const { data: session } = useSession()
   const [data, setData] = useState<SubscriptionData | null>(null)
   const [loading, setLoading] = useState(true)
   const [dismissed, setDismissed] = useState<string | null>(null)
+
+  // Admin users always have full free access — no subscription banner
+  if (session?.user?.role === "admin") return null
 
   useEffect(() => {
     fetch("/api/subscription")

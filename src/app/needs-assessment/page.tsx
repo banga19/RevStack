@@ -28,7 +28,6 @@ import {
   MessageSquare,
   Mail,
   Shield,
-  Github,
   AlertCircle,
   CalendarDays,
 } from "lucide-react"

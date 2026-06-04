@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { getTierFromBudget, getPriceFromBudget } from "@/lib/pricing"
-import { Brain, Loader2, CheckCircle2, ArrowRight, ArrowLeft, Sparkles, BarChart3, Target, Users, DollarSign } from "lucide-react"
+import { Brain, Loader2, CheckCircle2, ArrowRight, ArrowLeft, Sparkles, BarChart3, Target, Users, DollarSign, Crown, Clock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
 
@@ -108,9 +108,7 @@ export default function OnboardingPage() {
 
       if (res.ok) {
         setCompleted(true)
-        setTimeout(() => {
-          window.location.href = "/dashboard"
-        }, 800)
+        // User will choose: start trial (dashboard) or subscribe (pricing)
         return
       }
 
@@ -131,18 +129,64 @@ export default function OnboardingPage() {
   if (completed) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
-        <Card className="w-full max-w-md text-center border-emerald-500/20 shadow-2xl">
-          <CardContent className="pt-10 pb-10">
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-primary/5 blur-3xl" />
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full bg-primary/10 blur-3xl" />
+        </div>
+
+        <Card className="w-full max-w-lg text-center border-emerald-500/20 shadow-2xl relative backdrop-blur-sm bg-card/95">
+          <CardContent className="pt-10 pb-10 px-8">
             <div className="flex justify-center mb-6">
               <div className="p-4 rounded-full bg-emerald-500/10 animate-in zoom-in-50 duration-500">
                 <CheckCircle2 className="h-16 w-16 text-emerald-500" />
               </div>
             </div>
-            <h2 className="text-2xl font-bold mb-2">You&apos;re all set!</h2>
-            <p className="text-muted-foreground mb-2">Your profile has been created. We&apos;ll tailor the experience to your goals.</p>
-            <p className="text-sm text-muted-foreground">Redirecting to your dashboard...</p>
-            <div className="mt-6 flex justify-center">
-              <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+            <h2 className="text-2xl font-bold mb-2">You&apos;re all set, {formData.businessName || "welcome"}!</h2>
+            <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
+              Your profile is ready. We&apos;ve tailored everything to your goals. What would you like to do next?
+            </p>
+
+            <div className="space-y-3 mb-8 text-left">
+              {/* Start Free Trial Option */}
+              <button
+                onClick={() => router.push("/dashboard")}
+                className="w-full flex items-center gap-4 p-4 rounded-xl border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-all group cursor-pointer"
+              >
+                <div className="p-3 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors shrink-0">
+                  <Sparkles className="h-6 w-6" />
+                </div>
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-base font-semibold">Start My 14-Day Free Trial</p>
+                  <p className="text-sm text-muted-foreground">Full access to all features — no credit card required</p>
+                </div>
+                <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+              </button>
+
+              {/* Choose a Plan Option */}
+              <button
+                onClick={() => router.push("/pricing")}
+                className="w-full flex items-center gap-4 p-4 rounded-xl border border-border/50 hover:border-primary/30 hover:bg-muted/30 transition-all group cursor-pointer"
+              >
+                <div className="p-3 rounded-lg bg-amber-500/10 text-amber-500 group-hover:bg-amber-500 group-hover:text-white transition-colors shrink-0">
+                  <Crown className="h-6 w-6" />
+                </div>
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-base font-semibold">Choose a Plan & Subscribe Now</p>
+                  <p className="text-sm text-muted-foreground">Skip the trial — pick a plan starting at $50/mo and start immediately</p>
+                </div>
+                <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+              </button>
+            </div>
+
+            <div className="p-4 rounded-lg bg-gradient-to-r from-primary/5 via-primary/[0.02] to-emerald-500/5 border border-primary/10">
+              <div className="flex items-center gap-2 text-sm font-medium mb-1">
+                <Clock className="h-4 w-4 text-primary" />
+                Your 14-day trial starts now
+              </div>
+              <p className="text-xs text-muted-foreground">
+                If you choose the free trial, your 14-day countdown begins today with full Enterprise access.
+                Subscribe before it ends to keep your pipelines, automations, and data running.
+              </p>
             </div>
           </CardContent>
         </Card>
