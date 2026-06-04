@@ -7,7 +7,10 @@ export const PUT = withAuth(async (req: NextRequest, { params, session }) => {
   const body = await req.json()
   const client = await prisma.client.update({
     where: { id, userId: session.user.id },
-    data: body,
+    data: {
+      ...body,
+      organizationId: body.organizationId || undefined,
+    },
   })
   return NextResponse.json(client)
 })

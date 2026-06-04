@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { useTheme } from "@/lib/theme-provider"
 import { useLanguage } from "@/lib/i18n/language-context"
 import { LanguageToggle } from "@/components/language-toggle"
+import { useOrganization } from "@/components/auth-provider"
 import {
   LayoutDashboard,
   CalendarCheck,
@@ -60,6 +61,7 @@ export function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const { theme, toggleTheme } = useTheme()
+  const { organization } = useOrganization()
 
   // Hide sidebar on auth pages
   if (authPages.some((page) => pathname.startsWith(page))) {
@@ -99,7 +101,14 @@ export function Sidebar() {
         )}>
           <Brain className="h-7 w-7 text-primary shrink-0" />
           {!collapsed && (
-            <span className="ml-3 font-bold text-lg whitespace-nowrap">Mapato</span>
+            <div className="ml-3 min-w-0">
+              <span className="font-bold text-lg whitespace-nowrap block">Mapato</span>
+              {organization && (
+                <span className="text-[10px] text-muted-foreground truncate block leading-tight">
+                  {organization.name}
+                </span>
+              )}
+            </div>
           )}
         </div>
 

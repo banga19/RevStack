@@ -82,6 +82,19 @@ export function applySecurityHeaders(
 
   const headers = new Headers(response.headers)
 
+  // ── Preserve Set-Cookie headers ──────────────────────────────
+  // `response.headers` does NOT include `Set-Cookie` because it
+  // is a "forbidden response-header name" per the Fetch spec.
+  // `getSetCookie()` is available in Edge Runtime (V8) and must
+  // be called explicitly to forward cookies to the browser.
+  // Without this, login and CSRF cookies are silently dropped.
+  if (typeof response.headers.getSetCookie === "function") {
+    const setCookieHeaders = response.headers.getSetCookie()
+    for (const cookie of setCookieHeaders) {
+      headers.append("Set-Cookie", cookie)
+    }
+  }
+
   // ── Content-Security-Policy ─────────────────────────────────
   if (cfg.enableCsp) {
     headers.set("Content-Security-Policy", buildCsp(cfg.frameAncestors))
@@ -118,8 +131,11 @@ export function applySecurityHeaders(
   )
 
   // ── Cross-Origin isolation headers ──────────────────────────
+  // Note: COEP: require-corp is intentionally NOT set here because
+  // it aggressively blocks cross-origin resources (CDN images,
+  // fonts, etc.) and requires all subresources to explicitly opt in.
+  // For this application's architecture, we only set COOP.
   headers.set("Cross-Origin-Opener-Policy", "same-origin")
-  headers.set("Cross-Origin-Embedder-Policy", "require-corp")
 
   return new Response(response.body, {
     status: response.status,

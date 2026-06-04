@@ -1,23 +1,12 @@
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
-import Script from "next/script"
 import "./globals.css"
-import { AuthenticatedShell } from "@/components/authenticated-shell"
-import { TooltipProvider } from "@/components/ui/tooltip"
-import { ThemeProvider } from "@/lib/theme-provider"
-import { AuthProvider } from "@/components/auth-provider"
-import { LanguageProvider } from "@/lib/i18n/language-context"
-import { CookieConsent } from "@/components/cookie-consent"
-import { PushNotificationManager } from "@/components/push-notification-manager"
-import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
-import { AnalyticsTracker } from "@/components/analytics-tracker"
-import { OrgProvider } from "@/lib/organization"
+import { Providers } from "@/components/providers"
 
 const inter = Inter({ subsets: ["latin"] })
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://mapato.app"
 
-// Bing Webmaster Tools — replace VERIFICATION_CODE with your actual code from Bing
 const BING_VERIFICATION = process.env.NEXT_PUBLIC_BING_VERIFICATION || ""
 
 export const metadata: Metadata = {
@@ -92,7 +81,6 @@ export const metadata: Metadata = {
     "msapplication-TileColor": "#7C3AED",
     "msapplication-TileImage": "/icons/icon.svg",
     "theme-color": "#7C3AED",
-    // Facebook domain verification (optional)
     ...(process.env.NEXT_PUBLIC_FACEBOOK_VERIFICATION
       ? { "fb:app_id": process.env.NEXT_PUBLIC_FACEBOOK_VERIFICATION }
       : {}),
@@ -105,33 +93,9 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <Script id="theme-init" strategy="beforeInteractive">
-          {`
-            try {
-              const theme = localStorage.getItem("theme") || "dark";
-              document.documentElement.className = theme;
-            } catch {}
-          `}
-        </Script>
-      </head>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body className={inter.className} suppressHydrationWarning>
-        <ThemeProvider>
-          <TooltipProvider>
-            <AuthProvider>
-              <LanguageProvider>
-                <OrgProvider>
-                  <AuthenticatedShell>{children}</AuthenticatedShell>
-                </OrgProvider>
-                <AnalyticsTracker />
-                <CookieConsent />
-                <PushNotificationManager />
-                <PwaInstallPrompt />
-              </LanguageProvider>
-            </AuthProvider>
-          </TooltipProvider>
-        </ThemeProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   )

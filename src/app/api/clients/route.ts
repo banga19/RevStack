@@ -4,8 +4,18 @@ import { withAuth } from "@/lib/abac-middleware"
 import { getSuggestionFromBudget } from "@/lib/pricing"
 
 export const GET = withAuth(async (_req, { session }) => {
+  // Get user's org for multi-tenant scoping
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { organizationId: true },
+  })
   const clients = await prisma.client.findMany({
-    where: { userId: session.user.id },
+    where: {
+      OR: [
+        { userId: session.user.id },
+        ...(user?.organizationId ? [{ organizationId: user.organizationId }] : []),
+      ],
+    },
     orderBy: { createdAt: "desc" },
   })
   return NextResponse.json(clients)

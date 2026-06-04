@@ -2,6 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Initial theme: default to dark. ThemeProvider handles switching after hydration. */
+:root, html {
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root, html {
+    color-scheme: light;
+  }
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
