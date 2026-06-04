@@ -3,6 +3,13 @@ import Credentials from "next-auth/providers/credentials"
 import Google from "next-auth/providers/google"
 import { prisma } from "@/lib/db"
 
+// Server-side analytics logging for auth events
+function logEvent(event: string, data: Record<string, any>) {
+  if (process.env.NODE_ENV !== "production") {
+    console.log(`[Analytics] ${event}:`, data)
+  }
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Credentials({
@@ -51,6 +58,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     async signIn({ user, account }) {
+      // Track login event for retention analytics
+      if (account?.provider === "credentials") {
+        logEvent("login", { email: user.email, method: "credentials" })
+      }
+
       // For Google SSO, create or link user account
       if (account?.provider === "google") {
         const existingUser = await prisma.user.findUnique({
@@ -79,14 +91,27 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               subscriptionPlan: "monthly",
             },
           })
-        } else if (!existingUser.image && user.image) {
-          // Update profile image if not set
+          logEvent("signup", { email: user.email, method: "google" })
+        } else {
+          logEvent("login", { email: user.email, method: "google" })
+          // Update profile image and login timestamp for retention tracking
           await prisma.user.update({
             where: { id: existingUser.id },
-            data: { image: user.image },
+            data: {
+              image: user.image || existingUser.image,
+            },
           })
         }
       }
+
+      // Update lastLoginAt on every successful login (both credentials and Google)
+      if (user.email) {
+        await prisma.user.updateMany({
+          where: { email: user.email },
+          data: { lastLoginAt: new Date() },
+        })
+      }
+
       return true
     },
     async jwt({ token, user, account }) {

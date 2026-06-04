@@ -58,9 +58,17 @@ export class RAGPipeline {
 
   // Load document from various sources
   async loadDocument(source: string | Buffer, options: { type: string } = { type: "text" }): Promise<Document[]> {
+    const type = options.type.toLowerCase();
+
+    // For text/Buffer content, create a Document directly without a file loader
+    if (type === "text" || type === "txt" || source instanceof Buffer) {
+      const content: string = source instanceof Buffer ? source.toString("utf-8") : String(source);
+      return [new Document({ pageContent: content, metadata: {} })];
+    }
+
     let loader;
 
-    switch (options.type.toLowerCase()) {
+    switch (type) {
         case "pdf":
             loader = new PDFLoader(source as string);
             break;
@@ -80,10 +88,10 @@ export class RAGPipeline {
         case "url":
             loader = new CheerioWebBaseLoader(source as string);
             break;
-        case "text":
         default:
-            loader = new TextLoader(source as string);
-            break;
+            // Fallback: treat as plain text
+            const defaultContent: string = source instanceof Buffer ? source.toString("utf-8") : String(source);
+            return [new Document({ pageContent: defaultContent, metadata: {} })];
     }
 
     return await loader.load();

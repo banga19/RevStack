@@ -29,6 +29,8 @@ model User {
   phone          String?  // phone number for M-Pesa payments & WhatsApp follow-ups
   billingEmail   String?  // email for invoices (defaults to user email)
 
+  lastLoginAt   DateTime?  // Last login timestamp for retention tracking
+
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
