@@ -6,6 +6,8 @@ Mapato is a collaborative automation platform co-built by [Sokogate.com](https:/
 
 Like Polsia, Mapato runs on a low monthly subscription + success fee model — but at **half the revenue share** (10% vs Polsia's 20%). While Polsia automates e-commerce businesses, Mapato is purpose-built for WhatsApp-driven B2B trade operations across Africa and emerging markets.
 
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -24,12 +26,19 @@ npm install
 ### 2. Set up environment variables
 
 ```bash
-cp .env.example .env
+cp .env.example .env.local
 ```
 
-Edit `.env` and set at minimum:
+Edit `.env.local` and set at minimum:
 - `NEXTAUTH_SECRET` — generate with `openssl rand -base64 32`
 - `NEXTAUTH_URL` — `http://localhost:3000` for local dev
+- `NEXT_PUBLIC_BASE_URL` — `http://localhost:3000` (required for OG images + sitemap)
+
+For optional features (all come pre-configured with safe defaults):
+- **Sentry error tracking**: Set `SENTRY_DSN` (leave blank to disable)
+- **Bing Webmaster Tools**: Set `NEXT_PUBLIC_BING_VERIFICATION` (leave blank to skip)
+- **Analytics**: Set `NEXT_PUBLIC_ANALYTICS_PROVIDER` to `"plausible"`, `"ga4"`, `"posthog"`, or `"custom"`
+- **OG Images**: `NEXT_PUBLIC_BASE_URL` defaults to `http://localhost:3000`
 
 ### 3. Set up the database
 
@@ -37,7 +46,7 @@ Edit `.env` and set at minimum:
 npm run setup
 ```
 
-This pushes the Prisma schema to a local SQLite database and seeds it with demo data.
+This pushes the Prisma schema to a local SQLite database and seeds it with demo data (admin user, demo clients, products, compliance records, financial data, and Korea corridor pilot cohorts).
 
 ### 4. Start development server
 
@@ -53,6 +62,204 @@ Open [http://localhost:3000](http://localhost:3000) — you'll be redirected to 
 |-------|----------|------|
 | `admin@aibusinessos.com` | `admin123` | Admin |
 
+---
+
+## 🧪 How to Test Everything Locally
+
+### Run the test suite
+
+```bash
+# Run all 94 tests
+npx vitest run
+
+# Run a specific test file
+npx vitest run src/lib/agent-service-bridge.test.ts
+npx vitest run src/lib/ers-scoring.test.ts
+npx vitest run src/app/api/documents/documents.test.ts
+
+# Run in watch mode during development
+npx vitest
+```
+
+### TypeScript check
+
+```bash
+npx tsc --noEmit --skipLibCheck
+```
+
+Expected result: **0 errors**.
+
+---
+
+### 🔐 Test ABAC (Attribute-Based Access Control)
+
+ABAC is wired into **36 API route files** using `withAuth()` / `withAbac()` middleware.
+
+**As admin user (`admin@aibusinessos.com`):**
+1. Visit `/admin` — full access to Users, Audit Log, Payments, Trial Users, **Retention** (new!), Follow-ups, and God Mode tabs
+2. Visit `/korea/inquiries` — view all Korean buyer inquiries
+3. Visit `/operations` — full God Mode agent deployment access
+4. Change another user's role in the admin Users tab
+5. Try the **Retention tab** — shows sign-up trends, daily logins, activation rate, churn risk, and weekly retention cohorts
+
+**As regular user (sign up a new account):**
+1. Sign up at `/signup` → complete onboarding at `/onboarding`
+2. Visit `/dashboard` — your personal dashboard scoped to your data
+3. Visit `/admin` — should be blocked with "Access Denied" (redirects to `/dashboard`)
+4. Visit `/api/admin/retention` — returns 403 (admin-only endpoint)
+
+**Verify the ABAC middleware error handling:**
+- Call an authenticated API route without a session → get `401 { error: "Authentication required" }`
+- Call an admin-only route as a regular user → get `403 { error: "...", code: "access_denied" }`
+- Trigger a DB error → get `500 { error: "..." }` (middleware catch block)
+
+---
+
+### 📊 Test Analytics Tracking
+
+Analytics events are logged to the console in development mode:
+
+```bash
+# Start the server
+npm run dev
+
+# Watch for analytics log output
+# These will appear in the terminal:
+[Analytics] user_signed_up: { ... }
+[Analytics] onboarding_completed: { ... }
+```
+
+**Test the tracking flow:**
+1. Sign up a new user → check terminal for `[Analytics] user_signed_up`
+2. Complete onboarding → check for `[Analytics] onboarding_completed`
+3. Log in/log out → `lastLoginAt` is updated on the User model (check via admin panel or DB)
+
+**Retention dashboard:**
+1. Log in as admin → go to `/admin` → click **Retention** tab
+2. You should see: total users, new users (7d/30d), login rate %, active users, at-risk/churned users
+3. Daily login/signup bar charts for the last 14 days
+4. Weekly retention cohorts table
+5. Recent login activity list
+
+---
+
+### 🖼️ Test Open Graph & Social Sharing
+
+**Verify OG tags in the page head:**
+```bash
+curl -s http://localhost:3000 | grep -E 'og:|twitter:' | head -20
+```
+
+Expected output includes: `og:title`, `og:description`, `og:image`, `og:url`, `og:type`, `twitter:card`, `twitter:title`, `twitter:description`, `twitter:image`
+
+**Test the OG image endpoint:**
+```bash
+# Generate a dynamic OG image (1200×630 PNG)
+curl -s -o /tmp/og-test.png http://localhost:3000/opengraph-image
+file /tmp/og-test.png
+# Expected: PNG image data, 1200 x 630
+```
+
+**Test with the [Facebook Sharing Debugger](https://developers.facebook.com/tools/debug/)** (when deployed):
+- Enter your deployed URL → scrape → verify the preview looks correct
+
+---
+
+### 🗺️ Test Sitemap
+
+```bash
+# Build and start production server (sitemap is only served in production)
+npm run build && npm start
+# In another terminal:
+curl -s http://localhost:3000/sitemap.xml | head -40
+```
+
+Expected: XML sitemap with 17+ routes, each with `<loc>`, `<changefreq>`, `<priority>`, and `<lastmod>` tags.
+
+> Note: The sitemap is only served in production mode (`npm run build && npm start`). In dev mode, verify the sitemap logic by checking `src/app/sitemap.ts`.
+
+---
+
+### 🔍 Test Bing Webmaster Tools Verification
+
+```bash
+# Check for the Bing verification meta tag
+curl -s http://localhost:3000 | grep "msvalidate"
+```
+
+Expected: `<meta name="msvalidate.01" content="..." />` (content will be empty unless `NEXT_PUBLIC_BING_VERIFICATION` is set in `.env`).
+
+---
+
+### 🚨 Test Sentry Error Tracking
+
+Sentry is configured with `@sentry/nextjs` but **auto-disabled until you set `SENTRY_DSN`**.
+
+```bash
+# Verify Sentry config files exist
+ls sentry.client.config.ts sentry.server.config.ts
+```
+
+To enable Sentry:
+1. Create a project at [sentry.io](https://sentry.io)
+2. Copy your DSN
+3. Add to `.env`: `SENTRY_DSN="https://..."`
+
+Once enabled, errors in API routes and client components will automatically be captured.
+
+---
+
+### 📧 Test Email Deliverability
+
+A comprehensive guide is at [`EMAIL-DELIVERABILITY-GUIDE.md`](./EMAIL-DELIVERABILITY-GUIDE.md).
+
+**Locally**, email goes through Ethereal (dev fallback) by default:
+```bash
+# Emails appear in the terminal output
+npm run dev
+# Watch for: "Preview URL: https://ethereal.email/message/..."
+```
+
+**For production deliverability:**
+1. Follow the SPF/DKIM/DMARC setup in `EMAIL-DELIVERABILITY-GUIDE.md`
+2. Configure your SMTP credentials in `.env`
+3. Test with [mail-tester.com](https://www.mail-tester.com) after deployment
+
+---
+
+### 👤 Test Support Email & Legal Pages
+
+- **Contact info**: `src/lib/contact-info.ts` has `CONTACT_INFO.email = "bangali@ultimotradingltd.co.ke"`
+- **Privacy policy**: Visit `/privacy` — references the support email
+- **Terms of service**: Visit `/terms` — references the support email
+- **Cookie consent**: Visit any page → the cookie consent banner appears at the bottom
+  - Accept → preference saved to localStorage
+  - Decline → tracking scripts are disabled
+
+---
+
+### 🔄 Test the God Mode Agent Orchestrator
+
+1. Log in as admin → go to `/operations`
+2. Click **Quick Deploy All** or **Custom Deploy**
+3. Watch agent tasks execute in real-time with progress bars
+4. Visit the admin panel's **God Mode** tab to pause/resume/stop sessions
+5. View agent reports with insights and metrics
+
+---
+
+### 💳 Test Payment Flow (Flutterwave Sandbox)
+
+The payment system is configured for Flutterwave sandbox by default:
+1. Go to `/pricing` → select a plan → **Subscribe**
+2. Choose **M-Pesa**, **Mobile Money**, or **Card**
+3. For card testing in sandbox, use: `4242 4242 4242 4242`, any future expiry, any CVV
+4. Payment status polling at `/api/payments/status?tx_ref=...`
+
+Note: Actual charges only occur in production with live Flutterwave credentials.
+
+---
+
 ## 📖 Architecture
 
 ```
@@ -63,43 +270,64 @@ RevStack/
 │   └── seed-korea.ts        # Korea corridor pilot cohort seed (20 companies)
 ├── src/
 │   ├── app/                 # Next.js App Router pages & API routes
-│   │   ├── api/             # REST API endpoints
-│   │   │   ├── auth/        # Signup, login, NextAuth handlers
-│   │   │   ├── clients/     # CRUD for clients, products, compliance, trade finance
-│   │   │   ├── korea/       # Korean targets, cohorts, participants, inquiries
-│   │   │   ├── ers/         # ERS snapshots history
-│   │   │   └── health/      # Health check
+│   │   ├── api/             # REST API endpoints (36 routes, all ABAC-protected)
+│   │   ├── admin/           # Admin panel (7 tabs: Users, Audit, Payments, Trials, Retention, Follow-ups, God Mode)
 │   │   ├── korea/           # Korea Corridor dashboard
-│   │   │   ├── page.tsx     # Main dashboard (pipeline, pilot, analytics)
-│   │   │   ├── buyers/      # Korean buyer-facing landing page
-│   │   │   └── inquiries/   # Admin panel for buyer inquiries
-│   │   ├── trade/           # Trade & Export Readiness (products, compliance, ERS, finance)
-│   │   ├── pipeline/        # Pipeline CRM
-│   │   ├── dashboard/       # Main dashboard
-│   │   ├── plan/            # 75-Day Plan tracker
-│   │   ├── outreach/        # Outreach campaigns
-│   │   ├── content/         # Content calendar
-│   │   ├── financial/       # Financial model
-│   │   ├── onboarding/      # User onboarding flow
-│   │   ├── signup/          # Registration
-│   │   └── login/           # Authentication
+│   │   ├── trade/           # Trade & Export Readiness
+│   │   ├── dashboard/       # Main analytics dashboard
+│   │   └── ...              # Pipeline, Plan, Outreach, Content, Financial, etc.
 │   ├── components/          # Reusable UI components
-│   │   └── ui/              # shadcn/ui primitives (Button, Card, Dialog, etc.)
+│   │   ├── ui/              # shadcn/ui primitives
+│   │   ├── retention-dashboard.tsx  # Retention analytics (admin)
+│   │   ├── analytics-tracker.tsx    # Page view tracking
+│   │   └── ...              # AuthenticatedShell, SubscriptionGate, PaymentCheckout, etc.
 │   ├── lib/                 # Shared libraries & utilities
-│   │   ├── auth.ts          # NextAuth configuration
-│   │   ├── db.ts            # Prisma client singleton
-│   │   ├── ers-scoring.ts   # Export Readiness Score engine
-│   │   ├── ers-notifications.ts  # ERS change detection & alerts
-│   │   ├── supplier-matching.ts   # Korean buyer ↔ African supplier matching
-│   │   ├── email.ts         # Nodemailer email transport
-│   │   ├── utils.ts         # Shared utilities (cn, formatCurrency, etc.)
-│   │   ├── seed-data.ts     # Demo data definitions
-│   │   └── i18n/            # Internationalization (EN + Swahili)
-│   └── middleware.ts         # Route protection (auth redirect)
-├── .env.example             # Environment template
+│   │   ├── abac.ts          # ABAC policy engine (18 resources, 5 actions)
+│   │   ├── abac-middleware.ts  # withAuth() / withAbac() route wrappers
+│   │   ├── use-abac.ts      # Client-side useAbac() hook
+│   │   ├── analytics.ts     # Generic analytics service (Plausible/GA4/PostHog)
+│   │   ├── auth.ts          # NextAuth configuration + login retention tracking
+│   │   ├── agent-orchestrator.ts  # God Mode autonomous agent system
+│   │   ├── agent-service-bridge.ts  # Integration bridge (WATI, Zoho, Voiceflow, etc.)
+│   │   └── ...              # ERS scoring, supplier matching, email, etc.
+│   └── middleware.ts        # Route protection (auth redirect)
+├── sentry.client.config.ts  # Sentry client config (disabled without DSN)
+├── sentry.server.config.ts  # Sentry server config (disabled without DSN)
+├── EMAIL-DELIVERABILITY-GUIDE.md  # SPF/DKIM/DMARC setup guide
+├── .env.example             # Environment template with all documented env vars
 ├── vitest.config.ts         # Test configuration
 └── package.json
 ```
+
+---
+
+## 🧪 Test Files
+
+| File | Tests | Description |
+|------|-------|-------------|
+| `src/lib/ers-scoring.test.ts` | 23 | ERS dimensions, edge cases, serialization |
+| `src/lib/agent-service-bridge.test.ts` | 12 | All 5 agent plugins (Lead, Trade, Compliance, Onboarding, Revenue) |
+| `src/app/api/documents/documents.test.ts` | 6 | Document CRUD + filesystem fallback + path traversal |
+| `src/app/api/pipeline-actions/pipeline-actions.test.ts` | 7 | Pipeline action CRUD |
+| `src/app/api/content/content.test.ts` | 5 | Content article CRUD |
+| `src/lib/pricing.test.ts` | 37 | Pricing tiers, budget suggestions, onboarding-based suggestions |
+| **Total** | **94** | All passing ✅ |
+
+---
+
+## 🔐 Security
+
+- **ABAC (Attribute-Based Access Control)**: Centralized policy engine covering 18 resources with 5 actions (read/write/admin/deploy/manage)
+- **Authentication**: NextAuth v5 with JWT strategy + credentials + Google SSO
+- **API protection**: All route handlers use `withAuth()` or `withAbac()` middleware — no ad-hoc `auth()` calls
+- **Route protection**: Middleware redirects unauthenticated users to `/login`
+- **Admin routes**: `/admin`, `/api/admin/*`, `/korea/inquiries` require admin role (enforced by ABAC)
+- **Data isolation**: Row-level filtering by `userId` prevents data leakage
+- **Error handling**: ABAC middleware catches all handler errors → returns JSON 500 with safe error messages
+- **Password hashing**: bcryptjs with 12 salt rounds
+- **Environment**: `.env` is gitignored; use `.env.example` as a template
+
+---
 
 ## 📋 Available Scripts
 
@@ -113,90 +341,50 @@ RevStack/
 | `npm run db:seed` | Run main seed (demo data) |
 | `npm run db:generate` | Regenerate Prisma client |
 | `npm run lint` | Run ESLint |
-| `npx vitest run` | Run all tests |
-| `npx vitest run src/lib/ers-scoring.test.ts` | Run ERS engine tests |
+| `npx tsc --noEmit --skipLibCheck` | TypeScript check (should be 0 errors) |
+| `npx vitest run` | Run all 94 tests |
+| `npx vitest` | Run tests in watch mode |
+| `npx vitest run src/lib/pricing.test.ts` | Run a specific test file |
 
-## 🔐 Security
+---
 
-- **Authentication**: NextAuth v5 with JWT strategy + credentials provider
-- **Password hashing**: bcryptjs with 12 salt rounds
-- **API protection**: All mutation endpoints check `auth()` and verify resource ownership
-- **Route protection**: Middleware redirects unauthenticated users to `/login`
-- **Admin routes**: `/admin` and `/korea/inquiries` require admin role
-- **Database**: SQLite (dev) — row-level filtering by `userId` prevents data leakage
-- **Environment**: `.env` is gitignored; use `.env.example` as a template
+## 🌐 Key Pages
 
-## 🧪 Testing
+| Route | Description | Auth Required | ABAC Policy |
+|-------|-------------|---------------|-------------|
+| `/dashboard` | Main analytics dashboard | ✅ | dashboard:read |
+| `/pipeline` | Pipeline CRM | ✅ | pipeline:read |
+| `/trade` | Products, compliance, ERS, trade finance | ✅ | trade:read |
+| `/korea` | Korea Corridor dashboard | ✅ | korea:read |
+| `/admin` | Admin panel (7 tabs) | ✅ | admin:read |
+| `/operations` | God Mode agent orchestrator | ✅ | operations:read |
+| `/financial` | Revenue model & projections | ✅ | financial:read |
+| `/outreach` | Campaign templates & management | ✅ | outreach:read |
+| `/plan` | 75-Day implementation plan | ✅ | plan:read |
+| `/content` | SEO content calendar | ✅ | content:read |
+| `/pricing` | Subscription plans & checkout | ✅ | pricing:read |
+| `/onboarding` | User onboarding flow | ✅ | onboarding:write |
+| `/docs` | Platform documentation | ✅ | docs:read |
 
-```bash
-# Run all tests
-npx vitest run
-
-# Run specific test file
-npx vitest run src/lib/ers-scoring.test.ts
-
-# Run in watch mode
-npx vitest
-```
-
-### Test files
-
-| File | Description |
-|------|-------------|
-| `src/lib/ers-scoring.test.ts` | 23 tests covering ERS dimensions, edge cases, serialization |
-| `src/app/api/documents/documents.test.ts` | Document API tests |
-| `src/app/api/pipeline-actions/pipeline-actions.test.ts` | Pipeline action API tests |
-| `src/app/api/content/content.test.ts` | Content calendar API tests |
-
-## 🌐 Key Features
-
-### Export Readiness Score (ERS)
-Auto-calculated 0–100 score across 4 dimensions (documentation, compliance, export history, capacity). Recalculates in real-time when compliance records or products are added/updated. History tracked via `ErsSnapshot` model.
-
-### Korea-Africa Trade Corridor
-- Corporate target pipeline (10 Korean procurement teams)
-- Sokogate Platform Pilot (20 African exporters on free trials)
-- Supplier matching engine (product fit + compliance + capacity scoring)
-- Korean buyer inquiry registration & admin panel
-
-### Supplier Matching
-The `supplier-matching.ts` engine scores matches using:
-- **Product Fit (40%)**: Commodity keyword matching
-- **Compliance (35%)**: Certification gap analysis
-- **Capacity (25%)**: ERS sub-scores + volume
-
-### Pilot-to-Paid Conversion
-Automated conversion sequence with trial expiry tracking, check-in scheduling, and re-engagement workflows.
-
-## 🗺️ Key Pages
-
-| Route | Description |
-|-------|-------------|
-| `/dashboard` | Main analytics dashboard |
-| `/pipeline` | Pipeline CRM with drag-and-drop |
-| `/trade` | Products, compliance, ERS, trade finance |
-| `/korea` | Korea Corridor dashboard |
-| `/korea/buyers` | Korean buyer landing page (bilingual) |
-| `/korea/inquiries` | Buyer inquiry admin panel |
-| `/financial` | Revenue model & projections |
-| `/outreach` | Campaign templates & management |
-| `/plan` | 75-Day implementation plan |
-| `/content` | SEO content calendar |
-| `/docs` | Platform documentation |
-| `/api/health` | Health check endpoint |
+---
 
 ## 🛠️ Tech Stack
 
 - **Framework**: Next.js 15 (App Router)
 - **Language**: TypeScript (strict mode)
 - **Database**: SQLite (dev) / PostgreSQL (prod) via Prisma
-- **Auth**: NextAuth v5 (JWT + Credentials + optional Google SSO)
+- **Auth**: NextAuth v5 (JWT + Credentials + Google SSO) + ABAC policy engine
 - **UI**: Tailwind CSS + shadcn/ui + Framer Motion
 - **Charts**: Recharts
 - **Icons**: Lucide React
 - **Email**: Nodemailer (Ethereal dev fallback)
-- **Testing**: Vitest + Testing Library
-- **AI**: LangChain.js (optional, for RAG pipeline)
+- **Testing**: Vitest (94 tests, all passing)
+- **Error Tracking**: Sentry (auto-disabled without DSN)
+- **Analytics**: Generic service (Plausible / GA4 / PostHog / custom)
+- **SEO**: Dynamic sitemap.xml + OG image generation + Bing Webmaster Tools
+- **AI**: LangChain.js (optional, for RAG pipeline + agent orchestration)
+
+---
 
 ## 📝 License
 
