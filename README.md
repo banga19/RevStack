@@ -572,38 +572,41 @@ npx prisma db seed                      # Re-seed if needed
 
 ```
 RevStack/
-├── prisma/                  # Database schema & seeds
-│   ├── schema.prisma        # All models (User, Client, Product, Compliance, etc.)
-│   ├── seed.ts              # Main seed (demo clients, products, compliance, finance)
-│   └── seed-korea.ts        # Korea corridor pilot cohort seed (20 companies)
+├── middleware.ts             # Root middleware (re-exports handler from proxy.ts, config inline)
+├── proxy.ts                  # Edge-compatible middleware handler (auth redirect, rate limit, security headers)
+├── prisma/                   # Database schema & seeds
+│   ├── schema.prisma         # All models (User, Client, Organization, Product, Compliance, etc.)
+│   ├── seed.ts               # Main seed (demo clients, products, compliance, finance)
+│   └── seed-korea.ts         # Korea corridor pilot cohort seed (20 companies)
 ├── src/
-│   ├── app/                 # Next.js App Router pages & API routes
-│   │   ├── api/             # REST API endpoints (36 routes, all ABAC-protected)
-│   │   ├── admin/           # Admin panel (7 tabs: Users, Audit, Payments, Trials, Retention, Follow-ups, God Mode)
-│   │   ├── korea/           # Korea Corridor dashboard
-│   │   ├── trade/           # Trade & Export Readiness
-│   │   ├── dashboard/       # Main analytics dashboard
-│   │   └── ...              # Pipeline, Plan, Outreach, Content, Financial, etc.
-│   ├── components/          # Reusable UI components
-│   │   ├── ui/              # shadcn/ui primitives
-│   │   ├── retention-dashboard.tsx  # Retention analytics (admin)
-│   │   ├── analytics-tracker.tsx    # Page view tracking
-│   │   └── ...              # AuthenticatedShell, SubscriptionGate, PaymentCheckout, etc.
-│   ├── lib/                 # Shared libraries & utilities
-│   │   ├── abac.ts          # ABAC policy engine (18 resources, 5 actions)
+│   ├── app/                  # Next.js App Router pages & API routes
+│   │   ├── layout.tsx        # Root layout (server component — only imports <Providers> wrapper)
+│   │   ├── globals.css       # Tailwind + CSS custom properties + dark/light themes
+│   │   ├── api/              # REST API endpoints (40+ routes, all ABAC-protected)
+│   │   ├── admin/            # Admin panel (7 tabs: Users, Audit, Payments, Trials, Retention, Follow-ups, God Mode)
+│   │   ├── korea/            # Korea Corridor dashboard
+│   │   ├── trade/            # Trade & Export Readiness
+│   │   ├── dashboard/        # Main analytics dashboard
+│   │   ├── templates/        # Automation template library + deploy
+│   │   └── ...               # Pipeline, Plan, Outreach, Content, Financial, etc.
+│   ├── components/           # Reusable UI components
+│   │   ├── providers.tsx     # Single "use client" wrapper bundling ALL client providers
+│   │   ├── ui/               # shadcn/ui primitives
+│   │   └── ...               # AuthProvider (merged with OrgProvider), Sidebar, Dashboard, etc.
+│   ├── lib/                  # Shared libraries & utilities
+│   │   ├── abac.ts           # ABAC policy engine (18 resources, 5 actions)
 │   │   ├── abac-middleware.ts  # withAuth() / withAbac() route wrappers
-│   │   ├── use-abac.ts      # Client-side useAbac() hook
-│   │   ├── analytics.ts     # Generic analytics service (Plausible/GA4/PostHog)
-│   │   ├── auth.ts          # NextAuth configuration + login retention tracking
+│   │   ├── csrf.ts           # Stateless CSRF protection (HMAC-signed tokens)
+│   │   ├── rate-limiter.ts   # In-memory sliding-window rate limiter
+│   │   ├── security-headers.ts  # CSP, HSTS, XFO, Referrer-Policy, Permissions-Policy
+│   │   ├── auth.ts           # NextAuth v5 configuration + JWT callbacks
 │   │   ├── agent-orchestrator.ts  # God Mode autonomous agent system
 │   │   ├── agent-service-bridge.ts  # Integration bridge (WATI, Zoho, Voiceflow, etc.)
-│   │   └── ...              # ERS scoring, supplier matching, email, etc.
-│   └── middleware.ts        # Route protection (auth redirect)
-├── sentry.client.config.ts  # Sentry client config (disabled without DSN)
-├── sentry.server.config.ts  # Sentry server config (disabled without DSN)
-├── EMAIL-DELIVERABILITY-GUIDE.md  # SPF/DKIM/DMARC setup guide
-├── .env.example             # Environment template with all documented env vars
-├── vitest.config.ts         # Test configuration
+│   │   └── ...               # ERS scoring, supplier matching, email, pricing, templates, etc.
+├── sentry.client.config.ts   # Sentry client config (disabled without DSN)
+├── sentry.server.config.ts   # Sentry server config (disabled without DSN)
+├── .env.example              # Environment template with all documented env vars
+├── vitest.config.ts          # Test configuration
 └── package.json
 ```
 
@@ -628,7 +631,9 @@ RevStack/
 - **ABAC (Attribute-Based Access Control)**: Centralized policy engine covering 18 resources with 5 actions (read/write/admin/deploy/manage)
 - **Authentication**: NextAuth v5 with JWT strategy + credentials + Google SSO
 - **API protection**: All route handlers use `withAuth()` or `withAbac()` middleware — no ad-hoc `auth()` calls
-- **Route protection**: Middleware redirects unauthenticated users to `/login`
+- **Route protection**: Edge-compatible middleware (`proxy.ts`) redirects unauthenticated users to `/login`, applies rate limiting, and injects security headers (CSP, HSTS, XFO, etc.)
+- **CSRF protection**: Stateless HMAC-signed CSRF tokens via `src/lib/csrf.ts` — cookie-to-header validation on all mutating API requests
+- **Rate limiting**: In-memory sliding-window rate limiter with path-prefix granularity (strictest on auth endpoints: 5 POST/min on signup)
 - **Admin routes**: `/admin`, `/api/admin/*`, `/korea/inquiries` require admin role (enforced by ABAC)
 - **Data isolation**: Row-level filtering by `userId` prevents data leakage
 - **Error handling**: ABAC middleware catches all handler errors → returns JSON 500 with safe error messages
@@ -672,13 +677,14 @@ RevStack/
 | `/content` | SEO content calendar | ✅ | content:read |
 | `/pricing` | Subscription plans & checkout | ✅ | pricing:read |
 | `/onboarding` | User onboarding flow | ✅ | onboarding:write |
+| `/templates` | Automation template library | ✅ | — |
 | `/docs` | Platform documentation | ✅ | docs:read |
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Framework**: Next.js 15 (App Router)
+- **Framework**: Next.js 16 (App Router)
 - **Language**: TypeScript (strict mode)
 - **Database**: SQLite (dev) / PostgreSQL (prod) via Prisma
 - **Auth**: NextAuth v5 (JWT + Credentials + Google SSO) + ABAC policy engine
