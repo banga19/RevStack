@@ -5,6 +5,17 @@ import { sendWelcomeEmail } from "@/lib/email"
 import { validateCsrf } from "@/lib/csrf"
 import { appendSignupRow } from "@/lib/google-sheets"
 
+// Server-side analytics logging — replace with your real analytics provider
+function logEvent(event: string, data: Record<string, any>) {
+  // In production, send this to your analytics provider:
+  // Plausible: fetch('https://plausible.io/api/event', { method: 'POST', body: JSON.stringify({...}) })
+  // GA4:      fetch('https://www.google-analytics.com/mp/collect?...', { method: 'POST', body: JSON.stringify({...}) })
+  // Logging to console in dev for now
+  if (process.env.NODE_ENV !== "production") {
+    console.log(`[Analytics] ${event}:`, data)
+  }
+}
+
 export async function POST(req: NextRequest) {
   // Validate CSRF token
   const csrfCheck = await validateCsrf(req)
@@ -87,6 +98,15 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     }).catch((err) => {
       console.error("Google Sheets signup append error:", err)
+    })
+
+    // Track sign-up event
+    logEvent("signup", {
+      userId: user.id,
+      email: user.email,
+      method: "credentials",
+      hasPhone: !!phone,
+      trialEndsAt: trialEnd.toISOString(),
     })
 
     return NextResponse.json(

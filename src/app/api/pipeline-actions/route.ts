@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
-import { auth } from "@/lib/auth"
+import { withAuth } from "@/lib/abac-middleware"
 
-export async function GET(req: NextRequest) {
-  const session = await auth()
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+export const GET = withAuth(async (req: NextRequest) => {
   try {
     const { searchParams } = new URL(req.url)
     const clientId = searchParams.get("clientId")
@@ -19,27 +15,18 @@ export async function GET(req: NextRequest) {
   } catch {
     return NextResponse.json([])
   }
-}
+})
 
-export async function POST(req: NextRequest) {
-  const session = await auth()
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-  try {
-    const body = await req.json()
-    const action = await prisma.pipelineAction.create({
-      data: {
-        clientId: body.clientId,
-        type: body.type || "follow-up",
-        note: body.note || null,
-        status: body.status || "pending",
-        dueDate: body.dueDate ? new Date(body.dueDate) : null,
-      },
-    })
-    return NextResponse.json(action, { status: 201 })
-  } catch (error) {
-    console.error("POST pipeline action error:", error)
-    return NextResponse.json({ error: "Failed to create action" }, { status: 500 })
-  }
-}
+export const POST = withAuth(async (req: NextRequest) => {
+  const body = await req.json()
+  const action = await prisma.pipelineAction.create({
+    data: {
+      clientId: body.clientId,
+      type: body.type || "follow-up",
+      note: body.note || null,
+      status: body.status || "pending",
+      dueDate: body.dueDate ? new Date(body.dueDate) : null,
+    },
+  })
+  return NextResponse.json(action, { status: 201 })
+})

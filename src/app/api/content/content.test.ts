@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { NextRequest } from "next/server"
 
+const mockRequest = new NextRequest("http://localhost:3000/api/content")
+
 vi.mock("@/lib/auth", () => ({
   auth: vi.fn().mockResolvedValue({ user: { id: "test-user", role: "admin" } }),
   signIn: vi.fn(),
@@ -18,6 +20,17 @@ vi.mock("@/lib/db", () => ({
     },
   },
 }))
+
+vi.mock("@/lib/abac", async () => {
+  const actual = await vi.importActual("@/lib/abac")
+  return {
+    ...actual,
+    checkAccessFromSession: vi.fn().mockResolvedValue({
+      session: { user: { id: "test-user", role: "admin" } },
+      decision: { allowed: true, reason: "Admin bypass", grants: ["admin:full"] },
+    }),
+  }
+})
 
 import { prisma } from "@/lib/db"
 import { GET, POST } from "./route"
@@ -48,7 +61,7 @@ describe("GET /api/content", () => {
   it("returns all articles ordered by createdAt desc", async () => {
     vi.mocked(prisma.contentArticle.findMany).mockResolvedValue(mockArticles)
 
-    const response = await GET()
+    const response = await GET(mockRequest)
     const data = await response.json()
 
     expect(response.status).toBe(200)
@@ -58,13 +71,14 @@ describe("GET /api/content", () => {
     expect(prisma.contentArticle.findMany).toHaveBeenCalledWith({ orderBy: { week: "asc" } })
   })
 
-  it("returns empty array on error", async () => {
+  it("returns error on DB error", async () => {
     vi.mocked(prisma.contentArticle.findMany).mockRejectedValue(new Error("DB error"))
 
-    const response = await GET()
+    const response = await GET(mockRequest)
     const data = await response.json()
 
-    expect(data).toEqual([])
+    expect(response.status).toBe(500)
+    expect(data).toHaveProperty("error")
   })
 })
 

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
+import { NextRequest } from "next/server"
 
 vi.mock("@/lib/auth", () => ({
   auth: vi.fn().mockResolvedValue({ user: { id: "test-user", role: "admin" } }),
@@ -12,6 +13,7 @@ vi.mock("@/lib/db", () => ({
     document: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
+      delete: vi.fn(),
     },
   },
 }))
@@ -24,6 +26,17 @@ vi.mock("fs", () => ({
   existsSync: vi.fn(),
   readFileSync: vi.fn(),
 }))
+
+vi.mock("@/lib/abac", async () => {
+  const actual = await vi.importActual("@/lib/abac")
+  return {
+    ...actual,
+    checkAccessFromSession: vi.fn().mockResolvedValue({
+      session: { user: { id: "test-user", role: "admin" } },
+      decision: { allowed: true, reason: "Admin bypass", grants: ["admin:full"] },
+    }),
+  }
+})
 
 import { prisma } from "@/lib/db"
 import fs from "fs"
@@ -49,7 +62,7 @@ describe("GET /api/documents", () => {
   it("returns all documents ordered by category", async () => {
     vi.mocked(prisma.document.findMany).mockResolvedValue(mockDocs)
 
-    const req = new Request("http://localhost:3000/api/documents")
+    const req = new NextRequest("http://localhost:3000/api/documents")
     const response = await GET_LIST(req)
     const data = await response.json()
 
@@ -65,7 +78,7 @@ describe("GET /api/documents", () => {
 
   it("returns error response on error", async () => {
     vi.mocked(prisma.document.findMany).mockRejectedValue(new Error("DB error"))
-    const req = new Request("http://localhost:3000/api/documents")
+    const req = new NextRequest("http://localhost:3000/api/documents")
     const response = await GET_LIST(req)
     const data = await response.json()
     expect(response.status).toBe(500)
@@ -81,7 +94,7 @@ describe("GET /api/documents/[id]", () => {
     vi.mocked(fs.existsSync).mockReturnValue(true)
     vi.mocked(fs.readFileSync).mockReturnValue("# 75-Day Plan\n\nThis is the content.")
 
-    const req = new Request("http://localhost:3000/api/documents/doc-1")
+    const req = new NextRequest("http://localhost:3000/api/documents/doc-1")
     const response = await GET_BY_ID(req, { params: Promise.resolve({ id: "doc-1" }) })
     const data = await response.json()
 
@@ -93,7 +106,7 @@ describe("GET /api/documents/[id]", () => {
   it("returns 404 if document not found", async () => {
     vi.mocked(prisma.document.findUnique).mockResolvedValue(null)
 
-    const req = new Request("http://localhost:3000/api/documents/doc-404")
+    const req = new NextRequest("http://localhost:3000/api/documents/doc-404")
     const response = await GET_BY_ID(req, { params: Promise.resolve({ id: "doc-404" }) })
 
     expect(response.status).toBe(404)
@@ -103,11 +116,11 @@ describe("GET /api/documents/[id]", () => {
     const doc = { ...mockDocs[0], filename: "../../../etc/passwd" }
     vi.mocked(prisma.document.findUnique).mockResolvedValue(doc)
 
-    const req = new Request("http://localhost:3000/api/documents/doc-1")
+    const req = new NextRequest("http://localhost:3000/api/documents/doc-1")
     const response = await GET_BY_ID(req, { params: Promise.resolve({ id: "doc-1" }) })
     const data = await response.json()
 
-    // Should not read the file since it contains ..
+    expect(response.status).toBe(200)
     expect(fs.existsSync).not.toHaveBeenCalled()
     expect(data.content).toBe("")
   })
@@ -116,7 +129,7 @@ describe("GET /api/documents/[id]", () => {
     vi.mocked(prisma.document.findUnique).mockResolvedValue(mockDocs[0])
     vi.mocked(fs.existsSync).mockReturnValue(false)
 
-    const req = new Request("http://localhost:3000/api/documents/doc-1")
+    const req = new NextRequest("http://localhost:3000/api/documents/doc-1")
     const response = await GET_BY_ID(req, { params: Promise.resolve({ id: "doc-1" }) })
     const data = await response.json()
 

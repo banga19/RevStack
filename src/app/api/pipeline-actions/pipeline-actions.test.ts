@@ -20,6 +20,17 @@ vi.mock("@/lib/db", () => ({
   },
 }))
 
+vi.mock("@/lib/abac", async () => {
+  const actual = await vi.importActual("@/lib/abac")
+  return {
+    ...actual,
+    checkAccessFromSession: vi.fn().mockResolvedValue({
+      session: { user: { id: "test-user", role: "admin" } },
+      decision: { allowed: true, reason: "Admin bypass", grants: ["admin:full"] },
+    }),
+  }
+})
+
 import { prisma } from "@/lib/db"
 import { GET, POST } from "./route"
 import { PUT, DELETE } from "./[id]/route"

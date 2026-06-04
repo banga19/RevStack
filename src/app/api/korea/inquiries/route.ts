@@ -1,28 +1,19 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
+import { withAbac, withAuth } from "@/lib/abac-middleware"
+import { RESOURCES } from "@/lib/abac"
 
-export async function GET(req: NextRequest) {
-  try {
-    const session = await auth()
-    // Only admin users can view all inquiries
-    if (!session?.user?.id || session.user.role !== "admin") {
-      return NextResponse.json([])
-    }
+export const GET = withAbac(RESOURCES.admin, "read", async (req: NextRequest) => {
+  const { searchParams } = new URL(req.url)
+  const limit = parseInt(searchParams.get("limit") || "50")
 
-    const { searchParams } = new URL(req.url)
-    const limit = parseInt(searchParams.get("limit") || "50")
+  const inquiries = await prisma.koreanBuyerInquiry.findMany({
+    orderBy: { createdAt: "desc" },
+    take: Math.min(limit, 200),
+  })
 
-    const inquiries = await prisma.koreanBuyerInquiry.findMany({
-      orderBy: { createdAt: "desc" },
-      take: Math.min(limit, 200),
-    })
-
-    return NextResponse.json(inquiries)
-  } catch {
-    return NextResponse.json([])
-  }
-}
+  return NextResponse.json(inquiries)
+})
 
 export async function POST(req: NextRequest) {
   try {
