@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -38,8 +37,15 @@ import {
   Square,
   Pause,
   Globe,
+  BarChart3,
+  TrendingUp,
+  CalendarDays,
+  UserCheck,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useAbac } from "@/lib/use-abac"
+import { useSession } from "next-auth/react"
+import { RetentionDashboard } from "@/components/retention-dashboard"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -126,7 +132,7 @@ const AUDIT_ACTION_LABELS: Record<string, string> = {
   change_role: "Changed Role",
 }
 
-const AUDIT_ACTION_ICONS = {
+const AUDIT_ACTION_ICONS: Record<string, React.ReactNode> = {
   grant_permanent_access: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />,
   extend_trial: <Clock className="h-3.5 w-3.5 text-amber-500" />,
   change_role: <Shield className="h-3.5 w-3.5 text-blue-500" />,
@@ -145,6 +151,7 @@ const STAGE_LABELS: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 export default function AdminPage() {
+  const { isAdmin, isLoading } = useAbac()
   const { data: session, update } = useSession()
   const router = useRouter()
   const [users, setUsers] = useState<AdminUser[]>([])
@@ -255,11 +262,13 @@ export default function AdminPage() {
     }
   }
 
+  // ABAC check: only admin can access this page
   useEffect(() => {
-    if (!session?.user) return
-    if (session.user.role !== "admin") { router.push("/dashboard"); return }
+    if (isLoading) return
+    if (!isAdmin) { router.push("/dashboard"); return }
     loadAll()
-  }, [session, router, loadAll])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, isAdmin])
 
   // ---- Grant Permanent Access ----
   const grantPermanentAccess = async (userId: string) => {
@@ -349,8 +358,8 @@ export default function AdminPage() {
     finally { setTriggeringUser(null) }
   }
 
-  // ---- Auth guard ----
-  if (!session?.user) {
+  // ---- Auth guard (ABAC) ----
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -358,7 +367,7 @@ export default function AdminPage() {
     )
   }
 
-  if (session.user.role !== "admin") {
+  if (!isAdmin) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <ShieldAlert className="h-16 w-16 text-muted-foreground/50 mb-4" />
@@ -463,11 +472,12 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="users"><Users className="h-4 w-4 mr-2" /> Users</TabsTrigger>
           <TabsTrigger value="audit"><Shield className="h-4 w-4 mr-2" /> Audit Log</TabsTrigger>
           <TabsTrigger value="payments"><DollarSign className="h-4 w-4 mr-2" /> Payments</TabsTrigger>
           <TabsTrigger value="trials"><Clock className="h-4 w-4 mr-2" /> Trial Users</TabsTrigger>
+          <TabsTrigger value="retention"><BarChart3 className="h-4 w-4 mr-2" /> Retention</TabsTrigger>
           <TabsTrigger value="followups"><BellRing className="h-4 w-4 mr-2" /> Follow-ups</TabsTrigger>
           <TabsTrigger value="godmode"><Zap className="h-4 w-4 mr-2" /> God Mode</TabsTrigger>
         </TabsList>
@@ -806,6 +816,21 @@ export default function AdminPage() {
           })}
         </div>
       )}
+    </CardContent>
+  </Card>
+</TabsContent>
+
+{/* ================================================================= */}
+{/* TAB: Retention */}
+{/* ================================================================= */}
+<TabsContent value="retention" className="space-y-4">
+  <Card>
+    <CardHeader>
+      <CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" /> Retention &amp; Activity</CardTitle>
+      <CardDescription>User sign-ups, login activity, activation rates, and churn analysis</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <RetentionDashboard />
     </CardContent>
   </Card>
 </TabsContent>

@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { logAdminAction } from "@/lib/admin-audit"
+import { withAbac } from "@/lib/abac-middleware"
+import { RESOURCES } from "@/lib/abac"
 
-export async function GET() {
-  const session = await auth()
-  if (!session?.user || session.user.role !== "admin") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-
+export const GET = withAbac(RESOURCES.admin, "read", async (_req, { session }) => {
   const users = await prisma.user.findMany({
     orderBy: { createdAt: "desc" },
     select: {
@@ -24,14 +20,10 @@ export async function GET() {
   })
 
   return NextResponse.json(users)
-}
+})
 
-export async function PUT(req: Request) {
-  const session = await auth()
-  if (!session?.user || session.user.role !== "admin") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-
+export const PUT = withAbac(RESOURCES.admin, "admin", async (req, { session }) => {
+  const adminId = session.user.id as string
   const adminName = (session.user as any).name || null
 
   try {
@@ -55,9 +47,8 @@ export async function PUT(req: Request) {
         },
         select: { id: true, name: true, email: true, role: true, subscriptionStatus: true, subscriptionTier: true, createdAt: true },
       })
-      // Audit log
       logAdminAction({
-        adminId: session.user.id,
+        adminId,
         adminName,
         action: "grant_permanent_access",
         targetUserId: userId,
@@ -75,9 +66,7 @@ export async function PUT(req: Request) {
       }
       const now = new Date()
       const currentEnd = target.trialEndsAt || now
-      // Extend by 7 days from the current trial end (or from now if no end date)
       const newEnd = new Date(currentEnd.getTime() + 7 * 24 * 60 * 60 * 1000)
-      // If user is expired, reactivate to trial first
       const updated = await prisma.user.update({
         where: { id: userId },
         data: {
@@ -87,9 +76,8 @@ export async function PUT(req: Request) {
         },
         select: { id: true, name: true, email: true, role: true, subscriptionStatus: true, subscriptionTier: true, trialEndsAt: true, createdAt: true },
       })
-      // Audit log
       logAdminAction({
-        adminId: session.user.id,
+        adminId,
         adminName,
         action: "extend_trial",
         targetUserId: userId,
@@ -104,12 +92,10 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: "Invalid request: role, grantPermanentAccess, or extendTrial required" }, { status: 400 })
     }
 
-    // Prevent removing your own admin role
-    if (userId === session.user.id && role !== "admin") {
+    if (userId === adminId && role !== "admin") {
       return NextResponse.json({ error: "Cannot remove your own admin role" }, { status: 400 })
     }
 
-    // Prevent removing the last admin
     if (role !== "admin") {
       const adminCount = await prisma.user.count({ where: { role: "admin" } })
       if (adminCount <= 1) {
@@ -123,9 +109,8 @@ export async function PUT(req: Request) {
       data: { role },
       select: { id: true, name: true, email: true, role: true, createdAt: true },
     })
-    // Audit log
     logAdminAction({
-      adminId: session.user.id,
+      adminId,
       adminName,
       action: "change_role",
       targetUserId: userId,
@@ -136,4 +121,4 @@ export async function PUT(req: Request) {
   } catch (e) {
     return NextResponse.json({ error: "Failed to update user" }, { status: 500 })
   }
-}
+})

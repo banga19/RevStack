@@ -13,6 +13,10 @@ import { ChatPromptTemplate } from "@langchain/core/prompts"
 import { Annotation, StateGraph, END } from "@langchain/langgraph"
 import { agentMemory, type AgentType, type AgentReport, type GodModeConfig } from "./agent-memory"
 import { ragPipeline } from "./rag-pipeline"
+import {
+  executeAgentServiceAction,
+  type ServiceActionResult,
+} from "./agent-service-bridge"
 
 // ============================================================
 // Types
@@ -298,23 +302,53 @@ lead|Qualify all new leads in the pipeline and send personalized WhatsApp follow
   }
 
   private async executeAgentAction(task: AgentTask, session: GodModeSession): Promise<string> {
-    const actionPrompt = ChatPromptTemplate.fromMessages([
-      [
-        "system",
-        `You are the ${task.agentType} agent in the Mapato autonomous system. ` +
-        "Execute your assigned action and report the results. Be specific about what was done.",
-      ],
-      [
-        "human",
-        `Session Objective: ${session.config.objective}
+    // Use the service bridge to invoke real integrated services
+    const serviceResult = await executeAgentServiceAction(
+      task.agentType,
+      task.action,
+      {
+        sessionId: session.id,
+        objective: session.config.objective,
+        startTime: session.startTime || Date.now(),
+      }
+    )
+
+    if (serviceResult.success) {
+      return [
+        `=== ${task.agentType.toUpperCase()} AGENT EXECUTION REPORT ===`,
+        `Status: ✅ Success`,
+        `Summary: ${serviceResult.summary}`,
+        serviceResult.details ? `\nDetails:\n${serviceResult.details}` : "",
+        serviceResult.metrics
+          ? `\nMetrics:\n${Object.entries(serviceResult.metrics)
+              .map(([k, v]) => `  ${k}: ${v}`)
+              .join("\n")}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n")
+    } else {
+      // Fallback: if the service bridge fails, use the LLM as a fallback
+      const actionPrompt = ChatPromptTemplate.fromMessages([
+        [
+          "system",
+          `You are the ${task.agentType} agent in the Mapato autonomous system. ` +
+          "Execute your assigned action and report the results. Be specific about what was done. " +
+          "Note: The integrated service bridge was unavailable, so provide a simulated analysis.",
+        ],
+        [
+          "human",
+          `Session Objective: ${session.config.objective}
 Your Action: ${task.action}
+Service Error: ${serviceResult.errors?.join(", ") || "Unknown"}
 
-Execute this action and report the results. Include specific metrics and outcomes.`,
-      ],
-    ])
+Provide a simulated execution report with analysis.`,
+        ],
+      ])
 
-    const chain = actionPrompt.pipe(this.llm).pipe(new StringOutputParser())
-    return await chain.invoke({})
+      const chain = actionPrompt.pipe(this.llm).pipe(new StringOutputParser())
+      return await chain.invoke({})
+    }
   }
 
   // ==========================================================

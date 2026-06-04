@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
@@ -28,6 +29,9 @@ import {
   Sparkles,
   ArrowUpRight,
   Target,
+  Rocket,
+  MessageSquareText,
+  Wand2,
 } from "lucide-react"
 
 // ============================================================
@@ -120,7 +124,8 @@ export default function OperationsPage() {
   const [godModeConfig, setGodModeConfig] = useState({
     duration: "3600000",
     objective: GOD_MODE_OBJECTIVES[0],
-    agents: ["lead", "trade", "revenue"] as AgentType[],
+    customObjective: "",
+    agents: ["lead", "trade", "compliance", "onboarding", "revenue"] as AgentType[],
   })
   const [starting, setStarting] = useState(false)
   const [selectedReport, setSelectedReport] = useState<APIReport | null>(null)
@@ -169,10 +174,19 @@ export default function OperationsPage() {
   const startGodMode = async () => {
     setStarting(true)
     try {
+      // Use custom objective if provided, otherwise use the preset
+      const objective = godModeConfig.customObjective.trim()
+        ? godModeConfig.customObjective
+        : godModeConfig.objective
+
       const res = await fetch("/api/god-mode", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(godModeConfig),
+        body: JSON.stringify({
+          duration: parseInt(godModeConfig.duration) || 3600000,
+          objective,
+          agents: godModeConfig.agents,
+        }),
       })
       if (res.ok) {
         setGodModeDialogOpen(false)
@@ -279,9 +293,40 @@ export default function OperationsPage() {
               </Button>
             </div>
           ) : (
-            <Button onClick={() => setGodModeDialogOpen(true)}>
-              <Zap className="h-4 w-4 mr-2" /> Activate God Mode
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                disabled={starting}
+                onClick={async () => {
+                  setStarting(true)
+                  try {
+                    const res = await fetch("/api/god-mode", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        duration: 86400000,
+                        objective: "Full system sweep — all agents, all pending tasks",
+                        agents: ["lead", "trade", "compliance", "onboarding", "revenue"],
+                      }),
+                    })
+                    if (res.ok) await loadSessions()
+                  } catch (e) {
+                    console.error("Quick deploy failed:", e)
+                  } finally {
+                    setStarting(false)
+                  }
+                }}
+              >
+                {starting ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Deploying...</>
+                ) : (
+                  <><Rocket className="h-4 w-4 mr-2" /> Quick Deploy All</>
+                )}
+              </Button>
+              <Button onClick={() => setGodModeDialogOpen(true)}>
+                <Zap className="h-4 w-4 mr-2" /> Custom Deploy
+              </Button>
+            </div>
           )}
         </div>
       </div>
@@ -548,16 +593,39 @@ export default function OperationsPage() {
               {GOD_MODE_OBJECTIVES.map((objective, i) => (
                 <button
                   key={i}
-                  onClick={() => {
-                    setGodModeConfig((prev) => ({ ...prev, objective }))
-                    setGodModeDialogOpen(true)
+                  onClick={async () => {
+                    // One-click deploy with all agents
+                    setStarting(true)
+                    try {
+                      const res = await fetch("/api/god-mode", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          duration: "86400000",
+                          objective,
+                          agents: ["lead", "trade", "compliance", "onboarding", "revenue"],
+                        }),
+                      })
+                      if (res.ok) {
+                        await loadSessions()
+                      }
+                    } catch (e) {
+                      console.error("Quick deploy failed:", e)
+                    } finally {
+                      setStarting(false)
+                    }
                   }}
-                  className="flex items-center gap-3 p-3 rounded-lg border border-border/50 hover:border-primary/30 hover:bg-muted/30 transition-all text-left"
+                  disabled={starting}
+                  className="flex items-center gap-3 p-3 rounded-lg border border-border/50 hover:border-primary/30 hover:bg-muted/30 transition-all text-left group"
                 >
-                  <div className="p-2 rounded-lg bg-muted shrink-0">
-                    <Play className="h-4 w-4 text-primary" />
+                  <div className="p-2 rounded-lg bg-muted shrink-0 group-hover:bg-primary/10 transition-colors">
+                    {starting ? (
+                      <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                    ) : (
+                      <Rocket className="h-4 w-4 text-primary" />
+                    )}
                   </div>
-                  <span className="text-sm">{objective}</span>
+                  <span className="text-sm group-hover:text-foreground transition-colors">{objective}</span>
                 </button>
               ))}
             </div>
@@ -580,9 +648,40 @@ export default function OperationsPage() {
               qualification, trade operations, compliance tracking, and revenue management
               without any human intervention.
             </p>
-            <Button size="lg" onClick={() => setGodModeDialogOpen(true)}>
-              <Zap className="h-5 w-5 mr-2" /> Activate God Mode
-            </Button>
+            <div className="flex gap-3 justify-center">
+              <Button
+                size="lg"
+                disabled={starting}
+                onClick={async () => {
+                  setStarting(true)
+                  try {
+                    const res = await fetch("/api/god-mode", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        duration: 86400000,
+                        objective: "Full system sweep — all agents, all pending tasks",
+                        agents: ["lead", "trade", "compliance", "onboarding", "revenue"],
+                      }),
+                    })
+                    if (res.ok) await loadSessions()
+                  } catch (e) {
+                    console.error("Quick deploy failed:", e)
+                  } finally {
+                    setStarting(false)
+                  }
+                }}
+              >
+                {starting ? (
+                  <><Loader2 className="h-5 w-5 mr-2 animate-spin" /> Deploying...</>
+                ) : (
+                  <><Rocket className="h-5 w-5 mr-2" /> Quick Deploy All</>
+                )}
+              </Button>
+              <Button size="lg" variant="outline" onClick={() => setGodModeDialogOpen(true)}>
+                <Zap className="h-5 w-5 mr-2" /> Custom Deploy
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -604,21 +703,43 @@ export default function OperationsPage() {
             </div>
           </DialogHeader>
           <div className="space-y-5 py-4">
+            {/* Free-text objective */}
             <div className="space-y-2">
-              <Label>Objective</Label>
-              <Select
-                value={godModeConfig.objective}
-                onValueChange={(v) => setGodModeConfig((prev) => ({ ...prev, objective: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select objective" />
-                </SelectTrigger>
-                <SelectContent>
-                  {GOD_MODE_OBJECTIVES.map((obj) => (
-                    <SelectItem key={obj} value={obj}>{obj}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="flex items-center gap-2">
+                <MessageSquareText className="h-4 w-4 text-primary" />
+                Describe Your Objective
+              </Label>
+              <Textarea
+                placeholder="Describe what you want the agents to do... e.g., Qualify all new leads, send follow-ups to stuck onboarding clients, and scan for new Korea trade corridor matches"
+                value={godModeConfig.customObjective || godModeConfig.objective}
+                onChange={(e) => setGodModeConfig((prev) => ({ ...prev, customObjective: e.target.value }))}
+                className="min-h-[80px] resize-none"
+              />
+              <p className="text-xs text-muted-foreground">
+                Describe your objective in plain English. All selected agents will work autonomously to achieve it.
+              </p>
+            </div>
+
+            {/* Quick preset selector */}
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Or pick a preset objective</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {GOD_MODE_OBJECTIVES.map((obj) => (
+                  <button
+                    key={obj}
+                    type="button"
+                    onClick={() => setGodModeConfig((prev) => ({ ...prev, customObjective: "", objective: obj }))}
+                    className={cn(
+                      "text-xs px-2.5 py-1 rounded-full border transition-all",
+                      (godModeConfig.customObjective || "") === "" && godModeConfig.objective === obj
+                        ? "border-primary/40 bg-primary/10 text-primary"
+                        : "border-border/50 hover:border-primary/30 text-muted-foreground"
+                    )}
+                  >
+                    {obj}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-2">

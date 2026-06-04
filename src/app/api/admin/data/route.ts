@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { processFollowUps, triggerFollowUpForUser } from "@/lib/subscription-followups"
+import { withAbac } from "@/lib/abac-middleware"
+import { RESOURCES } from "@/lib/abac"
 
 /**
  * Admin Data API — powers the admin dashboard
@@ -10,14 +11,8 @@ import { processFollowUps, triggerFollowUpForUser } from "@/lib/subscription-fol
  * POST: Manually trigger follow-ups for a specific user
  */
 
-export async function GET() {
+export const GET = withAbac(RESOURCES.admin, "read", async () => {
   try {
-    const session = await auth()
-    if (!session?.user || session.user.role !== "admin") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    // Recent payments (last 50)
     const payments = await prisma.payment.findMany({
       orderBy: { createdAt: "desc" },
       take: 50,
@@ -26,7 +21,6 @@ export async function GET() {
       },
     })
 
-    // Users with trial/expired subscriptions
     const trialUsers = await prisma.user.findMany({
       where: {
         OR: [
@@ -49,7 +43,6 @@ export async function GET() {
       },
     })
 
-    // Follow-up logs (last 100)
     const followUpLogs = await prisma.followUpLog.findMany({
       orderBy: { sentAt: "desc" },
       take: 100,
@@ -58,13 +51,11 @@ export async function GET() {
       },
     })
 
-    // Audit logs (last 100)
     const auditLogs = await prisma.adminAuditLog.findMany({
       orderBy: { createdAt: "desc" },
       take: 100,
     })
 
-    // Stats
     const totalPayments = await prisma.payment.count()
     const successfulPayments = await prisma.payment.count({ where: { status: "success" } })
     const totalRevenue = await prisma.revenueEntry.aggregate({ _sum: { amount: true } })
@@ -124,7 +115,7 @@ export async function GET() {
     console.error("Admin data error:", error)
     return NextResponse.json({ error: "Failed to fetch admin data" }, { status: 500 })
   }
-}
+})
 
 /**
  * Manual follow-up trigger
@@ -134,13 +125,8 @@ export async function GET() {
  * OR run all pending follow-ups:
  * Body: { action: "run-all-followups" }
  */
-export async function POST(req: NextRequest) {
+export const POST = withAbac(RESOURCES.admin, "admin", async (req: NextRequest) => {
   try {
-    const session = await auth()
-    if (!session?.user || session.user.role !== "admin") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
     const body = await req.json()
     const { action } = body
 
@@ -172,4 +158,4 @@ export async function POST(req: NextRequest) {
     console.error("Admin POST error:", error)
     return NextResponse.json({ error: "Failed to process action" }, { status: 500 })
   }
-}
+})
