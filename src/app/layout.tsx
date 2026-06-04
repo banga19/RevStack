@@ -11,6 +11,7 @@ import { CookieConsent } from "@/components/cookie-consent"
 import { PushNotificationManager } from "@/components/push-notification-manager"
 import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
 import { AnalyticsTracker } from "@/components/analytics-tracker"
+import { OrgProvider } from "@/lib/organization"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -120,7 +121,9 @@ export default function RootLayout({
           <TooltipProvider>
             <AuthProvider>
               <LanguageProvider>
-                <AuthenticatedShell>{children}</AuthenticatedShell>
+                <OrgProvider>
+                  <AuthenticatedShell>{children}</AuthenticatedShell>
+                </OrgProvider>
                 <AnalyticsTracker />
                 <CookieConsent />
                 <PushNotificationManager />

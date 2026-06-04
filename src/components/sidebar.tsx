@@ -32,12 +32,14 @@ import {
   Settings,
   Shield,
   Languages,
+  Puzzle,
 } from "lucide-react"
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/operations", label: "Operations Center", icon: Brain },
   { href: "/plan", label: "75-Day Plan", icon: CalendarCheck },
+  { href: "/templates", label: "Templates", icon: Puzzle },
   { href: "/pipeline", label: "Pipeline CRM", icon: Users },
   { href: "/korea", label: "Korea Corridor", icon: Flag },
   { href: "/korea/inquiries", label: "Buyer Inquiries", icon: Mail },

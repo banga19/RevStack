@@ -7,8 +7,23 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Organization — represents a company/workspace (multi-tenant unit)
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  plan      String   @default("trial") // trial, starter, growth, enterprise
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  clients   Client[]
+}
+
 model User {
   id             String   @id @default(cuid())
+  organizationId String?
   name           String
   email          String   @unique
   password       String   // hashed with bcryptjs
@@ -34,6 +49,7 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  organization  Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   onboardingResponses  OnboardingResponse[]
   preAuthQuestionnaires PreAuthQuestionnaire[]
   clients              Client[]
@@ -142,6 +158,7 @@ model OnboardingResponse {
 
 model Client {
   id        String   @id @default(cuid())
+  organizationId String?
   userId    String
   name      String
   company   String
@@ -161,6 +178,7 @@ model Client {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   pipelineActions   PipelineAction[]
   outreachCampaigns OutreachCampaign[]

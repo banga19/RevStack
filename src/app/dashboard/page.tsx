@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
+import { useOrganization } from "@/lib/organization"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -27,6 +28,8 @@ import {
   Sparkles,
   Clock,
   CreditCard,
+  Puzzle,
+  BookOpen,
 } from "lucide-react"
 import {
   BarChart,
@@ -61,6 +64,7 @@ type DashboardData = {
 export default function DashboardPage() {
   const router = useRouter()
   const { data: session } = useSession()
+  const { organization } = useOrganization()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [trialStatus, setTrialStatus] = useState<{
@@ -188,6 +192,40 @@ export default function DashboardPage() {
           </Badge>
         </div>
       </div>
+
+      {/* Quick-Start Banner for new users */}
+      {stats.activeClients === 0 && stats.totalClients === 0 && !loading && (
+        <div className="p-6 rounded-2xl bg-gradient-to-r from-blue-500/10 via-primary/5 to-purple-500/10 border border-primary/20 space-y-4">
+          <div className="flex items-start sm:items-center gap-4 flex-col sm:flex-row">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-primary to-primary/60 shadow-lg shrink-0">
+              <Sparkles className="h-6 w-6 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg font-bold">Welcome to Mapato{organization ? `, ${organization.name}` : ""}! 👋</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Get started by deploying an automation template or adding your first client to the pipeline.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Link href="/templates">
+              <Button size="sm" variant="default">
+                <Puzzle className="h-4 w-4 mr-2" /> Browse Templates
+              </Button>
+            </Link>
+            <Link href="/pipeline">
+              <Button size="sm" variant="outline">
+                <Users className="h-4 w-4 mr-2" /> Add First Client
+              </Button>
+            </Link>
+            <Link href="/docs">
+              <Button size="sm" variant="ghost">
+                <BookOpen className="h-4 w-4 mr-2" /> View Guides
+              </Button>
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Trial Banner */}
       {trialStatus && trialStatus.isActive && (

@@ -63,6 +63,16 @@ export async function POST(req: NextRequest) {
     const now = new Date()
     const trialEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000)
 
+    // Create organization for multi-tenant isolation
+    const orgSlug = email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "-") + "-" + Date.now().toString(36)
+    const organization = await prisma.organization.create({
+      data: {
+        name: `${name}'s Company`,
+        slug: orgSlug,
+        plan: "trial",
+      },
+    })
+
     const user = await prisma.user.create({
       data: {
         name,
@@ -72,6 +82,7 @@ export async function POST(req: NextRequest) {
         termsAccepted: true,
         termsAcceptedAt: new Date(),
         termsVersion: "1.0",
+        organizationId: organization.id,
         // 14-day free trial with full access
         trialStartsAt: now,
         trialEndsAt: trialEnd,
