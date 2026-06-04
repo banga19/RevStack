@@ -260,6 +260,314 @@ Note: Actual charges only occur in production with live Flutterwave credentials.
 
 ---
 
+## 📦 Environment Variables Reference
+
+The application uses 20+ environment variables across several functional groups. Copy `.env.example` to `.env.local` and configure as needed.
+
+### Required
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | Database connection string | `file:./dev.db` (SQLite) |
+| `NEXTAUTH_SECRET` | JWT encryption secret (generate with `openssl rand -base64 32`) | — |
+| `NEXTAUTH_URL` | Public deployment URL | `http://localhost:3000` |
+| `NEXT_PUBLIC_BASE_URL` | Base URL for OG images and sitemap | `http://localhost:3000` |
+
+### AI Features (for God Mode, RAG, agent memory)
+
+| Variable | Description |
+|----------|-------------|
+| `OPENAI_API_KEY` | OpenAI API key for LangChain-based agents and RAG pipeline |
+
+> The app runs without this key — AI agent features (God Mode, RAG, agent memory) are gracefully disabled.
+
+### Authentication & SSO
+
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID for Google Sign-In |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
+
+### Third-Party Integrations
+
+| Variable | Service | Used By |
+|----------|---------|---------|
+| `WATI_API_TOKEN` | WATI.io (WhatsApp Business API) | Lead qualification, follow-ups |
+| `WATI_WHATSAPP_NUMBER_ID` | WATI.io WhatsApp number ID | Lead qualification, follow-ups |
+| `MAKE_*_WEBHOOK` (6 webhooks) | Make.com (workflow automation) | Lead capture, compliance alerts, reporting |
+| `ZOHO_CLIENT_ID` / `ZOHO_CLIENT_SECRET` / `ZOHO_REFRESH_TOKEN` | Zoho CRM | Lead, Onboarding, Revenue agents |
+| `VOICEFLOW_API_KEY` / `VOICEFLOW_PROJECT_ID` | Voiceflow (AI chatbot) | Lead qualification, onboarding |
+| `SOKOGATE_API_KEY` / `SOKOGATE_API_SECRET` | Sokogate (B2B trade) | Trade Agent |
+| `INSTANTLY_API_KEY` | Instantly.ai (cold email) | Outreach campaigns |
+| `QME_API_KEY` | QMe (document processing) | Compliance document collection |
+
+### Payments (Flutterwave)
+
+| Variable | Description |
+|----------|-------------|
+| `FLW_PUBLIC_KEY` | Flutterwave public key (sandbox or live) |
+| `FLW_SECRET_KEY` | Flutterwave secret key |
+| `FLW_ENCRYPTION_KEY` | Flutterwave encryption key |
+| `FLW_WEBHOOK_HASH` | Webhook signature hash from Flutterwave dashboard |
+
+> **Note**: If no Flutterwave keys are set, payments auto-simulate (3-second delay, auto-activate subscription) for local development.
+
+### Email (SMTP)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SMTP_HOST` | SMTP server hostname | `smtp.ethereal.email` |
+| `SMTP_PORT` | SMTP port | `587` |
+| `SMTP_USER` | SMTP username | — |
+| `SMTP_PASS` | SMTP password | — |
+| `SMTP_SECURE` | Use TLS (`true`/`false`) | `false` |
+
+> **Dev default**: Ethereal email (messages logged to console with preview URL). No real emails sent.
+
+### Observability
+
+| Variable | Description |
+|----------|-------------|
+| `SENTRY_DSN` | Sentry DSN for server-side error tracking (leave blank to disable) |
+| `NEXT_PUBLIC_SENTRY_DSN` | Sentry DSN for client-side error tracking |
+| `SENTRY_ENVIRONMENT` | Environment tag for Sentry events |
+| `NEXT_PUBLIC_ANALYTICS_PROVIDER` | Analytics provider: `plausible`, `ga`, `posthog`, or `custom` |
+| `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` | Plausible analytics domain |
+| `NEXT_PUBLIC_GA_ID` | Google Analytics 4 measurement ID |
+| `NEXT_PUBLIC_POSTHOG_KEY` | PostHog project API key |
+
+### Push Notifications (PWA)
+
+| Variable | Description |
+|----------|-------------|
+| `VAPID_PUBLIC_KEY` | VAPID public key (generate with `npx web-push generate-vapid-keys`) |
+| `VAPID_PRIVATE_KEY` | VAPID private key |
+| `VAPID_SUBJECT` | Mailto link for push notification sender identity |
+
+### SEO & Verification
+
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_GOOGLE_VERIFICATION` | Google Search Console verification code |
+| `NEXT_PUBLIC_BING_VERIFICATION` | Bing Webmaster Tools verification code |
+| `NEXT_PUBLIC_YANDEX_VERIFICATION` | Yandex Webmaster verification code |
+| `NEXT_PUBLIC_FACEBOOK_VERIFICATION` | Facebook domain verification code |
+| `NEXT_PUBLIC_BASE_URL` | Base URL for sitemap and OG images |
+
+### Admin & Infrastructure
+
+| Variable | Description |
+|----------|-------------|
+| `ADMIN_EMAIL` | Override default admin email for `npm run setup` |
+| `ADMIN_PASSWORD` | Override default admin password for `npm run setup` |
+| `CRON_SECRET` | Secret header for securing cron webhook endpoints |
+| `GOOGLE_SHEET_ID` | Google Sheets workbook ID for admin review exports |
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | Service account email for Google Sheets API |
+| `GOOGLE_PRIVATE_KEY` | Service account private key for Google Sheets API |
+
+---
+
+## 🚢 Deployment Guide
+
+### Prerequisites
+
+- **Node.js** v20+ (recommended: v22)
+- **PostgreSQL** 14+ (production) or SQLite (dev)
+- **npm** v10+
+
+### Step 1: Configure production environment
+
+```bash
+cp .env.example .env
+```
+
+Set `DATABASE_URL` to your PostgreSQL connection string:
+```
+DATABASE_URL="postgresql://user:password@host:5432/mapato?schema=public"
+```
+
+### Step 2: Build and run
+
+```bash
+# Install dependencies
+npm install
+
+# Push schema to PostgreSQL
+npx prisma db push
+
+# Build the Next.js app
+npm run build
+
+# Start the production server
+npm start
+```
+
+### Step 3: Set up Sentry (optional)
+
+1. Create a project at [sentry.io](https://sentry.io)
+2. Copy your DSN to `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` in `.env`
+3. Errors in API routes and client components are automatically captured
+
+### Step 4: Set up analytics (optional)
+
+Configure one analytics provider in `.env`:
+```
+NEXT_PUBLIC_ANALYTICS_PROVIDER=plausible
+NEXT_PUBLIC_PLAUSIBLE_DOMAIN=yourdomain.com
+```
+
+Supported providers: Plausible, Google Analytics 4, PostHog, or custom endpoint.
+
+### Step 5: Configure cron jobs
+
+The following cron endpoints are secured with `CRON_SECRET`:
+
+| Endpoint | Schedule | Purpose |
+|----------|----------|---------|
+| `/api/cron/trial-expiry` | Daily | Check for expired trials and downgrade/notify |
+| `/api/cron/subscription-followups` | Daily at 8 AM UTC | Send subscription renewal reminders |
+
+A GitHub Actions workflow (`.github/workflows/cron-subscription-followups.yml`) calls the follow-ups endpoint daily. Set `CRON_SECRET` and `APP_URL` in your GitHub repository secrets.
+
+### Process management (recommended)
+
+For production, use a process manager like [PM2](https://pm2.keymetrics.io/):
+
+```bash
+npm install -g pm2
+pm2 start npm --name "mapato" -- start
+pm2 save
+pm2 startup
+```
+
+### Docker (optional)
+
+For containerized deployment, create a `Dockerfile` at the project root:
+
+```dockerfile
+FROM node:22-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npx prisma generate && npm run build
+EXPOSE 3000
+CMD ["npm", "start"]
+```
+
+Build and run with:
+```bash
+docker build -t mapato .
+docker run -p 3000:3000 --env-file .env mapato
+```
+
+---
+
+## 🤖 CI/CD — GitHub Actions
+
+The project includes a GitHub Actions workflow for automated subscription follow-ups.
+
+### Workflow: Subscription Follow-ups
+
+| Trigger | Schedule | File |
+|---------|----------|------|
+| Scheduled | Daily at 8:00 AM UTC | `.github/workflows/cron-subscription-followups.yml` |
+| Manual | `workflow_dispatch` via GitHub UI | `.github/workflows/cron-subscription-followups.yml` |
+
+This workflow calls the `/api/cron/subscription-followups` endpoint to send renewal reminders. It requires two GitHub repository secrets:
+
+| Secret | Description |
+|--------|-------------|
+| `APP_URL` | Base URL of your deployed app (e.g., `https://mapato.app`) |
+| `CRON_SECRET` | Must match `CRON_SECRET` in your app's `.env` |
+
+### Adding new workflows
+
+To add a new cron workflow:
+
+```yaml
+# .github/workflows/my-cron.yml
+name: My Cron Job
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Every day at midnight UTC
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call endpoint
+        run: |
+          curl --fail -s -X GET "${{ secrets.APP_URL }}/api/cron/my-endpoint" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
+```
+
+### Security
+
+All cron endpoints are authenticated via the `x-cron-secret` header, which must match the `CRON_SECRET` environment variable on the server. The `--fail` flag ensures the job fails on non-200 responses.
+
+---
+
+## 🗄️ Database & Migrations
+
+### Schema overview
+
+The Prisma schema (`prisma/schema.prisma`) defines the following models:
+
+| Model | Purpose |
+|-------|---------|
+| `User` | Platform users with roles, subscription status, login tracking |
+| `Client` | B2B client companies (suppliers) with contact details |
+| `Product` | Products/commodities linked to clients |
+| `ComplianceRecord` | Compliance certifications and gaps for each client |
+| `TradeFinanceRecord` | Trade finance applications and status tracking |
+| `ErsSnapshot` | Historical Export Readiness Score snapshots |
+| `PipelineAction` | CRM pipeline stage actions and updates |
+| `OutreachCampaign` | Campaign templates and run history |
+| `ContentArticle` | SEO content calendar articles |
+| `RevenueRecord` | Revenue projections and actuals |
+| `Subscription` | User subscription tiers and status |
+| `KoreaTarget` | Korean buyer procurement targets |
+| `KoreaCohort` | Korea corridor pilot cohort groups |
+| `KoreaParticipant` | Cohort participant companies |
+| `KoreaInquiry` | Korean buyer inquiries |
+| `AdminAuditLog` | Admin action audit trail |
+| `Document` | Uploaded documents with filesystem storage |
+
+### Common operations
+
+```bash
+# After modifying schema.prisma, push changes to the database
+npm run db:push
+
+# Regenerate Prisma client (auto-run after push)
+npm run db:generate
+
+# Re-seed with demo data (resets existing data)
+npm run db:seed
+
+# Full setup (push + seed all)
+npm run setup
+```
+
+### SQLite vs PostgreSQL
+
+| Feature | SQLite (dev) | PostgreSQL (production) |
+|---------|-------------|------------------------|
+| Setup | Zero config (file-based) | Requires running PostgreSQL instance |
+| `DATABASE_URL` | `file:./dev.db` | `postgresql://user:pass@host/db` |
+| Concurrent writes | Limited | Full support |
+| Extensions | None | PostGIS, pgcrypto, etc. |
+
+Export data from SQLite to PostgreSQL:
+```bash
+npx prisma db push --accept-data-loss  # Push schema
+npx prisma db seed                      # Re-seed if needed
+```
+
+---
+
 ## 📖 Architecture
 
 ```
@@ -386,7 +694,50 @@ RevStack/
 
 ---
 
+## 🤝 Contributing
+
+### Getting started
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/my-feature`
+3. Install dependencies: `npm install`
+4. Set up your environment: `cp .env.example .env.local`
+5. Run the setup: `npm run setup`
+6. Make your changes
+7. Ensure tests pass: `npx vitest run`
+8. Ensure TypeScript is clean: `npx tsc --noEmit --skipLibCheck`
+9. Commit and push, then open a pull request
+
+### Code style
+
+- **TypeScript**: Strict mode enabled. Avoid `any` types — prefer proper interfaces.
+- **API routes**: Use `withAuth()` / `withAbac()` middleware wrappers — never use `auth()` directly.
+- **Components**: Use the existing shadcn/ui primitives from `src/components/ui/`.
+- **Imports**: Use `@/` path aliases (e.g., `import { db } from "@/lib/db"`).
+- **Tests**: Place test files next to the code they test (e.g., `route.test.ts` next to `route.ts`).
+
+### Commit messages
+
+Follow [conventional commits](https://www.conventionalcommits.org/):
+
+```
+feat: add Korea corridor buyer inquiry endpoint
+fix: correct ERS scoring zero-division edge case
+chore: update env.example with Sentry DSN docs
+docs: add deployment guide to README
+test: add pricing tier boundary tests
+```
+
+### Before submitting
+
+- [ ] Run `npx vitest run` — all tests pass
+- [ ] Run `npx tsc --noEmit --skipLibCheck` — 0 errors
+- [ ] Run `npm run lint` — no warnings
+- [ ] New features include tests
+- [ ] API changes include ABAC policy updates
+
+---
+
 ## 📝 License
 
 Private — Mapato
-# RevStack
