@@ -410,6 +410,14 @@ export class WATIIntegration {
     return Math.min(score, 100);
   }
 
+  /**
+   * Check if WATI is configured with real API credentials.
+   * Returns true when both apiToken and whatsappNumberId are set.
+   */
+  isConfigured(): boolean {
+    return !!(this.config.apiToken && this.config.whatsappNumberId)
+  }
+
   // Configure WATI instance
   configure(newConfig: Partial<WATIConfig>): void {
     this.config = { ...this.config, ...newConfig };

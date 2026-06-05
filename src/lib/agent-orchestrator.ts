@@ -7,11 +7,12 @@
  * Agents: Lead, Trade, Compliance, Onboarding, Revenue
  */
 
-import { ChatOpenAI } from "@langchain/openai"
+import { type ChatOpenAI } from "@langchain/openai"
 import { StringOutputParser } from "@langchain/core/output_parsers"
 import { ChatPromptTemplate } from "@langchain/core/prompts"
 import { Annotation, StateGraph, END } from "@langchain/langgraph"
 import { agentMemory, type AgentType, type AgentReport, type GodModeConfig } from "./agent-memory"
+import { createLlm } from "./model-provider"
 import { ragPipeline } from "./rag-pipeline"
 import {
   executeAgentServiceAction,
@@ -79,7 +80,7 @@ class AgentOrchestrator {
   private listeners: Array<(sessions: Map<string, GodModeSession>) => void>
 
   constructor() {
-    this.llm = new ChatOpenAI({ modelName: "gpt-4o", temperature: 0.7 })
+    this.llm = createLlm({ temperature: 0.7 })
     this.sessions = new Map()
     this.activeTimers = new Map()
     this.listeners = []

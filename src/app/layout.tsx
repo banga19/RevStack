@@ -1,52 +1,127 @@
-"use client"
-
-/**
- * Root Layout — Client Component
- *
- * Inlines ALL client-side providers directly instead of using a separate
- * Providers wrapper module. This eliminates cross-file module resolution
- * issues that were causing 'Element type is invalid' errors in Next.js 16.
- */
-
-import { useEffect, useRef } from "react"
+import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import { ThemeProvider } from "@/lib/theme-provider"
-import { TooltipProvider } from "@/components/ui/tooltip"
-import { AuthProvider } from "@/components/auth-provider"
-import { LanguageProvider } from "@/lib/i18n/language-context"
-import { AnalyticsTracker } from "@/components/analytics-tracker"
-import { CookieConsent } from "@/components/cookie-consent"
-import { PushNotificationManager } from "@/components/push-notification-manager"
-import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
-import { AuthenticatedShell } from "@/components/authenticated-shell"
+import { ClientShell } from "@/components/client-shell"
+import { PostHogProvider, PostHogPageView } from "@/lib/posthog-provider"
+import { allSchemas } from "@/components/json-ld"
+
+export const viewport: Viewport = {
+  themeColor: "#7C3AED",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+}
+
+export const metadata: Metadata = {
+  title: {
+    default:
+      "Mapato — AI-Powered Revenue Operations for B2B Trading Companies",
+    template: "%s | Mapato",
+  },
+  description:
+    "AI-powered B2B trade automation: qualify leads via WhatsApp, automate onboarding, manage trade corridors (Korea-Africa), track compliance certifications, and run autonomous AI agents 24/7.",
+  metadataBase: process.env.NEXT_PUBLIC_BASE_URL
+    ? new URL(process.env.NEXT_PUBLIC_BASE_URL)
+    : new URL("https://mapato.app"),
+  manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "32x32", type: "image/x-icon" },
+      { url: "/icons/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/icons/icon.svg", sizes: "180x180" }],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Mapato",
+  },
+  applicationName: "Mapato",
+  formatDetection: {
+    telephone: false,
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
+  // ── Open Graph / Social ────────────────────────────────
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    siteName: "Mapato",
+    title: "Mapato — AI Revenue Operations for B2B Trade",
+    description:
+      "AI-powered B2B trade automation: qualify leads, automate onboarding, manage Korea-Africa trade corridors, and run autonomous agents.",
+    url: process.env.NEXT_PUBLIC_BASE_URL || "https://mapato.app",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "Mapato — AI-Powered B2B Trade Automation Platform",
+      },
+    ],
+  },
+  // ── Twitter Card ────────────────────────────────────────
+  twitter: {
+    card: "summary_large_image",
+    title: "Mapato — AI Revenue Operations for B2B Trade",
+    description:
+      "AI-powered B2B trade automation: qualify leads, automate onboarding, manage Korea-Africa trade corridors, and run autonomous AI agents.",
+    images: ["/opengraph-image"],
+  },
+  // ── AEO / AI Search Optimization ─────────────────────────
+  keywords: [
+    "B2B trade automation",
+    "AI lead qualification",
+    "WhatsApp Business API",
+    "Africa trade platform",
+    "Korea Africa trade corridor",
+    "export readiness score",
+    "trade compliance tracking",
+    "autonomous AI agents",
+    "B2B revenue operations",
+    "import export software",
+    "African exporters",
+    "supplier matching platform",
+    "Polsia alternative",
+    "trade finance",
+    "Mapato",
+  ],
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  category: "technology",
+  classification: "B2B SaaS",
+  alternates: {
+    canonical: process.env.NEXT_PUBLIC_BASE_URL || "https://mapato.app",
+  },
+}
 
 const inter = Inter({ subsets: ["latin"] })
 
-const BASE_URL = (typeof process !== "undefined" && process.env.NEXT_PUBLIC_BASE_URL) || "https://mapato.app"
+// ── JSON-LD Structured Data ─────────────────────────────────
 
-function setMeta(nameOrProp: string, content: string, useProperty = nameOrProp.includes(":")) {
-  const attr = useProperty ? "property" : "name"
-  let el = document.querySelector(`meta[${attr}="${nameOrProp}"]`)
-  if (!el) {
-    el = document.createElement("meta")
-    el.setAttribute(attr, nameOrProp)
-    document.head.appendChild(el)
-  }
-  el.setAttribute("content", content)
-}
-
-function setLink(rel: string, href: string, extra?: Record<string, string>) {
-  let el = document.querySelector(`link[rel="${rel}"]`)
-  if (!el) {
-    el = document.createElement("link")
-    el.setAttribute("rel", rel)
-    document.head.appendChild(el)
-  }
-  el.setAttribute("href", href)
-  if (extra) {
-    for (const [k, v] of Object.entries(extra)) el.setAttribute(k, v)
-  }
+function JsonLd() {
+  const schemas = allSchemas()
+  return (
+    <>
+      {schemas.map((schema, i) => (
+        <script
+          key={i}
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+        />
+      ))}
+    </>
+  )
 }
 
 export default function RootLayout({
@@ -54,56 +129,22 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  const injected = useRef(false)
-
-  useEffect(() => {
-    if (injected.current) return
-    injected.current = true
-
-    document.title = "Mapato — AI-Powered Revenue Operations for B2B Trading Companies"
-    setMeta("description", "AI-powered B2B trade automation: qualify leads, automate onboarding, manage trade corridors, and run autonomous agents.")
-    setMeta("og:title", "Mapato — AI-Powered Revenue Operations for B2B Trading Companies")
-    setMeta("og:description", "Qualify leads, automate onboarding, manage trade corridors, and run autonomous AI agents — purpose-built for B2B trade.")
-    setMeta("og:url", BASE_URL)
-    setMeta("og:image", `${BASE_URL}/opengraph-image`)
-    setMeta("og:type", "website")
-    setMeta("og:site_name", "Mapato")
-    setMeta("twitter:card", "summary_large_image")
-    setMeta("twitter:title", "Mapato — AI-Powered Revenue Operations for B2B Trading")
-    setMeta("twitter:description", "Automate lead qualification, onboarding, trade corridors, and revenue ops with autonomous AI agents.")
-    setMeta("twitter:image", `${BASE_URL}/opengraph-image`)
-    setMeta("twitter:creator", "@mapato")
-    setLink("manifest", "/manifest.json")
-    setLink("icon", "/favicon.ico")
-    setLink("icon", "/icons/icon.svg", { type: "image/svg+xml" })
-    setMeta("theme-color", "#7C3AED")
-    setMeta("mobile-web-app-capable", "yes")
-    setMeta("apple-mobile-web-app-title", "Mapato")
-    setMeta("msapplication-TileColor", "#7C3AED")
-    setMeta("msapplication-TileImage", "/icons/icon.svg")
-    setMeta("robots", "index, follow")
-    const bingVerification = (typeof process !== "undefined" && process.env.NEXT_PUBLIC_BING_VERIFICATION) || ""
-    if (bingVerification) setMeta("msvalidate.01", bingVerification, false)
-    const googleVerification = (typeof process !== "undefined" && process.env.NEXT_PUBLIC_GOOGLE_VERIFICATION) || ""
-    if (googleVerification) setMeta("google-site-verification", googleVerification, false)
-  }, [])
-
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        {/* Preconnect to analytics domains */}
+        <link
+          rel="preconnect"
+          href="https://us.i.posthog.com"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body className={inter.className} suppressHydrationWarning>
-        <ThemeProvider>
-          <TooltipProvider>
-            <AuthProvider>
-              <LanguageProvider>
-                <AuthenticatedShell>{children}</AuthenticatedShell>
-                <AnalyticsTracker />
-                <CookieConsent />
-                <PushNotificationManager />
-                <PwaInstallPrompt />
-              </LanguageProvider>
-            </AuthProvider>
-          </TooltipProvider>
-        </ThemeProvider>
+        <PostHogProvider>
+          <PostHogPageView />
+          <JsonLd />
+          <ClientShell>{children}</ClientShell>
+        </PostHogProvider>
       </body>
     </html>
   )

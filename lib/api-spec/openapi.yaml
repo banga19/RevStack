@@ -1,0 +1,385 @@
+openapi: 3.1.0
+info:
+  title: RevStack API
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080/api
+    description: Development server
+tags:
+  - name: health
+    description: Health check endpoints
+  - name: leads
+    description: Lead management
+  - name: clients
+    description: Client management
+  - name: retainers
+    description: Retainer management
+  - name: followups
+    description: Follow-up management
+  - name: messages
+    description: Message management
+  - name: analytics
+    description: Analytics and reporting
+  - name: hermes
+    description: Hermes AI agent runs
+  - name: users
+    description: User management
+paths:
+  /healthz:
+    get:
+      tags:
+        - health
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+  /leads:
+    get:
+      tags:
+        - leads
+      summary: List leads
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [new, qualified, disqualified, converted]
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A list of leads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Lead'
+    post:
+      tags:
+        - leads
+      summary: Create a lead
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InsertLead'
+      responses:
+        '201':
+          description: Created lead
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+  /leads/{id}:
+    get:
+      tags:
+        - leads
+      summary: Get a lead by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: A lead
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+        '404':
+          description: Lead not found
+    patch:
+      tags:
+        - leads
+      summary: Update a lead
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLeadBody'
+      responses:
+        '200':
+          description: Updated lead
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+        '404':
+          description: Lead not found
+    delete:
+      tags:
+        - leads
+      summary: Delete a lead
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Lead deleted
+        '404':
+          description: Lead not found
+  /leads/{id}/qualify:
+    post:
+      tags:
+        - leads
+      summary: Qualify a lead
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Qualified lead
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+        '404':
+          description: Lead not found
+  /clients:
+    get:
+      tags:
+        - clients
+      summary: List clients
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [onboarding, active, churned, paused]
+      responses:
+        '200':
+          description: A list of clients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Client'
+    post:
+      tags:
+        - clients
+      summary: Create a client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InsertClient'
+      responses:
+        '201':
+          description: Created client
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+  /clients/{id}:
+    get:
+      tags:
+        - clients
+      summary: Get a client by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: A client
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '404':
+          description: Client not found
+    patch:
+      tags:
+        - clients
+      summary: Update a client
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClientBody'
+      responses:
+        '200':
+          description: Updated client
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '404':
+          description: Client not found
+  /clients/{id}/advance-onboarding:
+    post:
+      tags:
+        - clients
+      summary: Advance client onboarding step
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Updated client
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '404':
+          description: Client not found
+  /retainers:
+    get:
+      tags:
+        - retainers
+      summary: List retainers
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [active, cancelled, paused]
+      responses:
+        '200':
+          description: A list of retainers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Retainer'
+    post:
+      tags:
+        - retainers
+      summary: Create a retainer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InsertRetainer'
+      responses:
+        '201':
+          description: Created retainer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Retainer'
+  /retainers/{id}:
+    get:
+      tags:
+        - retainers
+      summary: Get a retainer by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: A retainer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Retainer'
+        '404':
+          description: Retainer not found
+    patch:
+      tags:
+        - retainers
+      summary: Update a retainer
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRetainerBody'
+      responses:
+        '200':
+          description: Updated retainer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Retainer'
+        '404':
+          description: Retainer not found
+  /followups:
+    get:
+      tags:
+        - followups
+      summary: List followups
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, sent, replied, skipped]
+      responses:
+        '200':
+          description: A list of followups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Followup'
+    post:
+      tags:
+        - followups
+      summary: Create a followup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InsertFollowup'
+      responses:
+        '201':
+          description: Created followup
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Followup

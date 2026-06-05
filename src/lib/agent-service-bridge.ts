@@ -21,7 +21,7 @@ import { sokogateIntegration } from "./sokogate-integration"
 import { instantlyIntegration } from "./instantly-integration"
 import { ragPipeline } from "./rag-pipeline"
 import { agentMemory, type AgentType } from "./agent-memory"
-import { ChatOpenAI } from "@langchain/openai"
+import { createLlm } from "./model-provider"
 import { StringOutputParser } from "@langchain/core/output_parsers"
 import { ChatPromptTemplate } from "@langchain/core/prompts"
 
@@ -47,7 +47,7 @@ interface AgentServiceContext {
 // LLM for analysis (shared)
 // ============================================================
 
-const llm = new ChatOpenAI({ modelName: "gpt-4o", temperature: 0.3 })
+const llm = createLlm({ temperature: 0.3 })
 
 // ============================================================
 // Lead Agent — WATI, CRM, Pipeline
@@ -62,6 +62,16 @@ export async function leadAgentAction(
   const errors: string[] = []
 
   try {
+    // 0. Check credentials and report status
+    const creds = checkLeadCredentials()
+    results.push(credentialBanner("Lead Agent", creds))
+
+    // Count how many services are in simulation mode
+    const simServices = Object.entries(creds).filter(([_, s]) => s.mode === "simulation")
+    if (simServices.length > 0) {
+      results.push(`   ℹ️  ${simServices.length} service(s) in simulation mode — set env vars above for live data`)
+    }
+
     // 1. Fetch unprocessed leads from the database
     const unprocessedLeads = await prisma.client.findMany({
       where: { status: "lead" },
@@ -207,6 +217,83 @@ export async function leadAgentAction(
 }
 
 // ============================================================
+// Credential Check Helpers
+// ============================================================
+
+/**
+ * Check which credentials are available for the Trade agent's external services.
+ * Returns a status map showing live vs simulation mode for each service.
+ */
+function checkTradeCredentials(): Record<string, { configured: boolean; mode: string; hint?: string }> {
+  return {
+    sokogate: {
+      configured: sokogateIntegration.isConfigured(),
+      mode: sokogateIntegration.isConfigured() ? "live" : "simulation",
+      hint: "Set SOKOGATE_API_KEY and SOKOGATE_API_SECRET for real supplier/buyer data",
+    },
+    "make.com": {
+      configured: !!process.env.MAKE_REPORTING_WEBHOOK,
+      mode: !!process.env.MAKE_REPORTING_WEBHOOK ? "live" : "simulation",
+      hint: "Set MAKE_REPORTING_WEBHOOK for automated reporting",
+    },
+    llm: {
+      configured: !!(process.env.NVIDIA_NIM_API_KEY || process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY || process.env.DEEPSEEK_API_KEY),
+      mode: !!(process.env.NVIDIA_NIM_API_KEY || process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY || process.env.DEEPSEEK_API_KEY) ? "live" : "unavailable",
+      hint: "Set NVIDIA_NIM_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, or DEEPSEEK_API_KEY",
+    },
+  }
+}
+
+/**
+ * Check which credentials are available for the Lead agent's external services.
+ */
+function checkLeadCredentials(): Record<string, { configured: boolean; mode: string; hint?: string }> {
+  return {
+    wati: {
+      configured: watiIntegration.isConfigured(),
+      mode: watiIntegration.isConfigured() ? "live" : "simulation",
+      hint: "Set WATI_API_TOKEN and WATI_WHATSAPP_NUMBER_ID for WhatsApp qualification",
+    },
+    "zoho-crm": {
+      configured: zohoCrmIntegration.isConfigured(),
+      mode: zohoCrmIntegration.isConfigured() ? "live" : "simulation",
+      hint: "Set ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, and ZOHO_REFRESH_TOKEN",
+    },
+    "instantly.ai": {
+      configured: instantlyIntegration.isConfigured(),
+      mode: instantlyIntegration.isConfigured() ? "live" : "simulation",
+      hint: "Set INSTANTLY_API_KEY for cold email outreach campaigns",
+    },
+    voiceflow: {
+      configured: voiceflowIntegration.isConfigured(),
+      mode: voiceflowIntegration.isConfigured() ? "live" : "simulation",
+      hint: "Set VOICEFLOW_API_KEY and VOICEFLOW_PROJECT_ID for chatbot dialogs",
+    },
+    "make.com": {
+      configured: !!process.env.MAKE_LEAD_CAPTURE_WEBHOOK,
+      mode: !!process.env.MAKE_LEAD_CAPTURE_WEBHOOK ? "live" : "simulation",
+      hint: "Set MAKE_LEAD_CAPTURE_WEBHOOK for automated lead capture",
+    },
+  }
+}
+
+/**
+ * Build a credential status banner from a credential check result.
+ */
+function credentialBanner(
+  label: string,
+  creds: Record<string, { configured: boolean; mode: string; hint?: string }>
+): string {
+  const lines = [`📋 ${label} Credential Status:`]
+  for (const [service, status] of Object.entries(creds)) {
+    const icon = status.mode === "live" ? "✅" : status.mode === "simulation" ? "⚠️" : "❌"
+    const hint = status.configured || !status.hint ? "" : ` — ${status.hint}`
+    lines.push(`   ${icon} ${service.padEnd(16)} ${status.mode}${hint}`)
+  }
+  return lines.join("\n")
+}
+
+// ============================================================
 // Trade Agent — Supplier Matching, Corridor Analysis
 // ============================================================
 
@@ -218,6 +305,10 @@ export async function tradeAgentAction(
   const metrics: Record<string, number> = {}
 
   try {
+    // 0. Check credentials and report status at the top of the output
+    const creds = checkTradeCredentials()
+    results.push(credentialBanner("Trade Agent", creds))
+
     // 1. Fetch suppliers from the database (clients with products)
     const dbSuppliers = await prisma.client.findMany({
       where: {
@@ -342,6 +433,97 @@ export async function tradeAgentAction(
   }
 }
 
+/**
+ * Check which credentials are available for the Compliance agent's external services.
+ */
+function checkComplianceCredentials(): Record<string, { configured: boolean; mode: string; hint?: string }> {
+  return {
+    qme: {
+      configured: true, // QMe is always available locally
+      mode: "live",
+    },
+    "make.com": {
+      configured: !!process.env.MAKE_COMPLIANCE_WEBHOOK,
+      mode: !!process.env.MAKE_COMPLIANCE_WEBHOOK ? "live" : "simulation",
+      hint: "Set MAKE_COMPLIANCE_WEBHOOK for automated compliance alerts",
+    },
+    voiceflow: {
+      configured: voiceflowIntegration.isConfigured(),
+      mode: voiceflowIntegration.isConfigured() ? "live" : "simulation",
+      hint: "Set VOICEFLOW_API_KEY and VOICEFLOW_PROJECT_ID for chatbot dialogs",
+    },
+    llm: {
+      configured: !!(process.env.NVIDIA_NIM_API_KEY || process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY || process.env.DEEPSEEK_API_KEY),
+      mode: !!(process.env.NVIDIA_NIM_API_KEY || process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY || process.env.DEEPSEEK_API_KEY) ? "live" : "unavailable",
+      hint: "Set NVIDIA_NIM_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, or DEEPSEEK_API_KEY",
+    },
+  }
+}
+
+/**
+ * Check which credentials are available for the Onboarding agent's external services.
+ */
+function checkOnboardingCredentials(): Record<string, { configured: boolean; mode: string; hint?: string }> {
+  return {
+    email: {
+      configured: !!(process.env.SMTP_USER && process.env.SMTP_PASS),
+      mode: !!(process.env.SMTP_USER && process.env.SMTP_PASS) ? "live" : "simulation",
+      hint: "Set SMTP_USER and SMTP_PASS for live emails (uses Ethereal in dev)",
+    },
+    qme: {
+      configured: true, // QMe is always available locally
+      mode: "live",
+    },
+    voiceflow: {
+      configured: voiceflowIntegration.isConfigured(),
+      mode: voiceflowIntegration.isConfigured() ? "live" : "simulation",
+      hint: "Set VOICEFLOW_API_KEY and VOICEFLOW_PROJECT_ID for chatbot dialogs",
+    },
+    "zoho-crm": {
+      configured: zohoCrmIntegration.isConfigured(),
+      mode: zohoCrmIntegration.isConfigured() ? "live" : "simulation",
+      hint: "Set ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, and ZOHO_REFRESH_TOKEN",
+    },
+    "make.com": {
+      configured: !!process.env.MAKE_FOLLOWUP_WEBHOOK,
+      mode: !!process.env.MAKE_FOLLOWUP_WEBHOOK ? "live" : "simulation",
+      hint: "Set MAKE_FOLLOWUP_WEBHOOK for automated follow-up sequences",
+    },
+    llm: {
+      configured: !!(process.env.NVIDIA_NIM_API_KEY || process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY || process.env.DEEPSEEK_API_KEY),
+      mode: !!(process.env.NVIDIA_NIM_API_KEY || process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY || process.env.DEEPSEEK_API_KEY) ? "live" : "unavailable",
+      hint: "Set NVIDIA_NIM_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, or DEEPSEEK_API_KEY",
+    },
+  }
+}
+
+/**
+ * Check which credentials are available for the Revenue agent's external services.
+ */
+function checkRevenueCredentials(): Record<string, { configured: boolean; mode: string; hint?: string }> {
+  return {
+    rag: {
+      configured: true, // RAG pipeline is always available locally
+      mode: "live",
+    },
+    "make.com": {
+      configured: !!process.env.MAKE_REPORTING_WEBHOOK,
+      mode: !!process.env.MAKE_REPORTING_WEBHOOK ? "live" : "simulation",
+      hint: "Set MAKE_REPORTING_WEBHOOK for automated daily reports",
+    },
+    "zoho-crm": {
+      configured: zohoCrmIntegration.isConfigured(),
+      mode: zohoCrmIntegration.isConfigured() ? "live" : "simulation",
+      hint: "Set ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, and ZOHO_REFRESH_TOKEN",
+    },
+    llm: {
+      configured: !!(process.env.NVIDIA_NIM_API_KEY || process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY || process.env.DEEPSEEK_API_KEY),
+      mode: !!(process.env.NVIDIA_NIM_API_KEY || process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY || process.env.DEEPSEEK_API_KEY) ? "live" : "unavailable",
+      hint: "Set NVIDIA_NIM_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, or DEEPSEEK_API_KEY",
+    },
+  }
+}
+
 // ============================================================
 // Compliance Agent — QMe Document Review, Certification Tracking
 // ============================================================
@@ -355,6 +537,10 @@ export async function complianceAgentAction(
   const errors: string[] = []
 
   try {
+    // 0. Check credentials and report status
+    const creds = checkComplianceCredentials()
+    results.push(credentialBanner("Compliance Agent", creds))
+
     // 1. Fetch compliance records approaching expiry
     const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
     const expiringCompliance = await prisma.clientCompliance.findMany({
@@ -473,6 +659,10 @@ export async function onboardingAgentAction(
   const metrics: Record<string, number> = {}
 
   try {
+    // 0. Check credentials and report status
+    const creds = checkOnboardingCredentials()
+    results.push(credentialBanner("Onboarding Agent", creds))
+
     // 1. Fetch clients stuck in onboarding
     const onboardingClients = await prisma.client.findMany({
       where: { status: "onboarding" },
@@ -605,6 +795,10 @@ export async function revenueAgentAction(
   const metrics: Record<string, number> = {}
 
   try {
+    // 0. Check credentials and report status
+    const creds = checkRevenueCredentials()
+    results.push(credentialBanner("Revenue Agent", creds))
+
     // 1. Fetch revenue data
     const totalRevenue = await prisma.revenueEntry.aggregate({
       _sum: { amount: true },

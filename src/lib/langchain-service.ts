@@ -1,20 +1,15 @@
-import { ChatOpenAI } from "@langchain/openai";
-import { OpenAIEmbeddings } from "@langchain/openai";
 import { MemoryVectorStore } from "@langchain/classic/vectorstores/memory";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { Annotation, StateGraph } from "@langchain/langgraph";
 import { z } from "zod";
+import { createLlm, createEmbeddings } from "./model-provider";
 
 // Initialize LLM
-const llm = new ChatOpenAI({
-  modelName: "gpt-4o",
-  temperature: 0.7,
-  maxRetries: 2,
-});
+const llm = createLlm({ temperature: 0.7 });
 
 // Initialize embeddings
-const embeddings = new OpenAIEmbeddings();
+const embeddings = createEmbeddings();
 
 // Initialize vector store for RAG
 const vectorStore = new MemoryVectorStore(embeddings);

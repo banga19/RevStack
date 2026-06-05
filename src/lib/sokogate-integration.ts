@@ -177,22 +177,61 @@ export class SokogateIntegration {
   // ==========================================================
 
   private simulatedSuppliers: SokogateSupplier[] = [
-    { id: "soko-sup-1", companyName: "Kenya Coffee Exporters Ltd", contactName: "James Kamau", email: "james@kenyacoffee.co.ke", country: "Kenya", commodities: ["Specialty Arabica Coffee"], certifications: ["HACCP", "Organic"], exportReadinessScore: 78, monthlyCapacity: "2000 kg/month", status: "active" },
-    { id: "soko-sup-2", companyName: "Tanzania Tea Growers Co-op", contactName: "Amina Mwinyi", email: "amina@tanzaniatea.co.tz", country: "Tanzania", commodities: ["Premium Black Tea", "Green Tea"], certifications: ["HACCP", "Halal"], exportReadinessScore: 72, monthlyCapacity: "5000 kg/month", status: "active" },
-    { id: "soko-sup-3", companyName: "DRC Cobalt Supply Co.", contactName: "Pierre Kasongo", email: "pierre@drc-cobalt.cd", country: "DRC", commodities: ["Cobalt Hydroxide"], certifications: ["Conflict-free"], exportReadinessScore: 62, monthlyCapacity: "200 tons/month", status: "active" },
-    { id: "soko-sup-4", companyName: "Ghana Cocoa Processing Co.", contactName: "Kwame Asante", email: "kwame@ghanacocoa.gh", country: "Ghana", commodities: ["Cocoa Butter", "Cocoa Powder"], certifications: ["UTZ", "Rainforest Alliance", "Organic"], exportReadinessScore: 80, monthlyCapacity: "10000 tons/year", status: "active" },
+    // ── Existing (Phase 1) ──────────────────────────────────
+    { id: "soko-sup-1", companyName: "Kenya Coffee Exporters Ltd", contactName: "James Kamau", email: "james@kenyacoffee.co.ke", phone: "+254712345678", country: "Kenya", commodities: ["Specialty Arabica Coffee"], certifications: ["HACCP", "Organic"], exportReadinessScore: 78, monthlyCapacity: "2000 kg/month", minOrderQuantity: "500 kg", pricing: "$8.50/kg FOB Mombasa", status: "active" },
+    { id: "soko-sup-2", companyName: "Tanzania Tea Growers Co-op", contactName: "Amina Mwinyi", email: "amina@tanzaniatea.co.tz", phone: "+255712345678", country: "Tanzania", commodities: ["Premium Black Tea", "Green Tea"], certifications: ["HACCP", "Halal"], exportReadinessScore: 72, monthlyCapacity: "5000 kg/month", minOrderQuantity: "1000 kg", pricing: "$3.20/kg FOB Dar es Salaam", status: "active" },
+    { id: "soko-sup-3", companyName: "DRC Cobalt Supply Co.", contactName: "Pierre Kasongo", email: "pierre@drc-cobalt.cd", phone: "+243812345678", country: "DRC", commodities: ["Cobalt Hydroxide"], certifications: ["Conflict-free"], exportReadinessScore: 62, monthlyCapacity: "200 tons/month", minOrderQuantity: "20 tons", pricing: "$35,000/ton CIF Busan", status: "active" },
+    { id: "soko-sup-4", companyName: "Ghana Cocoa Processing Co.", contactName: "Kwame Asante", email: "kwame@ghanacocoa.gh", phone: "+233512345678", country: "Ghana", commodities: ["Cocoa Butter", "Cocoa Powder", "Cocoa Liquor"], certifications: ["UTZ", "Rainforest Alliance", "Organic"], exportReadinessScore: 80, monthlyCapacity: "10000 tons/year", minOrderQuantity: "5 tons", pricing: "$4,200/ton FOB Tema", status: "active" },
+
+    // ── East African Agricultural Exports ───────────────────
+    { id: "soko-sup-5", companyName: "Ethiopian Spice Traders PLC", contactName: "Tesfaye Abebe", email: "tesfaye@ethiospice.com", phone: "+251912345678", country: "Ethiopia", commodities: ["Cardamom", "Turmeric", "Ginger", "Cinnamon"], certifications: ["Organic", "HACCP", "Fair Trade"], exportReadinessScore: 75, monthlyCapacity: "800 kg/month", minOrderQuantity: "100 kg", pricing: "$12.00/kg FOB Addis Ababa", status: "active" },
+    { id: "soko-sup-6", companyName: "Mozambique Macadamia Growers", contactName: "Helena dos Santos", email: "helena@mozmacadamia.co.mz", phone: "+258823456789", country: "Mozambique", commodities: ["Macadamia Nuts", "Cashew Nuts"], certifications: ["HACCP", "Organic", "Halal"], exportReadinessScore: 70, monthlyCapacity: "1500 kg/month", minOrderQuantity: "200 kg", pricing: "$14.50/kg FOB Beira", status: "active" },
+    { id: "soko-sup-7", companyName: "Uganda Cotton Exporters Ltd", contactName: "Sarah Nakato", email: "sarah@ugandacotton.co.ug", phone: "+256712345678", country: "Uganda", commodities: ["Organic Cotton Fiber", "Cotton Yarn"], certifications: ["GOTS", "Organic", "Fair Trade"], exportReadinessScore: 68, monthlyCapacity: "2000 tons/year", minOrderQuantity: "50 tons", pricing: "$2.80/kg FOB Kampala", status: "active" },
+    { id: "soko-sup-8", companyName: "Senegal Seafood Corp", contactName: "Mamadou Diallo", email: "mdiallo@senegalseafood.sn", phone: "+221773456789", country: "Senegal", commodities: ["Frozen Shrimp", "Octopus", "Tuna"], certifications: ["HACCP", "Halal", "ISO 9001", "BAP"], exportReadinessScore: 76, monthlyCapacity: "500 tons/month", minOrderQuantity: "10 tons", pricing: "$8.50/kg FOB Dakar", status: "active" },
+
+    // ── Mineral & Industrial Exports ────────────────────────
+    { id: "soko-sup-9", companyName: "Zambia Copper Mines Ltd", contactName: "Chanda Bwalya", email: "chanda@zambiacopper.co.zm", phone: "+260977123456", country: "Zambia", commodities: ["Copper Cathode", "Copper Concentrate"], certifications: ["ISO 9001", "ISO 14001", "Conflict-free"], exportReadinessScore: 82, monthlyCapacity: "5000 tons/month", minOrderQuantity: "100 tons", pricing: "$8,800/ton CIF Busan", status: "active" },
+    { id: "soko-sup-10", companyName: "Nigeria Palm Oil Refinery", contactName: "Chioma Okafor", email: "chioma@nigeriapalm.ng", phone: "+2348031234567", country: "Nigeria", commodities: ["Refined Palm Oil", "Shea Butter", "Vegetable Oil"], certifications: ["HACCP", "ISO 9001", "Organic"], exportReadinessScore: 65, monthlyCapacity: "8000 tons/month", minOrderQuantity: "200 tons", pricing: "$950/ton FOB Lagos", status: "active" },
+
+    // ── North & Southern African Exports ────────────────────
+    { id: "soko-sup-11", companyName: "Morocco Textile Works", contactName: "Youssef Benali", email: "youssef@moroccotextile.ma", phone: "+212612345678", country: "Morocco", commodities: ["Cotton Fabric", "Garments", "Leather Goods"], certifications: ["GOTS", "Organic", "ISO 9001", "OEKO-TEX"], exportReadinessScore: 74, monthlyCapacity: "50000 units/month", minOrderQuantity: "1000 units", pricing: "$15.00/unit FOB Casablanca", status: "active" },
+    { id: "soko-sup-12", companyName: "South Africa Wine Estates", contactName: "Pieter van der Merwe", email: "pieter@sawines.co.za", phone: "+272112345678", country: "South Africa", commodities: ["Chenin Blanc", "Cabernet Sauvignon", "Brandy"], certifications: ["HACCP", "Organic", "Fair Trade"], exportReadinessScore: 78, monthlyCapacity: "50000 cases/year", minOrderQuantity: "500 cases", pricing: "$60.00/case FOB Cape Town", status: "active" },
   ]
 
   private simulatedBuyers: SokogateBuyer[] = [
-    { id: "soko-buy-1", companyName: "Incheon Chemical Co.", contactName: "Min-Jun Park", email: "mjpark@incheonchem.kr", country: "South Korea", procurementInterests: ["Cobalt", "Industrial Minerals"], requiredCertifications: ["Conflict-free", "ISO 9001"], status: "active" },
-    { id: "soko-buy-2", companyName: "Seoul Food Corp", contactName: "Ji-Yeon Kim", email: "jykim@seoulfood.kr", country: "South Korea", procurementInterests: ["Coffee", "Tea", "Cocoa"], requiredCertifications: ["HACCP", "Organic", "Halal"], status: "active" },
-    { id: "soko-buy-3", companyName: "Busan Textile Mills", contactName: "Sung-Ho Lee", email: "shlee@busantex.kr", country: "South Korea", procurementInterests: ["Cotton", "Textiles"], requiredCertifications: ["GOTS", "Organic"], status: "active" },
+    // ── Korean Buyers ────────────────────────────────────────
+    { id: "soko-buy-1", companyName: "Incheon Chemical Co.", contactName: "Min-Jun Park", email: "mjpark@incheonchem.kr", country: "South Korea", procurementInterests: ["Cobalt", "Copper", "Industrial Minerals"], requiredCertifications: ["Conflict-free", "ISO 9001"], monthlyVolume: "500 tons/month", budgetRange: "$5M-10M/year", status: "active" },
+    { id: "soko-buy-2", companyName: "Seoul Food Corp", contactName: "Ji-Yeon Kim", email: "jykim@seoulfood.kr", country: "South Korea", procurementInterests: ["Coffee", "Tea", "Cocoa", "Spices", "Nuts"], requiredCertifications: ["HACCP", "Organic", "Halal"], monthlyVolume: "1000 tons/month", budgetRange: "$3M-8M/year", status: "active" },
+    { id: "soko-buy-3", companyName: "Busan Textile Mills", contactName: "Sung-Ho Lee", email: "shlee@busantex.kr", country: "South Korea", procurementInterests: ["Cotton", "Textiles", "Leather"], requiredCertifications: ["GOTS", "Organic", "OEKO-TEX"], monthlyVolume: "300 tons/month", budgetRange: "$2M-5M/year", status: "active" },
+    { id: "soko-buy-4", companyName: "LG Electronics Components", contactName: "Hyun-Woo Kim", email: "hwkim@lgcomponents.kr", country: "South Korea", procurementInterests: ["Cobalt", "Copper", "Industrial Minerals"], requiredCertifications: ["ISO 9001", "ISO 14001", "Conflict-free"], monthlyVolume: "1000 tons/month", budgetRange: "$10M-20M/year", status: "active" },
+
+    // ── Middle Eastern Buyers ───────────────────────────────
+    { id: "soko-buy-5", companyName: "Dubai Food Trading LLC", contactName: "Ahmed Al-Rashid", email: "ahmed@dubaifood.ae", country: "UAE", procurementInterests: ["Spices", "Nuts", "Coffee", "Tea", "Palm Oil", "Shea Butter"], requiredCertifications: ["HACCP", "Halal", "Organic"], monthlyVolume: "2000 tons/month", budgetRange: "$5M-15M/year", status: "active" },
+
+    // ── European Buyers ─────────────────────────────────────
+    { id: "soko-buy-6", companyName: "Rotterdam Commodities BV", contactName: "Emma van den Berg", email: "emma@rotterdamcommodities.nl", country: "Netherlands", procurementInterests: ["Cocoa", "Coffee", "Copper", "Palm Oil", "Seafood"], requiredCertifications: ["HACCP", "Rainforest Alliance", "ISO 9001", "Organic"], monthlyVolume: "5000 tons/month", budgetRange: "$20M-50M/year", status: "active" },
+    { id: "soko-buy-7", companyName: "Hamburg Industrial Supply GmbH", contactName: "Klaus Weber", email: "kweber@hamburg-industrial.de", country: "Germany", procurementInterests: ["Cobalt", "Copper", "Leather", "Textiles"], requiredCertifications: ["ISO 9001", "OEKO-TEX", "Conflict-free"], monthlyVolume: "800 tons/month", budgetRange: "$8M-12M/year", status: "active" },
+    { id: "soko-buy-8", companyName: "London Fine Foods Importers", contactName: "Sarah Mitchell", email: "sarah@londonfinefoods.co.uk", country: "United Kingdom", procurementInterests: ["Coffee", "Tea", "Wine", "Spices", "Nuts"], requiredCertifications: ["Organic", "Fair Trade", "HACCP"], monthlyVolume: "300 tons/month", budgetRange: "$2M-5M/year", status: "active" },
   ]
 
   private simulatedMatches: SokogateCorridorMatch[] = [
+    // ── Korea Corridor ───────────────────────────────────────
     { id: "soko-match-1", supplierId: "soko-sup-1", buyerId: "soko-buy-2", matchScore: 85, matchBreakdown: { productFit: 90, certificationCompatibility: 80, volumeFit: 75, logisticsFeasibility: 85, priceCompetitiveness: 95 }, status: "in-progress", initiatedAt: new Date().toISOString() },
     { id: "soko-match-2", supplierId: "soko-sup-2", buyerId: "soko-buy-2", matchScore: 78, matchBreakdown: { productFit: 85, certificationCompatibility: 75, volumeFit: 80, logisticsFeasibility: 70, priceCompetitiveness: 80 }, status: "pending", initiatedAt: new Date().toISOString() },
     { id: "soko-match-3", supplierId: "soko-sup-3", buyerId: "soko-buy-1", matchScore: 72, matchBreakdown: { productFit: 95, certificationCompatibility: 60, volumeFit: 70, logisticsFeasibility: 65, priceCompetitiveness: 70 }, status: "pending", initiatedAt: new Date().toISOString() },
+    { id: "soko-match-4", supplierId: "soko-sup-9", buyerId: "soko-buy-4", matchScore: 92, matchBreakdown: { productFit: 95, certificationCompatibility: 90, volumeFit: 90, logisticsFeasibility: 85, priceCompetitiveness: 100 }, status: "accepted", initiatedAt: new Date(Date.now() - 7 * 86400000).toISOString() },
+    { id: "soko-match-5", supplierId: "soko-sup-7", buyerId: "soko-buy-3", matchScore: 88, matchBreakdown: { productFit: 90, certificationCompatibility: 85, volumeFit: 80, logisticsFeasibility: 90, priceCompetitiveness: 95 }, status: "in-progress", initiatedAt: new Date(Date.now() - 3 * 86400000).toISOString() },
+    { id: "soko-match-6", supplierId: "soko-sup-11", buyerId: "soko-buy-3", matchScore: 76, matchBreakdown: { productFit: 80, certificationCompatibility: 85, volumeFit: 70, logisticsFeasibility: 75, priceCompetitiveness: 70 }, status: "pending", initiatedAt: new Date().toISOString() },
+
+    // ── Europe Corridor ─────────────────────────────────────
+    { id: "soko-match-7", supplierId: "soko-sup-4", buyerId: "soko-buy-6", matchScore: 91, matchBreakdown: { productFit: 95, certificationCompatibility: 90, volumeFit: 90, logisticsFeasibility: 85, priceCompetitiveness: 95 }, status: "in-progress", initiatedAt: new Date(Date.now() - 5 * 86400000).toISOString() },
+    { id: "soko-match-8", supplierId: "soko-sup-8", buyerId: "soko-buy-6", matchScore: 74, matchBreakdown: { productFit: 70, certificationCompatibility: 80, volumeFit: 65, logisticsFeasibility: 75, priceCompetitiveness: 80 }, status: "pending", initiatedAt: new Date().toISOString() },
+    { id: "soko-match-9", supplierId: "soko-sup-12", buyerId: "soko-buy-8", matchScore: 82, matchBreakdown: { productFit: 90, certificationCompatibility: 75, volumeFit: 80, logisticsFeasibility: 85, priceCompetitiveness: 80 }, status: "pending", initiatedAt: new Date().toISOString() },
+
+    // ── Middle East Corridor ────────────────────────────────
+    { id: "soko-match-10", supplierId: "soko-sup-5", buyerId: "soko-buy-5", matchScore: 87, matchBreakdown: { productFit: 90, certificationCompatibility: 85, volumeFit: 80, logisticsFeasibility: 85, priceCompetitiveness: 95 }, status: "accepted", initiatedAt: new Date(Date.now() - 2 * 86400000).toISOString() },
+    { id: "soko-match-11", supplierId: "soko-sup-6", buyerId: "soko-buy-5", matchScore: 79, matchBreakdown: { productFit: 80, certificationCompatibility: 85, volumeFit: 75, logisticsFeasibility: 75, priceCompetitiveness: 80 }, status: "pending", initiatedAt: new Date().toISOString() },
+    { id: "soko-match-12", supplierId: "soko-sup-10", buyerId: "soko-buy-5", matchScore: 71, matchBreakdown: { productFit: 75, certificationCompatibility: 65, volumeFit: 80, logisticsFeasibility: 65, priceCompetitiveness: 70 }, status: "pending", initiatedAt: new Date().toISOString() },
   ]
 
   private simulatedRequest(
@@ -233,6 +272,28 @@ export class SokogateIntegration {
             currency: data.currency || "USD",
             status: "pending",
             createdAt: new Date().toISOString(),
+          },
+        },
+      }
+    }
+    if (path.includes("/pilot/enroll") && method === "POST" && data) {
+      const trialDurationDays = data.trialDurationDays || 90
+      const now = new Date()
+      const end = new Date(now.getTime() + trialDurationDays * 86400000)
+      return {
+        success: true,
+        data: {
+          participant: {
+            id: `soko-pilot-sim-${Date.now()}`,
+            cohortId: data.cohortId,
+            companyName: data.companyName,
+            contactName: data.contactName,
+            email: data.email,
+            country: data.country,
+            commodities: data.commodities,
+            trialStartDate: now.toISOString(),
+            trialEndDate: end.toISOString(),
+            status: "active",
           },
         },
       }

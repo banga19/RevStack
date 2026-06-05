@@ -107,8 +107,10 @@ class ButtonSyncManager {
       };
 
       try {
-        // Dynamically import langchain service to avoid client-side bundle issues
-        const langchainModule = await import("./langchain-service");
+        // Dynamically import langchain service using a variable so webpack
+        // does not eagerly bundle the server-only @langchain/openai dependency.
+        const langchainPath = "./langchain-service";
+        const langchainModule = await import(langchainPath);
         const lcService = langchainModule.default || langchainModule;
 
         if (lcService && typeof lcService.getEnhancedButtonAction === 'function') {

@@ -41,6 +41,9 @@ import {
   TrendingUp,
   CalendarDays,
   UserCheck,
+  Sparkles,
+  Wand2,
+  ChevronRight,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAbac } from "@/lib/use-abac"
@@ -171,6 +174,13 @@ export default function AdminPage() {
   const [godModeLoading, setGodModeLoading] = useState(false)
   const [startingGodMode, setStartingGodMode] = useState(false)
 
+  // Hermes state
+  const [hermesOperations, setHermesOperations] = useState<any[]>([])
+  const [hermesSystemStatus, setHermesSystemStatus] = useState<any | null>(null)
+  const [hermesLoading, setHermesLoading] = useState(false)
+  const [hermesRunning, setHermesRunning] = useState(false)
+  const [hermesObjective, setHermesObjective] = useState("")
+
   const loadAdminData = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/data")
@@ -262,11 +272,45 @@ export default function AdminPage() {
     }
   }
 
+  const loadHermes = useCallback(async () => {
+    setHermesLoading(true)
+    try {
+      const res = await fetch("/api/hermes")
+      if (res.ok) {
+        const data = await res.json()
+        setHermesOperations(data.operations || [])
+        setHermesSystemStatus(data.systemStatus || null)
+      }
+    } catch (e) {
+      console.error("Failed to load Hermes:", e)
+    } finally {
+      setHermesLoading(false)
+    }
+  }, [])
+
+  const runHermes = async (action: string, objective?: string) => {
+    setHermesRunning(true)
+    try {
+      await fetch("/api/hermes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, objective }),
+      })
+      loadHermes()
+    } catch (e) {
+      console.error("Failed to run Hermes:", e)
+    } finally {
+      setHermesRunning(false)
+    }
+  }
+
   // ABAC check: only admin can access this page
   useEffect(() => {
     if (isLoading) return
     if (!isAdmin) { router.push("/dashboard"); return }
     loadAll()
+    loadHermes()
+    loadGodMode()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, isAdmin])
 
@@ -472,7 +516,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="users"><Users className="h-4 w-4 mr-2" /> Users</TabsTrigger>
           <TabsTrigger value="audit"><Shield className="h-4 w-4 mr-2" /> Audit Log</TabsTrigger>
           <TabsTrigger value="payments"><DollarSign className="h-4 w-4 mr-2" /> Payments</TabsTrigger>
@@ -480,6 +524,7 @@ export default function AdminPage() {
           <TabsTrigger value="retention"><BarChart3 className="h-4 w-4 mr-2" /> Retention</TabsTrigger>
           <TabsTrigger value="followups"><BellRing className="h-4 w-4 mr-2" /> Follow-ups</TabsTrigger>
           <TabsTrigger value="godmode"><Zap className="h-4 w-4 mr-2" /> God Mode</TabsTrigger>
+          <TabsTrigger value="hermes"><Sparkles className="h-4 w-4 mr-2" /> Hermes</TabsTrigger>
         </TabsList>
 
 {/* ================================================================= */}
@@ -1014,6 +1059,154 @@ export default function AdminPage() {
     </CardContent>
   </Card>
 </TabsContent>
+
+{/* ================================================================= */}
+{/* TAB: Hermes */}
+{/* ================================================================= */}
+<TabsContent value="hermes" className="space-y-4">
+  <Card>
+    <CardHeader className="flex flex-row items-center justify-between">
+      <div>
+        <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-amber-500" /> Hermes — Supervisory Agent</CardTitle>
+        <CardDescription>Autonomous oversight agent. Runs scheduled sweeps and health checks across the platform.</CardDescription>
+      </div>
+      <Button variant="outline" onClick={loadHermes} disabled={hermesLoading}>
+        <RefreshCw className={cn("h-4 w-4 mr-2", hermesLoading && "animate-spin")} />
+        Refresh
+      </Button>
+    </CardHeader>
+    <CardContent className="space-y-6">
+      <div className="grid gap-3 md:grid-cols-3">
+        <Button
+          className="h-auto flex-col items-start gap-2 p-4"
+          variant="outline"
+          onClick={() => runHermes("system-health")}
+          disabled={hermesRunning}
+        >
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-primary" />
+            <span className="text-xs font-medium uppercase tracking-wide">System Health Check</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground">Run full diagnostics across all agents</p>
+        </Button>
+        <Button
+          className="h-auto flex-col items-start gap-2 p-4"
+          variant="outline"
+          onClick={() => runHermes("lead-sweep")}
+          disabled={hermesRunning}
+        >
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-blue-500" />
+            <span className="text-xs font-medium uppercase tracking-wide">Lead Sweep</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground">Qualify leads and trigger follow-ups</p>
+        </Button>
+        <Button
+          className="h-auto flex-col items-start gap-2 p-4"
+          variant="outline"
+          disabled={hermesRunning}
+          onClick={() => {
+            const objective = prompt("Enter Hermes objective:", "Engage new leads, check compliance expiry, and submit two sales outreach packages.")
+            if (objective?.trim()) runHermes("run", objective.trim())
+          }}
+        >
+          <div className="flex items-center gap-2">
+            <Wand2 className="h-4 w-4 text-amber-500" />
+            <span className="text-xs font-medium uppercase tracking-wide">Custom Run</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground">Provide a free-form objective</p>
+        </Button>
+      </div>
+
+      {hermesSystemStatus && (
+        <div className="grid gap-3 md:grid-cols-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-xs text-muted-foreground">Total Operations</div>
+              <div className="text-lg font-bold">{hermesSystemStatus.totalOperations}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-xs text-muted-foreground">Insights</div>
+              <div className="text-lg font-bold">{hermesSystemStatus.insightsCount}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-xs text-muted-foreground">Recent Errors</div>
+              <div className="text-lg font-bold text-destructive">{hermesSystemStatus.recentErrorCount}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-xs text-muted-foreground">Last Operation</div>
+              <div className="text-sm font-medium line-clamp-1">
+                {hermesSystemStatus.lastOperation ? hermesSystemStatus.lastOperation.objective : "—"}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {hermesRunning && (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          <span className="font-medium">Hermes is running...</span>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <h4 className="text-sm font-medium">Recent Operations</h4>
+        {hermesOperations.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground text-sm">No Hermes operations yet</div>
+        ) : (
+          <div className="space-y-2">
+            {hermesOperations.slice(0, 5).map((op: any) => {
+              const startedAt = new Date(op.startedAt).toLocaleString()
+              const completedAt = op.completedAt ? new Date(op.completedAt).toLocaleString() : "In progress"
+              return (
+                <div key={op.id} className="rounded-lg border bg-card/50 p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{op.objective}</p>
+                      <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                        <span>{startedAt}</span>
+                        <span>·</span>
+                        <span>Completed {completedAt}</span>
+                      </div>
+                    </div>
+                    <Badge
+                      variant={
+                        op.status === "completed"
+                          ? "default"
+                          : op.status === "failed"
+                          ? "destructive"
+                          : op.status === "running" || op.status === "planning"
+                          ? "outline"
+                          : "secondary"
+                      }
+                      className={cn("shrink-0 text-[10px]",
+                        op.status === "completed" && "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
+                        (op.status === "running" || op.status === "planning") && "animate-pulse"
+                      )}
+                    >
+                      {op.status}
+                    </Badge>
+                  </div>
+                  {op.status === "running" && op.plannedActions.length > 0 && (
+                    <Progress value={Math.round((op.results.length / op.plannedActions.length) * 100)} className="h-1" />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </CardContent>
+  </Card>
+</TabsContent>
+
       </Tabs>
     </div>
   )

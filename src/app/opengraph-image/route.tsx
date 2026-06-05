@@ -1,20 +1,24 @@
 /**
  * Dynamic Open Graph Image Generation
  *
- * Generates a PNG image for social media previews (Slack, Twitter, WhatsApp, LinkedIn).
- * Next.js statically analyzes this file to serve /opengraph-image.
+ * Generates a PNG image for social media previews (Slack, Twitter/X, WhatsApp, LinkedIn).
+ * This image appears when sharing Mapato links on social platforms.
  *
- * To customize the design, edit the JSX below.
- * For a simpler static OG image, replace with a static file at /public/og-image.png
+ * Next.js statically analyzes this file to serve /opengraph-image.
+ * Uses the edge runtime for fast image generation.
+ *
+ * Brand colors: primary=#7C3AED (violet), accent=#F5B920 (amber/gold)
  */
 
 import { ImageResponse } from "next/og"
 
 export const runtime = "edge"
-export const contentType = "image/png"
-export const size = { width: 1200, height: 630 }
 
-export async function GET() {
+export const alt = "Mapato — AI-Powered B2B Trade Automation Platform"
+export const size = { width: 1200, height: 630 }
+export const contentType = "image/png"
+
+export default async function GET() {
   return new ImageResponse(
     (
       <div
@@ -27,7 +31,7 @@ export async function GET() {
           justifyContent: "center",
           background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e40af 100%)",
           color: "white",
-          fontFamily: "sans-serif",
+          fontFamily: "system-ui, sans-serif",
           padding: "60px 80px",
           position: "relative",
           overflow: "hidden",
@@ -38,8 +42,33 @@ export async function GET() {
           style={{
             position: "absolute",
             inset: 0,
-            backgroundImage: "radial-gradient(circle at 25px 25px, rgba(255,255,255,0.05) 1px, transparent 1px)",
+            backgroundImage:
+              "radial-gradient(circle at 25px 25px, rgba(255,255,255,0.05) 1px, transparent 1px)",
             backgroundSize: "50px 50px",
+          }}
+        />
+
+        {/* Glow accents */}
+        <div
+          style={{
+            position: "absolute",
+            top: -100,
+            right: -100,
+            width: 400,
+            height: 400,
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(124,58,237,0.2) 0%, transparent 70%)",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            bottom: -80,
+            left: -80,
+            width: 300,
+            height: 300,
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(245,185,32,0.15) 0%, transparent 70%)",
           }}
         />
 
@@ -59,7 +88,7 @@ export async function GET() {
               width: 40,
               height: 40,
               borderRadius: 10,
-              background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+              background: "linear-gradient(135deg, #7C3AED, #A78BFA)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -69,7 +98,9 @@ export async function GET() {
           >
             M
           </div>
-          <span style={{ fontSize: 24, fontWeight: 600, color: "#c7d2fe" }}>Mapato</span>
+          <span style={{ fontSize: 24, fontWeight: 600, color: "#c7d2fe" }}>
+            Mapato
+          </span>
         </div>
 
         {/* Main content */}
@@ -85,11 +116,11 @@ export async function GET() {
         >
           <h1
             style={{
-              fontSize: 56,
+              fontSize: 60,
               fontWeight: 800,
-              lineHeight: 1.2,
+              lineHeight: 1.15,
               marginBottom: 16,
-              background: "linear-gradient(135deg, #ffffff, #a5b4fc)",
+              background: "linear-gradient(135deg, #ffffff, #A78BFA, #F5B920)",
               backgroundClip: "text",
               color: "transparent",
             }}
@@ -102,13 +133,41 @@ export async function GET() {
               color: "#c7d2fe",
               lineHeight: 1.4,
               margin: 0,
+              marginBottom: 24,
             }}
           >
             AI-powered B2B trade automation platform
           </p>
+
+          {/* Feature badges */}
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", justifyContent: "center" }}>
+            {[
+              "🤖 AI Lead Qualification",
+              "📱 WhatsApp Automation",
+              "🌍 Korea-Africa Corridor",
+              "🛡️ Compliance Tracking",
+            ].map((text) => (
+              <div
+                key={text}
+                style={{
+                  padding: "8px 20px",
+                  borderRadius: 999,
+                  background: "rgba(124,58,237,0.2)",
+                  border: "1px solid rgba(124,58,237,0.3)",
+                  fontSize: 16,
+                  color: "#c7d2fe",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                {text}
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Bottom tagline */}
+        {/* Bottom bar */}
         <div
           style={{
             position: "absolute",
@@ -125,7 +184,8 @@ export async function GET() {
           }}
         >
           <span>mapato.app</span>
-          <span>AI-Powered B2B Trade</span>
+          <span>AI-Powered B2B Trade · Korea-Africa Corridor</span>
+          <span>14-Day Free Trial</span>
         </div>
       </div>
     ),

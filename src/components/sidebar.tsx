@@ -34,10 +34,20 @@ import {
   Shield,
   Languages,
   Puzzle,
+  Zap,
+  MessageSquare,
+  Bot,
+  BarChart3,
 } from "lucide-react"
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/revstack", label: "RevStack", icon: BarChart3 },
+  { href: "/leads", label: "Leads Pipeline", icon: Zap },
+  { href: "/retainers", label: "Retainers", icon: DollarSign },
+  { href: "/followups", label: "Follow-ups", icon: MessageSquare },
+  { href: "/messages", label: "Messages", icon: Send },
+  { href: "/hermes", label: "AI Agents", icon: Bot },
   { href: "/operations", label: "Operations Center", icon: Brain },
   { href: "/plan", label: "75-Day Plan", icon: CalendarCheck },
   { href: "/templates", label: "Templates", icon: Puzzle },

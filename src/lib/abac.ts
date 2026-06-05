@@ -45,6 +45,7 @@ export type AbacResource =
   | "admin"
   | "operations"
   | "god-mode"
+  | "hermes"
   | "pipeline"
   | "trade"
   | "korea"
@@ -59,6 +60,11 @@ export type AbacResource =
   | "subscription"
   | "payments"
   | "revenue"
+  | "leads"
+  | "retainers"
+  | "followups"
+  | "messages"
+  | "hermes-runs"
 
 // ============================================================
 // Resources as constants (for type-safe references)
@@ -69,6 +75,8 @@ export const RESOURCES: Record<AbacResource, AbacResource> = {
   admin: "admin",
   operations: "operations",
   "god-mode": "god-mode",
+  hermes: "hermes",
+  "hermes-runs": "hermes-runs",
   pipeline: "pipeline",
   trade: "trade",
   korea: "korea",
@@ -83,6 +91,10 @@ export const RESOURCES: Record<AbacResource, AbacResource> = {
   subscription: "subscription",
   payments: "payments",
   revenue: "revenue",
+  leads: "leads",
+  retainers: "retainers",
+  followups: "followups",
+  messages: "messages",
 }
 
 // ============================================================
@@ -167,6 +179,34 @@ const policies: Record<string, ResourcePolicies> = {
           u.role === "admin" ||
           (u.subscriptionStatus === "active" && u.subscriptionTier === "enterprise"),
         grant: "operations:deploy",
+      },
+    ],
+  },
+
+  // ── Hermes ──────────────────────────────────────────────
+  hermes: {
+    read: [
+      {
+        description: "Admin role required",
+        evaluate: (u) => u.role === "admin",
+        grant: "hermes:read",
+      },
+    ],
+    write: [
+      {
+        description: "Admin role required",
+        evaluate: (u) => u.role === "admin",
+        grant: "hermes:write",
+      },
+    ],
+  },
+
+  hermesruns: {
+    admin: [
+      {
+        description: "Admin role required",
+        evaluate: (u) => u.role === "admin",
+        grant: "hermes-runs:admin",
       },
     ],
   },
@@ -292,6 +332,43 @@ const policies: Record<string, ResourcePolicies> = {
     ],
     write: [
       { description: "Any authenticated user", evaluate: (u) => true, grant: "onboarding:write" },
+    ],
+  },
+
+  // ── Leads, Retainers, Followups, Messages (RevStack) ─────
+  leads: {
+    read: [
+      { description: "Admin or active/trial user", evaluate: (u) => u.role === "admin" || u.subscriptionStatus === "active" || u.subscriptionStatus === "trial", grant: "leads:read" },
+    ],
+    write: [
+      { description: "Admin or active user", evaluate: (u) => u.role === "admin" || u.subscriptionStatus === "active", grant: "leads:write" },
+    ],
+  },
+
+  retainers: {
+    read: [
+      { description: "Admin or active/trial user", evaluate: (u) => u.role === "admin" || u.subscriptionStatus === "active" || u.subscriptionStatus === "trial", grant: "retainers:read" },
+    ],
+    write: [
+      { description: "Admin or active user", evaluate: (u) => u.role === "admin" || u.subscriptionStatus === "active", grant: "retainers:write" },
+    ],
+  },
+
+  followups: {
+    read: [
+      { description: "Admin or active/trial user", evaluate: (u) => u.role === "admin" || u.subscriptionStatus === "active" || u.subscriptionStatus === "trial", grant: "followups:read" },
+    ],
+    write: [
+      { description: "Admin or active user", evaluate: (u) => u.role === "admin" || u.subscriptionStatus === "active", grant: "followups:write" },
+    ],
+  },
+
+  messages: {
+    read: [
+      { description: "Admin or active/trial user", evaluate: (u) => u.role === "admin" || u.subscriptionStatus === "active" || u.subscriptionStatus === "trial", grant: "messages:read" },
+    ],
+    write: [
+      { description: "Admin or active user", evaluate: (u) => u.role === "admin" || u.subscriptionStatus === "active", grant: "messages:write" },
     ],
   },
 

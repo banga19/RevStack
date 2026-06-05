@@ -1,18 +1,20 @@
+"use client"
+
 /**
  * Analytics Service
  *
- * Generic analytics wrapper that tracks key events (sign-ups, activations, retention).
- * Replace the placeholder provider with your real analytics service:
- *   - Plausible: set NEXT_PUBLIC_ANALYTICS_PROVIDER=plausible, NEXT_PUBLIC_PLAUSIBLE_DOMAIN=yourdomain.com
- *   - Google Analytics: set NEXT_PUBLIC_ANALYTICS_PROVIDER=ga, NEXT_PUBLIC_GA_ID=G-XXXXXXXXXX
- *   - PostHog: set NEXT_PUBLIC_ANALYTICS_PROVIDER=posthog, NEXT_PUBLIC_POSTHOG_KEY=phc_xxx
- *   - Custom: set NEXT_PUBLIC_ANALYTICS_PROVIDER=custom, NEXT_PUBLIC_ANALYTICS_ENDPOINT=https://...
+ * Tracks key business events via PostHog. Falls back gracefully when
+ * PostHog isn't configured (logs to console in dev).
+ *
+ * Environment variables:
+ *   NEXT_PUBLIC_POSTHOG_KEY — enables PostHog tracking
+ *
+ * Usage in components:
+ *   import { trackSignUp, trackFeatureUsed } from "@/lib/analytics"
+ *   trackSignUp(userId, "credentials")
  */
 
-"use client"
-
-import { useEffect } from "react"
-import { usePathname } from "next/navigation"
+import posthog from "posthog-js"
 
 // ============================================================
 // Types
@@ -30,114 +32,45 @@ export type AnalyticsEvent =
   | "god_mode_deployed"
   | "feature_used"
   | "page_view"
-
-export interface AnalyticsProps {
-  provider?: string
-  plausibleDomain?: string
-  gaId?: string
-  posthogKey?: string
-  customEndpoint?: string
-}
-
-// ============================================================
-// Configuration (from env vars)
-// ============================================================
-
-const config: AnalyticsProps = {
-  provider: process.env.NEXT_PUBLIC_ANALYTICS_PROVIDER || "", // e.g., "plausible", "ga", "posthog", "custom"
-  plausibleDomain: process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN || "",
-  gaId: process.env.NEXT_PUBLIC_GA_ID || "",
-  posthogKey: process.env.NEXT_PUBLIC_POSTHOG_KEY || "",
-  customEndpoint: process.env.NEXT_PUBLIC_ANALYTICS_ENDPOINT || "",
-}
+  | "lead_qualified"
+  | "lead_converted"
+  | "trade_match_found"
+  | "compliance_alert_sent"
+  | "outreach_sent"
+  | "pipeline_updated"
 
 // ============================================================
 // Core Track Function
 // ============================================================
 
-/**
- * Track an analytics event.
- * Uses the configured provider, or falls back to console.log in development.
- */
-export function trackEvent(event: AnalyticsEvent, properties?: Record<string, any>) {
-  const payload = { event, properties: { ...properties, timestamp: new Date().toISOString() } }
+const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY
 
-  switch (config.provider) {
-    case "plausible":
-      trackPlausible(event, properties)
-      break
-    case "ga":
-      trackGoogleAnalytics(event, properties)
-      break
-    case "posthog":
-      trackPostHog(event, properties)
-      break
-    case "custom":
-      trackCustomEndpoint(event, properties)
-      break
-    default:
-      // In development, log to console
-      if (process.env.NODE_ENV !== "production") {
-        console.log("[Analytics]", event, properties)
-      }
-      break
+/**
+ * Track an analytics event via PostHog.
+ * Falls back to console.log in development when PostHog isn't configured.
+ */
+export function trackEvent(
+  event: AnalyticsEvent,
+  properties?: Record<string, any>
+) {
+  const payload = {
+    event,
+    properties: {
+      ...properties,
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV,
+    },
   }
-}
 
-// ============================================================
-// Provider Implementations
-// ============================================================
-
-function trackPlausible(event: string, properties?: Record<string, any>) {
-  try {
-    if (typeof window !== "undefined" && (window as any).plausible) {
-      ;(window as any).plausible(event, { props: properties || {} })
+  if (POSTHOG_KEY && typeof window !== "undefined") {
+    try {
+      posthog.capture(event, properties || {})
+    } catch {
+      // Silently fail — analytics should never block the app
     }
-  } catch { /* silently fail */ }
-}
-
-function trackGoogleAnalytics(event: string, properties?: Record<string, any>) {
-  try {
-    if (typeof window !== "undefined" && (window as any).gtag) {
-      ;(window as any).gtag("event", event, properties || {})
-    }
-  } catch { /* silently fail */ }
-}
-
-function trackPostHog(event: string, properties?: Record<string, any>) {
-  try {
-    if (typeof window !== "undefined" && (window as any).posthog) {
-      ;(window as any).posthog.capture(event, properties || {})
-    }
-  } catch { /* silently fail */ }
-}
-
-function trackCustomEndpoint(event: string, properties?: Record<string, any>) {
-  if (!config.customEndpoint) return
-  try {
-    fetch(config.customEndpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ event, properties }),
-      keepalive: true,
-    })
-  } catch { /* silently fail */ }
-}
-
-// ============================================================
-// React Hook — Automatic Page View Tracking
-// ============================================================
-
-/**
- * Hook that automatically tracks page views on route change.
- * Include in the root layout or _app component.
- */
-export function usePageViewTracking() {
-  const pathname = usePathname()
-
-  useEffect(() => {
-    trackEvent("page_view", { path: pathname })
-  }, [pathname])
+  } else if (process.env.NODE_ENV !== "production") {
+    console.log("[Analytics]", event, properties)
+  }
 }
 
 // ============================================================
@@ -146,10 +79,24 @@ export function usePageViewTracking() {
 
 export function trackSignUp(userId: string, method: "credentials" | "google") {
   trackEvent("signup", { userId, method })
+  if (POSTHOG_KEY && typeof window !== "undefined") {
+    try {
+      posthog.identify(userId, { signupMethod: method })
+    } catch {
+      // non-critical
+    }
+  }
 }
 
 export function trackLogin(userId: string, method: "credentials" | "google") {
   trackEvent("login", { userId, method })
+  if (POSTHOG_KEY && typeof window !== "undefined") {
+    try {
+      posthog.identify(userId)
+    } catch {
+      // non-critical
+    }
+  }
 }
 
 export function trackOnboardingStarted(userId: string) {
@@ -158,20 +105,135 @@ export function trackOnboardingStarted(userId: string) {
 
 export function trackOnboardingCompleted(userId: string, businessName: string) {
   trackEvent("onboarding_completed", { userId, businessName })
+  if (POSTHOG_KEY && typeof window !== "undefined") {
+    try {
+      posthog.people.set({ businessName, onboardingCompleted: true })
+    } catch {
+      // non-critical
+    }
+  }
 }
 
 export function trackTrialStarted(userId: string) {
   trackEvent("trial_started", { userId })
+  if (POSTHOG_KEY && typeof window !== "undefined") {
+    try {
+      posthog.people.set({ trialStarted: true })
+    } catch {
+      // non-critical
+    }
+  }
 }
 
-export function trackSubscriptionCreated(userId: string, tier: string, plan: string) {
+export function trackSubscriptionCreated(
+  userId: string,
+  tier: string,
+  plan: string
+) {
   trackEvent("subscription_created", { userId, tier, plan })
+  if (POSTHOG_KEY && typeof window !== "undefined") {
+    try {
+      posthog.people.set({ tier, plan, subscriptionActive: true })
+      posthog.group("tier", tier, { name: tier, plan })
+    } catch {
+      // non-critical
+    }
+  }
 }
 
-export function trackGodModeDeployed(userId: string, objective: string, agents: string[]) {
+export function trackGodModeDeployed(
+  userId: string,
+  objective: string,
+  agents: string[]
+) {
   trackEvent("god_mode_deployed", { userId, objective, agents })
 }
 
 export function trackFeatureUsed(userId: string, feature: string) {
   trackEvent("feature_used", { userId, feature })
+}
+
+export function trackLeadQualified(
+  userId: string,
+  leadId: string,
+  score: number
+) {
+  trackEvent("lead_qualified", { userId, leadId, score })
+}
+
+export function trackLeadConverted(
+  userId: string,
+  leadId: string,
+  dealValue: number
+) {
+  trackEvent("lead_converted", { userId, leadId, dealValue })
+}
+
+export function trackTradeMatch(
+  userId: string,
+  supplierId: string,
+  buyerId: string,
+  matchScore: number
+) {
+  trackEvent("trade_match_found", {
+    userId,
+    supplierId,
+    buyerId,
+    matchScore,
+  })
+}
+
+export function trackComplianceAlert(userId: string, certType: string) {
+  trackEvent("compliance_alert_sent", { userId, certType })
+}
+
+export function trackOutreachSent(
+  userId: string,
+  channel: string,
+  recipientCount: number
+) {
+  trackEvent("outreach_sent", { userId, channel, recipientCount })
+}
+
+// ============================================================
+// PostHog Feature Flag Helpers
+// ============================================================
+
+/**
+ * Check if a PostHog feature flag is enabled for the current user.
+ * Returns null if PostHog is not configured.
+ */
+export function isFeatureEnabled(flagKey: string): boolean | null | undefined {
+  if (!POSTHOG_KEY || typeof window === "undefined") return null
+  try {
+    return posthog.isFeatureEnabled(flagKey)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Get the payload of a PostHog feature flag.
+ */
+export function getFeatureFlagPayload(
+  flagKey: string
+): Record<string, any> | null {
+  if (!POSTHOG_KEY || typeof window === "undefined") return null
+  try {
+    return posthog.getFeatureFlagPayload(flagKey) as Record<string, any> | null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Reload feature flags (call after user identifies/login).
+ */
+export function reloadFeatureFlags(): void {
+  if (!POSTHOG_KEY || typeof window === "undefined") return
+  try {
+    posthog.reloadFeatureFlags()
+  } catch {
+    // non-critical
+  }
 }

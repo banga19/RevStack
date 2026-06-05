@@ -67,7 +67,10 @@ export function PwaInstallPrompt() {
     if (!deferredPrompt) return
 
     setIsInstalling(true)
-    const promptEvent = deferredPrompt as Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> }
+    const promptEvent = deferredPrompt as Event & {
+      prompt: () => Promise<void>
+      userChoice: Promise<{ outcome: string }>
+    }
 
     try {
       await promptEvent.prompt()
@@ -76,14 +79,23 @@ export function PwaInstallPrompt() {
       if (choiceResult.outcome === "accepted") {
         setIsVisible(false)
         setDeferredPrompt(null)
+      } else {
+        setDeferredPrompt(null)
       }
-    } catch {
-      // User dismissed the install prompt
+    } catch (error) {
+      console.error("[PWA] Install failed:", error)
+      setDeferredPrompt(null)
     } finally {
       setIsInstalling(false)
-      setDeferredPrompt(null)
     }
   }, [deferredPrompt])
+
+  const handleManualInstall = useCallback(() => {
+    const url = typeof window !== "undefined" ? window.location.href : "/"
+    alert(
+      `To install Mapato:\n1. Open Chrome menu (⋮)\n2. Click "Install Mapato" or "Add to Home Screen"\n\nCurrent URL: ${url}`
+    )
+  }, [])
 
   const handleDismiss = useCallback(() => {
     setIsVisible(false)
@@ -122,24 +134,32 @@ export function PwaInstallPrompt() {
             Install our app for quick access, offline support, and push notifications — just like a native app.
           </p>
 
-          <div className="flex gap-2">
+           <div className="flex flex-col gap-2 w-full">
             <Button
               size="sm"
-              className="flex-1 gap-1.5"
+              className="w-full gap-1.5"
               onClick={handleInstall}
-              disabled={isInstalling}
+              disabled={isInstalling || !deferredPrompt}
             >
               {isInstalling ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Download className="h-4 w-4" />
               )}
-              Install
+              Install App
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full"
+              onClick={handleManualInstall}
+            >
+              Manual Install
             </Button>
             <Button
               size="sm"
               variant="ghost"
-              className="flex-shrink-0"
+              className="w-full"
               onClick={handleDismiss}
             >
               Not now

@@ -16,9 +16,10 @@
   "launch_handler": {
     "client_mode": "auto"
   },
-  "serviceworker": {
+  "service_worker": {
     "src": "/sw.js",
-    "scope": "/"
+    "scope": "/",
+    "type": "classic"
   },
   "icons": [
     {

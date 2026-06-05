@@ -56,6 +56,8 @@ model User {
   koreanTargets        KoreanCorporateTarget[]
   payments             Payment[]
   followUpLogs         FollowUpLog[]
+  leads                Lead[]
+  retainers            Retainer[]
 }
 
 // Payment transactions — M-Pesa, Mobile Money, Visa/Mastercard
@@ -186,6 +188,9 @@ model Client {
   complianceRecords ClientCompliance[]
   tradeFinanceApps  TradeFinanceApplication[]
   ersSnapshots      ErsSnapshot[]
+  followups         Followup[]
+  retainers         Retainer[]
+  convertedLead     Lead?     // lead that converted to this client
 }
 
 // Products/services a client offers for export/trade — enables B2B matching
@@ -446,4 +451,102 @@ model KoreanBuyerInquiry {
   notes             String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+}
+
+// ── RevStack: AI-Powered Revenue Automation Models ──────────────────────
+
+// Lead — tracks incoming prospects through qualification pipeline
+model Lead {
+  id                 String   @id @default(cuid())
+  companyName        String
+  contactName        String
+  email              String
+  phone              String?
+  whatsapp           String?
+  industry           String?
+  country            String?
+  status             String   @default("new") // new, qualified, disqualified, converted
+  qualificationScore Int?
+  qualificationTier  String?   // hot, qualified, lukewarm, cold
+  qualificationBreakdown String? // JSON: per-component breakdown details
+  notes              String?
+  source             String?
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  client             Client?  @relation(fields: [clientId], references: [id]) // populated when lead converts to client
+  clientId           String?  @unique
+  followups          Followup[]
+}
+
+// Retainer — recurring revenue agreements with clients
+model Retainer {
+  id              String   @id @default(cuid())
+  clientId        String
+  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name            String
+  amountUsd       Float
+  billingCycle    String   @default("monthly") // monthly, quarterly, annual
+  status          String   @default("active") // active, paused, cancelled
+  startDate       String
+  nextBillingDate String?
+  notes           String?
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// Followup — scheduled outreach messages for leads/clients
+model Followup {
+  id          String    @id @default(cuid())
+  leadId      String?
+  lead        Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  clientId    String?
+  client      Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  channel     String    @default("whatsapp") // whatsapp, email
+  messageBody String
+  status      String    @default("pending") // pending, sent, replied, skipped
+  scheduledAt DateTime  @default(now())
+  sentAt      DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+// Message — cross-channel communication log
+model Message {
+  id        String   @id @default(cuid())
+  channel   String   // whatsapp, email
+  to        String
+  body      String
+  status    String   @default("queued") // queued, sent, failed
+  leadId    String?
+  clientId  String?
+  createdAt DateTime @default(now())
+}
+
+// Activity — audit trail / activity feed entries
+model Activity {
+  id          String   @id @default(cuid())
+  type        String
+  description String
+  entityType  String?  // lead, client, retainer, followup, message, hermes_run
+  entityId    String?
+  userId      String?
+  createdAt   DateTime @default(now())
+}
+
+// HermesRun — tracks AI agent execution runs
+model HermesRun {
+  id              String    @id @default(cuid())
+  taskType        String    // qualify_leads, send_followups, onboard_clients, generate_report, custom
+  status          String    @default("pending") // pending, running, completed, failed
+  input           String?
+  output          String?
+  errorMessage    String?
+  leadsProcessed  Int?
+  messagesQueued  Int?
+  userId          String?
+  createdAt       DateTime  @default(now())
+  completedAt     DateTime?
 }

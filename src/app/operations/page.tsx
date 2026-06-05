@@ -32,6 +32,9 @@ import {
   Rocket,
   MessageSquareText,
   Wand2,
+  Send,
+  BookOpen,
+  ChevronRight,
 } from "lucide-react"
 
 // ============================================================
@@ -131,6 +134,15 @@ export default function OperationsPage() {
   const [selectedReport, setSelectedReport] = useState<APIReport | null>(null)
   const pollRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Hermes state
+  const [hermesOperations, setHermesOperations] = useState<any[]>([])
+  const [hermesSystemStatus, setHermesSystemStatus] = useState<any>(null)
+  const [hermesLoading, setHermesLoading] = useState(false)
+  const [hermesRunning, setHermesRunning] = useState(false)
+  const [hermesDialogOpen, setHermesDialogOpen] = useState(false)
+  const [hermesObjective, setHermesObjective] = useState("")
+  const [selectedHermesOp, setSelectedHermesOp] = useState<any | null>(null)
+
   // Load sessions from API
   const loadSessions = useCallback(async () => {
     try {
@@ -213,6 +225,56 @@ export default function OperationsPage() {
       console.error(`Failed to ${action} God Mode:`, e)
     }
   }
+
+  // Load Hermes operations
+  const loadHermes = useCallback(async () => {
+    setHermesLoading(true)
+    try {
+      const res = await fetch("/api/hermes")
+      if (res.ok) {
+        const data = await res.json()
+        setHermesOperations(data.operations || [])
+        setHermesSystemStatus(data.systemStatus || null)
+      }
+    } catch (e) {
+      console.error("Failed to load Hermes operations:", e)
+    } finally {
+      setHermesLoading(false)
+    }
+  }, [])
+
+  // Run a Hermes operation
+  const runHermesOperation = async (action: string, objective?: string) => {
+    setHermesRunning(true)
+    try {
+      const res = await fetch("/api/hermes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          objective: objective || undefined,
+        }),
+      })
+      if (res.ok) {
+        setHermesDialogOpen(false)
+        setHermesObjective("")
+        await loadHermes()
+      }
+    } catch (e) {
+      console.error(`Failed to run Hermes ${action}:`, e)
+    } finally {
+      setHermesRunning(false)
+    }
+  }
+
+  // Poll Hermes operations if any are running
+  const hasRunningHermes = hermesOperations.some((op) => op.status === "running" || op.status === "planning")
+  useEffect(() => {
+    if (hasRunningHermes) {
+      const timer = setInterval(loadHermes, 5000)
+      return () => clearInterval(timer)
+    }
+  }, [hasRunningHermes, loadHermes])
 
   const toggleAgent = (agent: AgentType) => {
     setGodModeConfig((prev) => ({
@@ -577,6 +639,404 @@ export default function OperationsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* ================================================================= */}
+      {/* Hermes — Autonomous Operations Supervisor */}
+      {/* ================================================================= */}
+      <Card className="border-t-2 border-t-indigo-500/30">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <div className="p-1.5 rounded-lg bg-gradient-to-br from-indigo-500/20 to-indigo-500/5 border border-indigo-500/20">
+                  <Send className="h-5 w-5 text-indigo-400" />
+                </div>
+                Hermes — Autonomous Operations Supervisor
+                {hasRunningHermes && (
+                  <Badge variant="outline" className="ml-2 text-indigo-500 border-indigo-500/30 animate-pulse">
+                    <Activity className="h-3 w-3 mr-1" />
+                    Running
+                  </Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                Context-aware multi-agent orchestrator using RAG + LangGraph. Hermes retrieves business
+                context, plans a workflow across all integrated services, and stores insights for future runs.
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={hermesRunning}
+                onClick={() => runHermesOperation("lead-sweep")}
+                className="border-indigo-500/30 hover:border-indigo-500/50"
+              >
+                {hermesRunning ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <Users className="h-3.5 w-3.5 mr-1.5" />
+                )}
+                Lead Sweep
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={hermesRunning}
+                onClick={() => runHermesOperation("system-health")}
+                className="border-indigo-500/30 hover:border-indigo-500/50"
+              >
+                {hermesRunning ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <Activity className="h-3.5 w-3.5 mr-1.5" />
+                )}
+                System Health
+              </Button>
+              <Button
+                size="sm"
+                disabled={hermesRunning}
+                onClick={() => setHermesDialogOpen(true)}
+              >
+                <Zap className="h-3.5 w-3.5 mr-1.5" />
+                Custom Operation
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={loadHermes}
+                disabled={hermesLoading}
+              >
+                <Loader2 className={cn("h-3.5 w-3.5", hermesLoading && "animate-spin")} />
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* System Status Bar */}
+          {hermesSystemStatus && (
+            <div className="flex items-center gap-4 p-3 rounded-lg bg-indigo-500/5 border border-indigo-500/10 text-sm">
+              <div className="flex items-center gap-2">
+                <Brain className="h-4 w-4 text-indigo-400" />
+                <span className="text-muted-foreground">{hermesSystemStatus.totalOperations} operations</span>
+              </div>
+              <div className="w-px h-4 bg-border" />
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-amber-400" />
+                <span className="text-muted-foreground">{hermesSystemStatus.insightsCount} insights</span>
+              </div>
+              {hermesSystemStatus.recentErrorCount > 0 && (
+                <>
+                  <div className="w-px h-4 bg-border" />
+                  <div className="flex items-center gap-2">
+                    <XCircle className="h-4 w-4 text-destructive" />
+                    <span className="text-destructive">{hermesSystemStatus.recentErrorCount} recent errors</span>
+                  </div>
+                </>
+              )}
+              {hermesSystemStatus.lastOperation && (
+                <>
+                  <div className="w-px h-4 bg-border" />
+                  <span className="text-xs text-muted-foreground">
+                    Last: {hermesSystemStatus.lastOperation.objective.substring(0, 50)}...
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Running Hermes Operation */}
+          {hermesOperations.filter((op) => op.status === "running" || op.status === "planning").slice(0, 1).map((op) => (
+            <div key={op.id} className="p-4 rounded-lg border border-indigo-500/30 bg-gradient-to-br from-indigo-500/[0.04] to-transparent">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 text-indigo-400 animate-spin" />
+                  <span className="text-sm font-medium">{op.status === "planning" ? "Planning" : "Executing"}</span>
+                  <span className="text-xs text-muted-foreground">{op.objective.substring(0, 80)}{op.objective.length > 80 ? "..." : ""}</span>
+                </div>
+                <Badge variant="outline" className="text-[10px] capitalize">{op.status}</Badge>
+              </div>
+              {op.plannedActions?.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {op.plannedActions.map((action: any, i: number) => {
+                    const done = op.results?.some((r: any) => r.action?.agentType === action.agentType) || false
+                    return (
+                      <span
+                        key={i}
+                        className={cn(
+                          "text-[10px] px-2 py-0.5 rounded-full border transition-all",
+                          done
+                            ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                            : "bg-indigo-500/10 text-indigo-400 border-indigo-500/20 animate-pulse"
+                        )}
+                      >
+                        {done ? <CheckCircle2 className="h-3 w-3 inline mr-0.5" /> : <Loader2 className="h-3 w-3 inline mr-0.5 animate-spin" />}
+                        {action.agentType}
+                      </span>
+                    )
+                  })}
+                </div>
+              )}
+              <Progress value={op.results?.length > 0 ? (op.results.length / (op.plannedActions?.length || 1)) * 100 : 10} className="h-1" />
+            </div>
+          ))}
+
+          {/* Completed Hermes Operations */}
+          {hermesOperations.filter((op) => op.status === "completed" || op.status === "failed").slice(0, 5).length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Recent Operations
+              </p>
+              <div className="space-y-1.5">
+                {hermesOperations.filter((op) => op.status === "completed" || op.status === "failed").slice(0, 5).map((op) => {
+                  const successCount = op.results?.filter((r: any) => r.result?.success).length || 0
+                  const totalCount = op.results?.length || 0
+                  return (
+                    <button
+                      key={op.id}
+                      onClick={() => setSelectedHermesOp(op)}
+                      className="w-full text-left flex items-center gap-3 p-3 rounded-lg border border-border/50 hover:border-indigo-500/20 hover:bg-muted/30 transition-all group"
+                    >
+                      <div className={cn(
+                        "p-1.5 rounded-lg shrink-0",
+                        op.status === "completed" ? "bg-emerald-500/10" : "bg-destructive/10"
+                      )}>
+                        {op.status === "completed" ? (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-destructive" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm truncate">{op.objective}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {successCount}/{totalCount} actions · {new Date(op.startedAt).toLocaleString()}
+                          {op.duration && ` · ${(op.duration / 1000).toFixed(0)}s`}
+                        </p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* No Hermes operations yet */}
+          {!hermesLoading && hermesOperations.length === 0 && (
+            <div className="text-center py-6">
+              <div className="p-3 rounded-xl bg-gradient-to-br from-indigo-500/10 to-indigo-500/5 border border-indigo-500/10 inline-flex mb-3">
+                <Send className="h-8 w-8 text-indigo-400" />
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">
+                Hermes has not run any operations yet. Use the buttons above to run a lead sweep,
+                system health check, or custom operation. Hermes uses RAG context from the knowledge
+                base to plan the most effective agent workflow.
+              </p>
+              <div className="flex gap-2 justify-center">
+                <Button size="sm" variant="outline" onClick={() => runHermesOperation("lead-sweep")} disabled={hermesRunning}>
+                  <Users className="h-3.5 w-3.5 mr-1.5" /> Run Lead Sweep
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => runHermesOperation("system-health")} disabled={hermesRunning}>
+                  <Activity className="h-3.5 w-3.5 mr-1.5" /> System Health
+                </Button>
+                <Button size="sm" variant="default" onClick={() => setHermesDialogOpen(true)}>
+                  <Zap className="h-3.5 w-3.5 mr-1.5" /> Custom
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Hermes Operation Detail Dialog */}
+      <Dialog open={!!selectedHermesOp} onOpenChange={(o) => !o && setSelectedHermesOp(null)}>
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+          {selectedHermesOp && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "p-2 rounded-lg",
+                    selectedHermesOp.status === "completed" ? "bg-emerald-500/10" : "bg-destructive/10"
+                  )}>
+                    {selectedHermesOp.status === "completed" ? (
+                      <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-destructive" />
+                    )}
+                  </div>
+                  <div>
+                    <DialogTitle>Hermes Operation Report</DialogTitle>
+                    <DialogDescription>
+                      {new Date(selectedHermesOp.startedAt).toLocaleString()}
+                      {selectedHermesOp.completedAt && ` · ${Math.round((selectedHermesOp.completedAt - selectedHermesOp.startedAt) / 1000)}s duration`}
+                    </DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              <div className="space-y-4 py-2">
+                {/* Objective */}
+                <div className="p-3 rounded-lg bg-muted/30">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Objective</p>
+                  <p className="text-sm">{selectedHermesOp.objective}</p>
+                </div>
+
+                {/* Context */}
+                {selectedHermesOp.context && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Retrieved Context</p>
+                    <p className="text-xs text-muted-foreground bg-muted/20 p-2 rounded max-h-24 overflow-y-auto">
+                      {selectedHermesOp.context}
+                    </p>
+                  </div>
+                )}
+
+                {/* Planned Actions */}
+                {selectedHermesOp.plannedActions?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-2">Planned Workflow ({selectedHermesOp.plannedActions.length} steps)</p>
+                    <div className="space-y-1.5">
+                      {selectedHermesOp.plannedActions.map((action: any, i: number) => {
+                        const result = selectedHermesOp.results?.find((r: any) => r.action?.agentType === action.agentType)
+                        const status = result?.result?.success ? "completed" : result ? "failed" : "pending"
+                        return (
+                          <div key={i} className="flex items-start gap-2 p-2 rounded bg-muted/10">
+                            <span className={cn(
+                              "flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold shrink-0 mt-0.5",
+                              status === "completed" ? "bg-emerald-500/10 text-emerald-500" :
+                              status === "failed" ? "bg-destructive/10 text-destructive" :
+                              "bg-muted text-muted-foreground"
+                            )}>{i + 1}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] px-1 py-0.5 rounded font-medium uppercase">{action.agentType}</span>
+                                <span className="text-sm">{action.action}</span>
+                              </div>
+                              {result?.result?.summary && (
+                                <p className="text-xs text-muted-foreground mt-0.5 truncate">{result.result.summary}</p>
+                              )}
+                              {result?.result?.metrics && Object.keys(result.result.metrics).length > 0 && (
+                                <p className="text-[10px] text-muted-foreground mt-0.5">
+                                  {Object.entries(result.result.metrics).map(([k, v]) => `${k}: ${v}`).join(", ")}
+                                </p>
+                              )}
+                            </div>
+                            <Badge variant="outline" className={cn(
+                              "text-[9px] capitalize",
+                              status === "completed" && "border-emerald-500/30 text-emerald-500",
+                              status === "failed" && "border-destructive/30 text-destructive",
+                            )}>{status}</Badge>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Errors */}
+                {selectedHermesOp.errors?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-destructive mb-1">Errors ({selectedHermesOp.errors.length})</p>
+                    <div className="space-y-1">
+                      {selectedHermesOp.errors.map((err: string, i: number) => (
+                        <p key={i} className="text-xs text-destructive bg-destructive/5 p-2 rounded">{err}</p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Insights */}
+                {selectedHermesOp.insights?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Insights Discovered</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedHermesOp.insights.map((insight: any, i: number) => (
+                        <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                          {insight.title}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button variant="outline">Close</Button>
+                </DialogClose>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Hermes Custom Operation Dialog */}
+      <Dialog open={hermesDialogOpen} onOpenChange={setHermesDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-indigo-500/20 to-indigo-500/5 border border-indigo-500/20">
+                <Send className="h-5 w-5 text-indigo-400" />
+              </div>
+              <div>
+                <DialogTitle>Hermes Custom Operation</DialogTitle>
+                <DialogDescription>
+                  Describe what you want Hermes to do. It will retrieve context from the knowledge base,
+                  plan a multi-agent workflow, and execute autonomously.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <BookOpen className="h-4 w-4 text-indigo-400" />
+                Describe Your Objective
+              </Label>
+              <Textarea
+                placeholder="e.g., Qualify all new leads, send WATI follow-ups, sync to Zoho CRM, check compliance expiry dates, and run trade corridor matching"
+                value={hermesObjective}
+                onChange={(e) => setHermesObjective(e.target.value)}
+                className="min-h-[100px] resize-none"
+              />
+              <p className="text-xs text-muted-foreground">
+                Hermes uses the RAG knowledge base and agent memory to understand context, then plans and executes
+                the optimal sequence of agent actions across all integrated services (WATI, Zoho, QMe, Make.com, etc.).
+              </p>
+            </div>
+
+            <div className="p-3 rounded-lg bg-indigo-500/5 border border-indigo-500/10">
+              <div className="flex items-center gap-2 text-sm font-medium mb-1">
+                <Sparkles className="h-4 w-4 text-indigo-400" />
+                How It Works
+              </div>
+              <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+                <li><strong>Context Retrieval</strong> — Queries RAG knowledge base for relevant business context</li>
+                <li><strong>Workflow Planning</strong> — Uses LLM to plan the optimal agent sequence and actions</li>
+                <li><strong>Execution</strong> — Runs each agent action via real service integrations</li>
+                <li><strong>Memory</strong> — Stores patterns and insights in cross-agent memory for future runs</li>
+              </ol>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button
+              onClick={() => runHermesOperation("run", hermesObjective)}
+              disabled={hermesRunning || !hermesObjective.trim()}
+            >
+              {hermesRunning ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Running...</>
+              ) : (
+                <><Send className="h-4 w-4 mr-2" /> Run Hermes</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Quick Actions */}
       {!activeSession && (

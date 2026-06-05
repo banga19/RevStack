@@ -5,12 +5,13 @@
  * When one agent discovers a pattern or insight, it's shared across all agents.
  */
 
-import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai"
+import { type ChatOpenAI } from "@langchain/openai"
 import { MemoryVectorStore } from "@langchain/classic/vectorstores/memory"
 import { StringOutputParser } from "@langchain/core/output_parsers"
 import { ChatPromptTemplate } from "@langchain/core/prompts"
 import { Document } from "@langchain/core/documents"
 import { z } from "zod"
+import { createLlm, createEmbeddings } from "./model-provider"
 
 // ============================================================
 // Types
@@ -82,8 +83,8 @@ class AgentMemorySystem {
       },
       lastUpdated: Date.now(),
     }
-    this.vectorStore = new MemoryVectorStore(new OpenAIEmbeddings())
-    this.llm = new ChatOpenAI({ modelName: "gpt-4o", temperature: 0.7 })
+    this.vectorStore = new MemoryVectorStore(createEmbeddings())
+    this.llm = createLlm({ temperature: 0.7 })
     this.reportHistory = new Map()
     this.listeners = []
   }
