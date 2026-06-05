@@ -201,7 +201,7 @@ const policies: Record<string, ResourcePolicies> = {
     ],
   },
 
-  hermesruns: {
+  "hermes-runs": {
     admin: [
       {
         description: "Admin role required",

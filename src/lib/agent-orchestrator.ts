@@ -270,7 +270,7 @@ lead|Qualify all new leads in the pipeline and send personalized WhatsApp follow
       task.status = "completed"
       task.result = result
       task.completedAt = Date.now()
-      const completedSoFar = session.tasks.filter((t) => t.status === "completed").length + 1
+      const completedSoFar = session.tasks.filter((t) => t.status === "completed").length
       session.progress = Math.round(
         (completedSoFar / session.tasks.length) * 100
       )

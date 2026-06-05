@@ -1,35 +1,40 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
-import { withAuth } from "@/lib/abac-middleware"
+import { withAbac } from "@/lib/abac-middleware"
 import { agentOrchestrator } from "@/lib/agent-orchestrator"
 import { agentMemory } from "@/lib/agent-memory"
+import { RESOURCES } from "@/lib/abac"
 
 // POST /api/god-mode — Start a new God Mode session
-export const POST = withAuth(async (req: NextRequest) => {
-  const body = await req.json()
-  const { duration, objective, agents } = body
+export const POST = withAbac(
+  RESOURCES["god-mode"],
+  "deploy",
+  async (req: NextRequest) => {
+    const body = await req.json()
+    const { duration, objective, agents } = body
 
-  if (!objective || !agents || !Array.isArray(agents) || agents.length === 0) {
-    return NextResponse.json(
-      { error: "Missing required fields: objective, agents" },
-      { status: 400 }
-    )
+    if (!objective || !agents || !Array.isArray(agents) || agents.length === 0) {
+      return NextResponse.json(
+        { error: "Missing required fields: objective, agents" },
+        { status: 400 }
+      )
+    }
+
+    const session = await agentOrchestrator.startGodMode({
+      duration: parseInt(duration) || 3600000,
+      objective,
+      agents,
+      checkInterval: 60000,
+    })
+
+    return NextResponse.json({
+      session: serializeSession(session),
+    })
   }
-
-  const session = await agentOrchestrator.startGodMode({
-    duration: parseInt(duration) || 3600000,
-    objective,
-    agents,
-    checkInterval: 60000,
-  })
-
-  return NextResponse.json({
-    session: serializeSession(session),
-  })
-})
+)
 
 // GET /api/god-mode — Get all sessions
-export const GET = withAuth(async () => {
+export const GET = withAbac(RESOURCES["god-mode"], "read", async () => {
   const sessions = agentOrchestrator.getAllSessions()
   const allReports = agentMemory.getAllReports()
   const agentStatus = agentOrchestrator.getAgentStatus()
@@ -42,48 +47,52 @@ export const GET = withAuth(async () => {
 })
 
 // PATCH /api/god-mode — Control a session (pause/resume/stop)
-export const PATCH = withAuth(async (req: NextRequest) => {
-  const body = await req.json()
-  const { sessionId, action } = body
+export const PATCH = withAbac(
+  RESOURCES["god-mode"],
+  "deploy",
+  async (req: NextRequest) => {
+    const body = await req.json()
+    const { sessionId, action } = body
 
-  if (!sessionId || !action) {
-    return NextResponse.json(
-      { error: "Missing required fields: sessionId, action" },
-      { status: 400 }
-    )
-  }
-
-  let success = false
-  switch (action) {
-    case "pause":
-      success = await agentOrchestrator.pauseGodMode(sessionId)
-      break
-    case "resume":
-      success = await agentOrchestrator.resumeGodMode(sessionId)
-      break
-    case "stop":
-      success = await agentOrchestrator.stopGodMode(sessionId)
-      break
-    default:
+    if (!sessionId || !action) {
       return NextResponse.json(
-        { error: `Unknown action: ${action}` },
+        { error: "Missing required fields: sessionId, action" },
         { status: 400 }
       )
+    }
+
+    let success = false
+    switch (action) {
+      case "pause":
+        success = await agentOrchestrator.pauseGodMode(sessionId)
+        break
+      case "resume":
+        success = await agentOrchestrator.resumeGodMode(sessionId)
+        break
+      case "stop":
+        success = await agentOrchestrator.stopGodMode(sessionId)
+        break
+      default:
+        return NextResponse.json(
+          { error: `Unknown action: ${action}` },
+          { status: 400 }
+        )
+    }
+
+    if (!success) {
+      return NextResponse.json(
+        { error: `Failed to ${action} session. It may not exist or be in an invalid state.` },
+        { status: 404 }
+      )
+    }
+
+    const updatedSession = agentOrchestrator.getSession(sessionId)
+
+    return NextResponse.json({
+      session: updatedSession ? serializeSession(updatedSession) : null,
+    })
   }
-
-  if (!success) {
-    return NextResponse.json(
-      { error: `Failed to ${action} session. It may not exist or be in an invalid state.` },
-      { status: 404 }
-    )
-  }
-
-  const updatedSession = agentOrchestrator.getSession(sessionId)
-
-  return NextResponse.json({
-    session: updatedSession ? serializeSession(updatedSession) : null,
-  })
-})
+)
 
 // Serialize functions to prevent circular references
 function serializeSession(session: any) {

@@ -77,8 +77,10 @@ function OrgProviderInner({ children }: { children: ReactNode }) {
     }
   }
 
+  const refreshOrgs = useCallback(fetchOrgs, [fetchOrgs])
+
   return (
-    <OrgContext.Provider value={{ organization, organizations, loading, switchOrg, refreshOrgs: fetchOrgs }}>
+    <OrgContext.Provider value={{ organization, organizations, loading, switchOrg, refreshOrgs }}>
       {children}
     </OrgContext.Provider>
   )
@@ -86,7 +88,7 @@ function OrgProviderInner({ children }: { children: ReactNode }) {
 
 // ── Combined Auth + Org provider ─────────────────────────────────
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <SessionProvider>
       <OrgProviderInner>
