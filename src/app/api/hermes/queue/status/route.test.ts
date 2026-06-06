@@ -105,20 +105,20 @@ const mockRecentJobs = [
 ]
 
 // ── Mock functions (bare vi.fn with no persistent return values — set in beforeEach) ──
-const mockGetWaitingCount = vi.fn()
-const mockGetActiveCount = vi.fn()
-const mockGetCompletedCount = vi.fn()
-const mockGetFailedCount = vi.fn()
-const mockGetDelayedCount = vi.fn()
-const mockGetJobs = vi.fn()
-const mockFindMany = vi.fn()
-const mockTypeGroupBy = vi.fn()
-const mockStatusGroupBy = vi.fn()
-const mockCount = vi.fn()
+const mockGetWaitingCount = vi.hoisted(() => vi.fn())
+const mockGetActiveCount = vi.hoisted(() => vi.fn())
+const mockGetCompletedCount = vi.hoisted(() => vi.fn())
+const mockGetFailedCount = vi.hoisted(() => vi.fn())
+const mockGetDelayedCount = vi.hoisted(() => vi.fn())
+const mockGetJobs = vi.hoisted(() => vi.fn())
+const mockFindMany = vi.hoisted(() => vi.fn())
+const mockTypeGroupBy = vi.hoisted(() => vi.fn())
+const mockStatusGroupBy = vi.hoisted(() => vi.fn())
+const mockCount = vi.hoisted(() => vi.fn())
 
 // Plain async functions (not vi.fn) — not affected by clearAllMocks
-const mockTypeGroupByFn = () => Promise.resolve(mockTypeAgg)
-const mockStatusGroupByFn = () => Promise.resolve(mockStatusAgg)
+const mockTypeGroupByFn = vi.hoisted(() => () => Promise.resolve(mockTypeAgg))
+const mockStatusGroupByFn = vi.hoisted(() => () => Promise.resolve(mockStatusAgg))
 
 vi.mock("@/lib/hermes/queue", () => ({
   hermesQueue: {

@@ -40,7 +40,7 @@ vi.mock("@/lib/abac", async () => {
 })
 
 // Mock the BullMQ queue so no real Redis connection is attempted
-const mockQueueAdd = vi.fn().mockResolvedValue({ id: "mock-job-1" })
+const mockQueueAdd = vi.hoisted(() => vi.fn().mockResolvedValue({ id: "mock-job-1" }))
 
 vi.mock("@/lib/hermes/queue", () => ({
   hermesQueue: {

@@ -24,7 +24,7 @@ vi.mock("@/lib/auth", () => ({
 }))
 
 // Mock the BullMQ queue so no real Redis connection is attempted
-const mockQueueAdd = vi.fn().mockResolvedValue({ id: "mock-sweep-job-1" })
+const mockQueueAdd = vi.hoisted(() => vi.fn().mockResolvedValue({ id: "mock-sweep-job-1" }))
 
 vi.mock("@/lib/hermes/queue", () => ({
   hermesQueue: {
