@@ -107,10 +107,10 @@ class ButtonSyncManager {
       };
 
       try {
-        // Dynamically import langchain service using a variable so webpack
-        // does not eagerly bundle the server-only @langchain/openai dependency.
-        const langchainPath = "./langchain-service";
-        const langchainModule = await import(langchainPath);
+        // Dynamically import langchain service using dynamic import with a literal
+        // string so webpack does not eagerly bundle the server-only @langchain/openai
+        // dependency into client-side code, while still being statically analyzable.
+        const langchainModule = await import("./langchain-service");
         const lcService = langchainModule.default || langchainModule;
 
         if (lcService && typeof lcService.getEnhancedButtonAction === 'function') {

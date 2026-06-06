@@ -1,65 +1,74 @@
 "use client"
 
 /**
- * PostHog Provider
+ * PostHog Analytics Provider
  *
- * Initializes PostHog analytics on the client side using posthog-js.
- * Wraps the app with PostHogProvider to enable hooks like usePostHog(),
- * useFeatureFlagEnabled(), and automatic $pageview capture.
+ * Provides analytics page view tracking via PostHog when configured.
+ * When NEXT_PUBLIC_POSTHOG_KEY is not set, all components are inert.
  *
- * Environment variables:
+ * We deliberately avoid importing from "posthog-js/react" because
+ * webpack has issues resolving the subpath export. Instead we use
+ * posthog-js directly via dynamic import inside useEffect.
+ *
+ * Environment:
  *   NEXT_PUBLIC_POSTHOG_KEY  — required (phc_xxx)
  *   NEXT_PUBLIC_POSTHOG_HOST — optional (defaults to https://us.i.posthog.com)
  */
 
-import posthog from "posthog-js"
-import { PostHogProvider as PHProvider, usePostHog } from "posthog-js/react"
+import { useEffect, Suspense, type ReactNode } from "react"
 import { usePathname, useSearchParams } from "next/navigation"
-import { useEffect, Suspense } from "react"
-
-// ── Initialize PostHog ────────────────────────────────────────
 
 const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY
-const POSTHOG_HOST =
-  process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com"
 
-if (typeof window !== "undefined" && POSTHOG_KEY) {
-  posthog.init(POSTHOG_KEY, {
-    api_host: POSTHOG_HOST,
-    capture_pageview: false, // We capture manually via PostHogPageView
-    capture_pageleave: true,
-    persistence: "localStorage",
-
-    loaded: (ph) => {
-      // Opt out of session recording if user has DNT enabled
-      if (window.navigator.doNotTrack === "1") {
-        ph.opt_out_capturing()
-      }
-    },
-  })
-}
-
-// ── Page View Tracker (inner component for useSearchParams) ───
+// ── Page View Tracker ───────────────────────────────────────
 
 function PostHogPageViewInner() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const ph = usePostHog()
 
   useEffect(() => {
-    if (pathname && ph) {
-      let url = window.origin + pathname
-      if (searchParams?.toString()) {
-        url = url + `?${searchParams.toString()}`
-      }
-      ph.capture("$pageview", { $current_url: url })
+    if (!pathname || !POSTHOG_KEY) return
+
+    let cancelled = false
+
+    // Dynamically import posthog-js to track pageviews.
+    // This avoids eager bundling and works around webpack subpath issues.
+    import("posthog-js")
+      .then((mod) => {
+        if (cancelled) return
+        const ph = mod.default || mod
+        if (typeof ph.capture !== "function") return
+
+        // Initialize on first use
+        if (!ph.__loaded) {
+          ph.init(POSTHOG_KEY, {
+            api_host:
+              process.env.NEXT_PUBLIC_POSTHOG_HOST ||
+              "https://us.i.posthog.com",
+            capture_pageview: false,
+            capture_pageleave: true,
+            persistence: "localStorage",
+          })
+          ph.__loaded = true
+        }
+
+        let url = window.origin + pathname
+        if (searchParams?.toString()) {
+          url = url + `?${searchParams.toString()}`
+        }
+        ph.capture("$pageview", { $current_url: url })
+      })
+      .catch(() => {
+        // posthog-js not available — page view tracking disabled
+      })
+
+    return () => {
+      cancelled = true
     }
-  }, [pathname, searchParams, ph])
+  }, [pathname, searchParams])
 
   return null
 }
-
-// ── Page View Tracker (wrapped in Suspense) ───────────────────
 
 export function PostHogPageView() {
   return (
@@ -69,13 +78,10 @@ export function PostHogPageView() {
   )
 }
 
-// ── Provider Component ────────────────────────────────────────
+// ── Provider Component ──────────────────────────────────────
+// Simply renders children. No PostHog React context needed since
+// we use posthog-js as a singleton via dynamic import.
 
-export function PostHogProvider({ children }: { children: React.ReactNode }) {
-  if (!POSTHOG_KEY) {
-    // PostHog not configured — render children without tracking
-    return <>{children}</>
-  }
-
-  return <PHProvider client={posthog}>{children}</PHProvider>
+export function PostHogProvider({ children }: { children: ReactNode }) {
+  return <>{children}</>
 }

@@ -10,15 +10,15 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "drizzle-orm": "catalog:",
+    "drizzle-orm": "^0.43.1",
     "better-sqlite3": "^9.6.0"
   },
   "devDependencies": {
-    "@types/node": "catalog:",
+    "@types/node": "^22.10.0",
     "@types/better-sqlite3": "^7.6.8",
-    "drizzle-kit": "^0.31.1",
+    "drizzle-kit": "^0.31.10",
     "drizzle-zod": "^0.7.0",
-    "typescript": "catalog:",
-    "zod": "catalog:"
+    "typescript": "^5.7.2",
+    "zod": "^3.23.8"
   }
 }

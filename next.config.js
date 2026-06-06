@@ -12,8 +12,8 @@ const nextConfig = {
    * this webpack block and the `--webpack` flag can be removed.
    */
   webpack: (config, { isServer }) => {
-    // Follow symlinks (required for pnpm's node_modules structure)
-    config.resolve.symlinks = true
+    // Follow symlinks (not needed for npm, but harmless)
+    config.resolve.symlinks = false
 
     if (!isServer) {
       config.resolve.fallback = {

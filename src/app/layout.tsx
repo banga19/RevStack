@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { ClientShell } from "@/components/client-shell"
-import { PostHogProvider, PostHogPageView } from "@/lib/posthog-provider"
+
 import { allSchemas } from "@/components/json-ld"
 
 export const viewport: Viewport = {
@@ -140,11 +140,8 @@ export default function RootLayout({
         />
       </head>
       <body className={inter.className} suppressHydrationWarning>
-        <PostHogProvider>
-          <PostHogPageView />
-          <JsonLd />
+        <JsonLd />
           <ClientShell>{children}</ClientShell>
-        </PostHogProvider>
       </body>
     </html>
   )

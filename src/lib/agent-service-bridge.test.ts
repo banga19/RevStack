@@ -27,6 +27,7 @@ vi.mock("./db", () => ({
 
 vi.mock("./wati-integration", () => ({
   watiIntegration: {
+    isConfigured: vi.fn().mockReturnValue(true),
     handleIncomingMessage: vi.fn(),
     sendTemplate: vi.fn(),
     sendMessage: vi.fn(),
@@ -51,12 +52,14 @@ vi.mock("./make-integration", () => ({
 
 vi.mock("./zoho-crm-integration", () => ({
   zohoCrmIntegration: {
+    isConfigured: vi.fn().mockReturnValue(true),
     syncClientToCrm: vi.fn(),
   },
 }))
 
 vi.mock("./voiceflow-integration", () => ({
   voiceflowIntegration: {
+    isConfigured: vi.fn().mockReturnValue(true),
     qualifyLead: vi.fn(),
     startDialog: vi.fn(),
   },
@@ -64,6 +67,7 @@ vi.mock("./voiceflow-integration", () => ({
 
 vi.mock("./sokogate-integration", () => ({
   sokogateIntegration: {
+    isConfigured: vi.fn().mockReturnValue(true),
     getSuppliers: vi.fn(),
     getBuyers: vi.fn(),
   },
@@ -71,6 +75,7 @@ vi.mock("./sokogate-integration", () => ({
 
 vi.mock("./instantly-integration", () => ({
   instantlyIntegration: {
+    isConfigured: vi.fn().mockReturnValue(true),
     launchOutreachCampaign: vi.fn(),
   },
 }))

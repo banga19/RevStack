@@ -18,7 +18,7 @@ export const alt = "Mapato — AI-Powered B2B Trade Automation Platform"
 export const size = { width: 1200, height: 630 }
 export const contentType = "image/png"
 
-export default async function GET() {
+export async function GET() {
   return new ImageResponse(
     (
       <div
