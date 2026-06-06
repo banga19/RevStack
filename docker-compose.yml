@@ -1,27 +1,170 @@
-version: "3.8"
+# =============================================================================
+# Mapato / RevStack — Docker Compose
+#
+# Usage:
+#   docker compose up -d                     # Start all services
+#   docker compose up -d app redis chroma    # Start specific services
+#   docker compose run --rm app pnpm run setup  # Run DB setup
+#   docker compose logs -f                   # Follow logs
+#   docker compose down                      # Stop all services
+# =============================================================================
+
+volumes:
+  redis-data:
+  chroma-data:
+  sqlite-data:
+
+networks:
+  mapato-network:
+    driver: bridge
 
 services:
+  # ── Main Next.js Application ──────────────────────────────────────────
   app:
     build:
       context: .
       dockerfile: Dockerfile
+      target: runner
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
       - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-      - DATABASE_URL=${DATABASE_URL:-file:/app/dev.sqlite}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required}
+      - DATABASE_URL=${DATABASE_URL:-file:/app/data/dev.db}
+      - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL:-http://localhost:3000}
+
+      # ── LLM Providers (set at least one) ──────────────────────────
+      - NVIDIA_NIM_API_KEY=${NVIDIA_NIM_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - POSTHOG_API_KEY=${POSTHOG_API_KEY:-}
-      - POSTHOG_HOST=${POSTHOG_HOST:-https://us.i.posthog.com}
+
+      # ── Integrations ──────────────────────────────────────────────
+      - WATI_API_TOKEN=${WATI_API_TOKEN:-}
+      - WATI_WHATSAPP_NUMBER_ID=${WATI_WHATSAPP_NUMBER_ID:-}
+      - ZOHO_CLIENT_ID=${ZOHO_CLIENT_ID:-}
+      - ZOHO_CLIENT_SECRET=${ZOHO_CLIENT_SECRET:-}
+      - ZOHO_REFRESH_TOKEN=${ZOHO_REFRESH_TOKEN:-}
+      - INSTANTLY_API_KEY=${INSTANTLY_API_KEY:-}
+      - VOICEFLOW_API_KEY=${VOICEFLOW_API_KEY:-}
+      - VOICEFLOW_PROJECT_ID=${VOICEFLOW_PROJECT_ID:-}
+      - SOKOGATE_API_KEY=${SOKOGATE_API_KEY:-}
+      - SOKOGATE_API_SECRET=${SOKOGATE_API_SECRET:-}
+
+      # ── Payments ──────────────────────────────────────────────────
+      - FLW_PUBLIC_KEY=${FLW_PUBLIC_KEY:-}
+      - FLW_SECRET_KEY=${FLW_SECRET_KEY:-}
+      - FLW_ENCRYPTION_KEY=${FLW_ENCRYPTION_KEY:-}
+      - FLW_WEBHOOK_HASH=${FLW_WEBHOOK_HASH:-}
+
+      # ── Email ─────────────────────────────────────────────────────
+      - SMTP_HOST=${SMTP_HOST:-smtp.ethereal.email}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+
+      # ── Optional: Redis (for BullMQ / Hermes workers) ─────────────
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+
+      # ── Optional: Google OAuth ────────────────────────────────────
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+
+      # ── Sentry / Observability ────────────────────────────────────
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN:-}
+      - NEXT_PUBLIC_ANALYTICS_PROVIDER=${NEXT_PUBLIC_ANALYTICS_PROVIDER:-}
+
+      # ── Push Notifications ────────────────────────────────────────
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
+
+      # ── Cron ──────────────────────────────────────────────────────
+      - CRON_SECRET=${CRON_SECRET:-}
+
     volumes:
-      - ./dev.sqlite:/app/dev.sqlite
+      - sqlite-data:/app/data
       - ./prisma:/app/prisma
     restart: unless-stopped
+    networks:
+      - mapato-network
+
+  # ── Redis (for BullMQ job queue — optional, only needed for Hermes) ──
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
       retries: 3
-      start_period: 40s
+    restart: unless-stopped
+    profiles:
+      - all
+    networks:
+      - mapato-network
+
+  # ── Chroma (Vector DB for RAG — optional, only needed for RAG pipeline) ─
+  chroma:
+    image: chromadb/chroma:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+      - ANONYMIZED_TELEMETRY=FALSE
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    profiles:
+      - all
+      - rag
+    networks:
+      - mapato-network
+
+  # ── Hermes Worker (Background job processor — optional) ─────────────────
+  hermes-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    command: npx tsx workers/hermes-worker.ts
+    environment:
+      - NODE_ENV=production
+      - RUN_WORKER=true
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=${DATABASE_URL:-file:/app/data/dev.db}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required}
+      # Forward LLM provider keys
+      - NVIDIA_NIM_API_KEY=${NVIDIA_NIM_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # Forward integration keys needed by Hermes
+      - WATI_API_TOKEN=${WATI_API_TOKEN:-}
+      - WATI_WHATSAPP_NUMBER_ID=${WATI_WHATSAPP_NUMBER_ID:-}
+      - SOKOGATE_API_KEY=${SOKOGATE_API_KEY:-}
+      - SOKOGATE_API_SECRET=${SOKOGATE_API_SECRET:-}
+    volumes:
+      - sqlite-data:/app/data
+      - ./workers:/app/workers
+      - ./prisma:/app/prisma
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - all
+      - workers
+    networks:
+      - mapato-network

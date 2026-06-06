@@ -13,20 +13,62 @@ Like Polsia, Mapato runs on a low monthly subscription + success fee model — b
 ### Prerequisites
 
 - **Node.js** v20+ (recommended: v22)
-- **npm** v10+ or **pnpm** v9+
+- **pnpm** v9+ (recommended) or **npm** v10+
+- **Docker** v24+ & **Docker Compose** v2+ (optional — recommended for full stack)
 
-### 1. Clone and install
+### Option A: Local Development (Node + pnpm)
 
 ```bash
 git clone <repo-url> revstack
 cd revstack
 
-# Using npm:
-npm install
-
-# Or using pnpm (recommended for workspace support):
+# Install dependencies:
 pnpm install
+
+# Set up environment:
+cp .env.example .env.local
+# Edit .env.local with your keys (at minimum NEXTAUTH_SECRET)
+
+# Set up database:
+pnpm run setup
+
+# Start dev server:
+pnpm dev
 ```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+### Option B: Docker (Recommended for Full Stack)
+
+```bash
+git clone <repo-url> revstack
+cd revstack
+
+# Copy environment template:
+cp .env.example .env
+# Edit .env — set NEXTAUTH_SECRET at minimum
+
+# Start the app (with Redis + Chroma + Hermes worker):
+docker compose --profile all up -d
+
+# Or just the app:
+docker compose up -d app
+
+# Run database setup:
+docker compose run --rm app pnpm run setup
+
+# Follow logs:
+docker compose logs -f app
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+For development with hot reload:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d app
+```
+
+See [🐳 Docker](#-docker) section below for detailed Docker guidance.
 
 ### 2. Set up environment variables
 
@@ -153,6 +195,260 @@ The **God Mode** orchestrator (`src/lib/agent-orchestrator.ts`) deploys all 5 ag
 - Start, pause, resume, and stop agent sessions
 - View real-time progress bars and task status
 - Review agent reports with insights and metrics
+
+---
+
+## 🧠 Hermes Autonomous Brain – Complete Implementation Guide
+
+Below is the **step‑by‑step integration** of the advanced Hermes system (LangGraph, BullMQ, RAG, tools) into the existing RevStack codebase, including Docker deployment. All code paths are relative to the RevStack root.
+
+### Prerequisites
+
+- Node.js 20+, pnpm
+- Docker & Docker Compose (for full stack)
+- API keys for at least one LLM provider (NVIDIA NIM, DeepSeek, OpenAI) and for WATI, Sokogate, etc.
+
+---
+
+### Phase 1: Install Dependencies
+
+```bash
+cd revstack
+pnpm add @langchain/langgraph @langchain/core @langchain/openai @langchain/community
+pnpm add bullmq ioredis chromadb playwright zod
+pnpm add @resend/node
+pnpm add -D @types/node
+npx playwright install chromium
+```
+
+---
+
+### Phase 2: Set Up Redis & Chroma (Docker)
+
+Create a `docker-compose.yml` in the root (if not already present) with the services described earlier (redis, chromadb, postgres optional). Then start them:
+
+```bash
+docker-compose up -d redis chromadb
+```
+
+---
+
+### Phase 3: Create RAG Knowledge Base
+
+1. Create a folder `knowledge/` and place PDFs/txt files (e.g., `korean_import_rules.txt`, `halal_handbook.pdf`).
+2. Create `scripts/seed-rag.ts` (as shown in previous answer).
+3. Run the seeder:
+
+```bash
+pnpm tsx scripts/seed-rag.ts
+```
+
+---
+
+### Phase 4: Implement LangGraph Tools
+
+Create `src/lib/hermes/tools/` with files:
+
+- `sokogate.ts` – wraps `sokogateIntegration.searchProducts`
+- `exportReadiness.ts` – wraps `calculateERS`
+- `wati.ts` – wraps `watiIntegration.sendTemplate`
+- `email.ts` – wraps Resend / SMTP
+
+Example (`src/lib/hermes/tools/wati.ts`):
+
+```typescript
+import { tool } from "@langchain/core/tools";
+import { z } from "zod";
+import { watiIntegration } from "@/lib/wati-integration";
+
+export const watiSendTemplate = tool(
+  async ({ phone, templateName, parameters }) => {
+    const result = await watiIntegration.sendTemplate(phone, templateName, parameters);
+    return JSON.stringify(result);
+  },
+  {
+    name: "wati_send_template",
+    description: "Send a WhatsApp template message via WATI.io",
+    schema: z.object({
+      phone: z.string(),
+      templateName: z.string(),
+      parameters: z.array(z.string()).optional(),
+    }),
+  }
+);
+```
+
+---
+
+### Phase 5: Build the LangGraph Sales Pipeline
+
+Create `src/lib/hermes/sales-graph.ts` with the state graph (score → outreach → follow_up → close). Use the model with bound tools.
+
+```typescript
+import { StateGraph, Annotation } from "@langchain/langgraph";
+import { ChatOpenAI } from "@langchain/openai";
+import { sokogateProductSearch, exportReadinessCalculator, watiSendTemplate, emailSendSequence } from "./tools";
+
+const SalesState = Annotation.Root({
+  lead: Annotation<{ id: string; phone: string; email: string; companyName: string; productInterest: string }>,
+  stage: Annotation<string>,
+  score: Annotation<number>,
+  messages: Annotation<any[]>,
+});
+
+const model = new ChatOpenAI({ model: "gpt-4o", temperature: 0 }).bindTools([
+  sokogateProductSearch,
+  exportReadinessCalculator,
+  watiSendTemplate,
+  emailSendSequence,
+]);
+
+// ... nodes and conditional edges
+export const salesGraph = workflow.compile();
+```
+
+---
+
+### Phase 6: BullMQ Queue & Worker
+
+Create `src/lib/hermes/queue.ts`:
+
+```typescript
+import { Queue, Worker } from "bullmq";
+import IORedis from "ioredis";
+import { salesGraph } from "@/lib/hermes/sales-graph";
+import { prisma } from "@/lib/db";
+
+export const redis = new IORedis(process.env.REDIS_URL!);
+export const hermesQueue = new Queue("hermes-tasks", { connection: redis });
+
+if (process.env.NODE_ENV !== "production" || process.env.RUN_WORKER === "true") {
+  new Worker("hermes-tasks", async (job) => {
+    const { leadId } = job.data;
+    const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+    if (!lead) return;
+    const result = await salesGraph.invoke({ lead, stage: "start", score: 0, messages: [] });
+    await prisma.hermesRun.create({ data: { leadId, stage: result.stage, output: JSON.stringify(result) } });
+  }, { connection: redis });
+}
+```
+
+Create a dedicated worker entrypoint `workers/hermes-worker.ts` that only imports and starts the worker (for Docker).
+
+---
+
+### Phase 7: API Route for Manual Triggering
+
+Create `app/api/hermes/run/route.ts`:
+
+```typescript
+import { hermesQueue } from "@/lib/hermes/queue";
+import { getServerSession } from "next-auth";
+import { defineRulesFor } from "@/lib/abac";
+
+export async function POST(req: Request) {
+  const session = await getServerSession();
+  const ability = defineRulesFor(session?.user);
+  if (!ability.can("trigger", "HermesRun")) {
+    return new Response("Forbidden", { status: 403 });
+  }
+  const { leadId } = await req.json();
+  await hermesQueue.add("process-lead", { leadId });
+  return Response.json({ queued: true });
+}
+```
+
+---
+
+### Phase 8: Scheduled Runs (Cron)
+
+Use BullMQ's repeatable jobs. Create a one‑time script `scripts/schedule-hermes-cron.ts`:
+
+```typescript
+import { hermesQueue } from "@/lib/hermes/queue";
+await hermesQueue.add("sweep", { allLeads: true }, { repeat: { pattern: "0 */6 * * *" } });
+```
+
+Run it once (e.g., during deployment). For Vercel, use Vercel Cron Jobs to call an API endpoint that adds the job.
+
+---
+
+### Phase 9: Extend Admin Panel
+
+In `app/admin/hermes/page.tsx`, add:
+
+- Queue status (using `hermesQueue.getJobCounts()`)
+- List of recent `HermesRun` records from database
+- Manual trigger form (lead ID input or "Run for all leads")
+- Button to retry failed jobs
+
+---
+
+### Phase 10: Update ABAC Policies
+
+The ABAC system already supports the `"hermes-runs"` resource (see `src/lib/abac.ts`). Hook it up via:
+
+```typescript
+can("admin", "hermes-runs");
+```
+
+Protect the new API route with middleware – already handled by the `matcher` in `middleware.ts`.
+
+---
+
+### Phase 11: Unit Tests
+
+Create `__tests__/hermes/sales-graph.test.ts` and `__tests__/hermes/tools.test.ts`. Use Vitest. Example:
+
+```typescript
+import { describe, it, expect, vi } from "vitest";
+import { salesGraph } from "@/lib/hermes/sales-graph";
+
+vi.mock("@/lib/hermes/tools/wati", () => ({ watiSendTemplate: vi.fn() }));
+
+it("should transition to outreach when score > 60", async () => {
+  const result = await salesGraph.invoke({ lead: { score: 70, ...mockLead } });
+  expect(result.stage).toBe("outreach_sent");
+});
+```
+
+---
+
+### Phase 12: Docker Deployment (Full Stack)
+
+See the [🐳 Docker](#-docker) section below for the complete Docker setup guide, including production Dockerfile, docker-compose.yml with Redis + Chroma, Hermes worker, and development overrides.
+
+```bash
+# Start everything (app + Redis + Chroma + Hermes worker):
+docker compose --profile all up -d
+
+# Run setup:
+docker compose run --rm app pnpm run setup
+
+# Seed RAG:
+docker compose run --rm app pnpm tsx scripts/seed-rag.ts
+```
+
+Access the app at `http://localhost:3000`.
+
+---
+
+### ✅ Final Implementation Checklist
+
+- [ ] PWA enabled (manifest, service worker, icons)
+- [ ] Redis & Chroma running (Docker)
+- [ ] RAG knowledge base seeded
+- [ ] LangGraph tools implemented for WATI, Sokogate, ERS, Email
+- [ ] Sales graph created with scoring, outreach, follow‑up, close nodes
+- [ ] BullMQ queue and worker integrated
+- [ ] API route `/api/hermes/run` protected by ABAC
+- [ ] Scheduled runs every 6 hours
+- [ ] Admin panel extended with Hermes controls
+- [ ] Unit tests for Hermes (≥80% coverage)
+- [ ] Docker‑compose stack working end‑to‑end
+- [ ] PWA installable on all devices
+
+Once all steps are completed, RevStack will operate as a **silent autonomous income engine**: sourcing products from Sokogate, scoring exporters with RAG‑augmented intelligence, executing WhatsApp/email sequences via LangGraph, and closing deals – all containerized and installable as a PWA.
 
 ---
 
@@ -606,6 +902,330 @@ RevStack/
 | `npx tsx scripts/test-deepseek.ts` | Test DeepSeek API |
 
 ---
+
+## 📱 PWA – Install RevStack as a Desktop/Mobile App
+
+RevStack can be installed as a **Progressive Web App (PWA)** on Android, iOS, and desktop. Once installed, it behaves like a native app: offline support, home screen icon, push notifications (optional), and full‑screen experience.
+
+### How to Enable PWA in RevStack
+
+We use `next-pwa` (built on Workbox) to generate the service worker and manifest.
+
+#### 1. Install `next-pwa`
+
+```bash
+npm install next-pwa
+```
+
+#### 2. Configure `next.config.js`
+
+```javascript
+// next.config.js
+const withPWA = require('next-pwa')({
+  dest: 'public',
+  register: true,
+  skipWaiting: true,
+  disable: process.env.NODE_ENV === 'development',
+  buildExcludes: [/middleware-manifest\.json$/],
+  runtimeCaching: [
+    {
+      urlPattern: /^https:\/\/fonts\.(?:googleapis|gstatic)\.com\/.*/i,
+      handler: 'CacheFirst',
+      options: { cacheName: 'google-fonts', expiration: { maxEntries: 4, maxAgeSeconds: 365 * 24 * 60 * 60 } }
+    },
+    {
+      urlPattern: /\.(?:eot|otf|ttc|ttf|woff|woff2|font.css)$/i,
+      handler: 'StaleWhileRevalidate',
+      options: { cacheName: 'static-font-assets' }
+    },
+    {
+      urlPattern: /\.(?:jpg|jpeg|gif|png|svg|ico|webp)$/i,
+      handler: 'CacheFirst',
+      options: { cacheName: 'static-image-assets', expiration: { maxEntries: 64, maxAgeSeconds: 30 * 24 * 60 * 60 } }
+    },
+    // Add more rules for API calls if needed
+  ],
+});
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+  swcMinify: true,
+  // ... other existing config
+};
+
+module.exports = withPWA(nextConfig);
+```
+
+#### 3. Create a Web App Manifest
+
+The manifest is already at `public/manifest.json` — update the `name`, `short_name`, `description`, and `icons` paths to match your RevStack brand if needed.
+
+#### 4. Link Manifest in `app/layout.tsx`
+
+Already configured — the layout exports `manifest: "/manifest.json"` in its metadata.
+
+#### 5. Add Service Worker Registration
+
+`next-pwa` injects the registration script automatically in production builds.
+
+#### 6. Test PWA
+
+Build the app:
+
+```bash
+npm run build
+npm start
+```
+
+Then open Chrome DevTools → Application → Manifest to verify. Click the install icon in the address bar.
+
+### PWA Download Process – User Guide
+
+```markdown
+## 📲 Install RevStack as an App (PWA)
+
+You can install RevStack on your device for one‑click access, offline support, and push notifications.
+
+### On Android (Chrome / Edge / Samsung Internet)
+
+1. Open RevStack in your browser (e.g., `https://yourdomain.com`).
+2. Tap the **three dots** menu → **Install app** (or **Add to Home screen**).
+3. Confirm the name "RevStack" and tap **Install**.
+4. The app icon appears on your home screen – tap to open like a native app.
+
+### On iPhone / iPad (Safari)
+
+1. Open RevStack in Safari.
+2. Tap the **Share** button (box with arrow up).
+3. Scroll down and tap **Add to Home Screen**.
+4. Edit the name if desired, then tap **Add**.
+5. The icon will appear on your home screen.
+
+### On Desktop (Chrome / Edge)
+
+1. Visit RevStack.
+2. Click the **install icon** (🔽) in the address bar, or go to the Chrome menu → **Install RevStack…**.
+3. Click **Install** – a standalone window opens.
+
+### Offline Mode
+
+Once installed, the app will cache the core UI and static assets. API calls that require network will show a friendly message when offline.
+
+### Push Notifications (optional)
+
+If enabled by the admin, you will receive real‑time alerts for new leads, Hermes run completions, and follow‑up reminders. Grant notification permission when prompted.
+```
+
+---
+
+## 🐳 Docker
+
+Mapato is fully containerized for consistent development, testing, and production environments. The Docker setup includes:
+
+- **Multi-stage Dockerfile** — pnpm-based, Prisma-aware, non-root user
+- **docker-compose.yml** — app, Redis (BullMQ), Chroma (RAG), Hermes worker services
+- **docker-compose.dev.yml** — hot-reload override for local development
+- **Profiles** — opt-in services (`--profile all`, `--profile workers`, `--profile rag`)
+
+### Prerequisites
+
+- Docker v24+ and Docker Compose v2+
+
+### Quick Start
+
+```bash
+# 1. Clone and enter the project
+git clone <repo-url> revstack
+cd revstack
+
+# 2. Copy environment template and set required variables
+cp .env.example .env
+# Edit .env — at minimum, set:
+#   NEXTAUTH_SECRET=$(openssl rand -base64 32)
+
+# 3. Start all services (app + Redis + Chroma + Hermes worker)
+docker compose --profile all up -d
+
+# 4. Run database setup
+docker compose run --rm app pnpm run setup
+
+# 5. Open http://localhost:3000
+```
+
+### Available Profiles
+
+| Profile  | Services                          | When to use                          |
+|----------|-----------------------------------|--------------------------------------|
+| _(none)_ | app only                          | Basic app testing                    |
+| `all`    | app + redis + chroma + worker     | Full stack                           |
+| `workers`| app + redis + worker              | Hermes background jobs               |
+| `rag`    | app + chroma                      | RAG knowledge base pipeline          |
+
+Use profiles with:
+```bash
+docker compose --profile all up -d
+```
+
+### Docker Development (Hot Reload)
+
+For local development with live code reloading, use the dev override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d app
+```
+
+This mounts your source code into the container so Next.js hot-reload works. Changes to `src/`, `public/`, `prisma/`, and config files are reflected immediately.
+
+For full stack dev with all services:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile all up -d
+```
+
+### Common Docker Commands
+
+```bash
+# Build images (no cache)
+docker compose build --no-cache
+
+# Start services
+docker compose up -d
+
+# View logs
+docker compose logs -f app
+
+# Run one-off commands (e.g., seed RAG)
+docker compose run --rm app pnpm tsx scripts/seed-rag.ts
+
+# Run tests
+docker compose run --rm app npx vitest run
+
+# Open a shell inside the container
+docker compose exec app sh
+
+# Stop all services
+docker compose down
+
+# Stop and remove volumes (WARNING: deletes data)
+docker compose down -v
+```
+
+### Services Overview
+
+#### 1. App (`app`)
+The main Next.js application container. Built from the multi-stage Dockerfile with:
+- pnpm for dependency management
+- Prisma client generation at build time
+- Non-root `nextjs` user for security
+- Health check at `/api/health`
+- SQLite database persisted via Docker volume
+
+#### 2. Redis (`redis`)
+In-memory data store for BullMQ job queue. Required when running Hermes background workers.
+- Port: `6379`
+- Persisted via `redis-data` volume
+- Health-checked with `redis-cli ping`
+
+#### 3. Chroma (`chroma`)
+Vector database for the RAG (Retrieval-Augmented Generation) knowledge base.
+- Port: `8000`
+- Persisted via `chroma-data` volume
+- Telemetry disabled by default
+
+#### 4. Hermes Worker (`hermes-worker`)
+Background job processor for the Hermes autonomous agent. Processes BullMQ jobs from Redis.
+- Requires Redis (`depends_on`)
+- Set `RUN_WORKER=true`
+- Uses the same codebase and environment as the app
+
+### Environment Variables for Docker
+
+Create a `.env` file in the project root (copied from `.env.example`). The docker-compose file reads variables from this file automatically.
+
+**Minimum required:**
+```bash
+NEXTAUTH_SECRET=your-random-secret-here
+```
+
+**Set at least one LLM provider** (for AI agent features):
+```bash
+NVIDIA_NIM_API_KEY=nvapi-your-key
+# or
+DEEPSEEK_API_KEY=sk-your-key
+# or
+OPENAI_API_KEY=sk-your-key
+```
+
+All other variables are optional. Services that are not configured run in simulation mode.
+
+### Dockerfile Details
+
+The `Dockerfile` uses a multi-stage build:
+
+| Stage     | Description                                      |
+|-----------|--------------------------------------------------|
+| `base`    | Node.js 20 Alpine + pnpm via corepack            |
+| `deps`    | Installs all dependencies (cached for speed)     |
+| `builder` | Generates Prisma client + builds Next.js app     |
+| `runner`  | Production image — minimal, non-root, ready to run |
+
+Build just the runner stage:
+```bash
+docker compose build app
+```
+
+Or build manually:
+```bash
+docker build --target runner -t mapato .
+docker run -p 3000:3000 --env-file .env mapato
+```
+
+### Production Deployment
+
+For production deployment on a VPS or cloud server:
+
+```bash
+# Clone on server
+git clone <repo-url> revstack
+cd revstack
+
+# Configure environment
+cp .env.example .env
+# Edit .env with production values (set DATABASE_URL for PostgreSQL, etc.)
+
+# Start services
+docker compose --profile all up -d
+
+# Verify health
+curl http://localhost:3000/api/health
+```
+
+#### Reverse Proxy (Nginx)
+
+For production, place Nginx in front of the app:
+
+```nginx
+server {
+    listen 80;
+    server_name yourdomain.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+---
+
+## 🌐 Key Integrations
 
 ## 🌐 Key Integrations
 

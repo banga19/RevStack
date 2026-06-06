@@ -9,6 +9,7 @@ allowBuilds:
   better-sqlite3: false
   core-js: set this to true or false
   esbuild: false
+  msgpackr-extract: set this to true or false
   prisma: false
   sharp: false
   unrs-resolver: false
@@ -25,7 +26,7 @@ catalog:
   react-dom: "^19.1.0"
   "@tanstack/react-query": "^5.80.5"
   drizzle-orm: "^0.43.1"
-  zod: "^3.25.0"
+  zod: "^3.25.76"
   lucide-react: "^0.511.0"
   framer-motion: "^12.17.0"
   clsx: "^2.1.1"

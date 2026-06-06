@@ -1,0 +1,59 @@
+# =============================================================================
+# Mapato / RevStack — Development Override
+#
+# Provides hot-reload for local development. Mounts source code and starts
+# Next.js dev server with Turbopack fallback.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d app
+#
+# Or with all services (Redis + Chroma + Hermes worker):
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml \
+#     --profile all up -d
+# =============================================================================
+
+services:
+  app:
+    build:
+      target: deps  # Only install dependencies (no prod build)
+    entrypoint: ["pnpm", "dev"]
+    environment:
+      - NODE_ENV=development
+    volumes:
+      # Mount source code for hot reload
+      - ./src:/app/src
+      - ./public:/app/public
+      - ./prisma:/app/prisma
+      - ./lib:/app/lib
+      - ./scripts:/app/scripts
+      - ./workers:/app/workers
+      - ./next.config.js:/app/next.config.js
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./tailwind.config.ts:/app/tailwind.config.ts
+      - ./postcss.config.js:/app/postcss.config.js
+      - ./middleware.ts:/app/middleware.ts
+      - ./proxy.ts:/app/proxy.ts
+      - ./sentry.client.config.ts:/app/sentry.client.config.ts
+      - ./sentry.server.config.ts:/app/sentry.server.config.ts
+      # Persist SQLite database
+      - sqlite-data:/app/data
+    ports:
+      - "3000:3000"
+
+  hermes-worker:
+    build:
+      target: deps
+    entrypoint: ["npx", "tsx", "watch", "workers/hermes-worker.ts"]
+    environment:
+      - NODE_ENV=development
+      - RUN_WORKER=true
+    volumes:
+      - ./src:/app/src
+      - ./lib:/app/lib
+      - ./workers:/app/workers
+      - ./scripts:/app/scripts
+      - ./prisma:/app/prisma
+      - sqlite-data:/app/data
+    profiles:
+      - all
+      - workers
