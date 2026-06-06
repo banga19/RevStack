@@ -13,12 +13,12 @@
  * Security: Validates via x-cron-secret header or admin session.
  *
  * Add to your cron provider:
- *   Schedule: 0 */6 * * *  (every 6 hours)
+ *   Schedule: every 6 hours (e.g. cron expression: 0 /6 * * *)
  *   URL: https://your-domain.com/api/cron/hermes-sweep
  *   Headers: x-cron-secret: <your-secret>
  *
  * Or for a daily full sweep:
- *   Schedule: 0 7 * * *
+ *   Schedule: daily at 7 AM (0 7 * * *)
  *   URL: https://your-domain.com/api/cron/hermes-sweep?mode=full
  */
 

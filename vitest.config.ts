@@ -12,7 +12,7 @@ export default defineConfig({
         inline: ["next-auth"],
       },
     },
-    exclude: ["**/lib/db/src/schema/__tests__/**"],
+    exclude: ["**/lib/db/src/schema/__tests__/**", "**/node_modules/**"],
   },
   resolve: {
     alias: {
