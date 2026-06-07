@@ -28,4 +28,5 @@ prisma/dev.db-journal
 
 # Generated type declarations
 types/
+!types/web-push.d.ts
 
