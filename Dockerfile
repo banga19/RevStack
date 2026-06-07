@@ -9,7 +9,7 @@
 # =============================================================================
 
 # ── Base stage ──────────────────────────────────────────────────────────────
-FROM node:20-alpine AS base
+FROM node:22.13-alpine AS base
 
 # Enable pnpm via corepack (bundled with Node.js 20+)
 RUN corepack enable && corepack prepare pnpm@latest --activate
