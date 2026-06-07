@@ -25,7 +25,8 @@ import { prisma } from "@/lib/db"
 
 export const GET = withAbac(RESOURCES["hermes-runs"], "admin", async (req: NextRequest, { session }) => {
   const { searchParams } = new URL(req.url)
-  const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "25", 10) || 25, 1), 100)
+  const raw = parseInt(searchParams.get("limit") || "25", 10)
+  const limit = Math.min(Math.max(isNaN(raw) ? 25 : raw, 1), 100)
 
   try {
     // ── BullMQ queue metrics (parallel) ──────────────────────

@@ -16,9 +16,52 @@ services:
   app:
     build:
       target: deps  # Only install dependencies (no prod build)
-    entrypoint: ["pnpm", "dev"]
+    command: sh -c "npx prisma generate && pnpm dev"
     environment:
       - NODE_ENV=development
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-dev-secret-change-in-production}
+      - DATABASE_URL=${DATABASE_URL:-file:/app/data/dev.db}
+      - REDIS_URL=redis://redis:6379
+      - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL:-http://localhost:3000}
+      # LLM Providers
+      - NVIDIA_NIM_API_KEY=${NVIDIA_NIM_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # Integrations
+      - WATI_API_TOKEN=${WATI_API_TOKEN:-}
+      - WATI_WHATSAPP_NUMBER_ID=${WATI_WHATSAPP_NUMBER_ID:-}
+      - ZOHO_CLIENT_ID=${ZOHO_CLIENT_ID:-}
+      - ZOHO_CLIENT_SECRET=${ZOHO_CLIENT_SECRET:-}
+      - ZOHO_REFRESH_TOKEN=${ZOHO_REFRESH_TOKEN:-}
+      - INSTANTLY_API_KEY=${INSTANTLY_API_KEY:-}
+      - VOICEFLOW_API_KEY=${VOICEFLOW_API_KEY:-}
+      - VOICEFLOW_PROJECT_ID=${VOICEFLOW_PROJECT_ID:-}
+      - SOKOGATE_API_KEY=${SOKOGATE_API_KEY:-}
+      - SOKOGATE_API_SECRET=${SOKOGATE_API_SECRET:-}
+      # Payments
+      - FLW_PUBLIC_KEY=${FLW_PUBLIC_KEY:-}
+      - FLW_SECRET_KEY=${FLW_SECRET_KEY:-}
+      - FLW_ENCRYPTION_KEY=${FLW_ENCRYPTION_KEY:-}
+      - FLW_WEBHOOK_HASH=${FLW_WEBHOOK_HASH:-}
+      # Email
+      - SMTP_HOST=${SMTP_HOST:-smtp.ethereal.email}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      # Google OAuth
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      # Sentry / Observability
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN:-}
+      - NEXT_PUBLIC_ANALYTICS_PROVIDER=${NEXT_PUBLIC_ANALYTICS_PROVIDER:-}
+      # Push Notifications
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
+      # Cron
+      - CRON_SECRET=${CRON_SECRET:-}
     volumes:
       # Mount source code for hot reload
       - ./src:/app/src
@@ -35,18 +78,39 @@ services:
       - ./proxy.ts:/app/proxy.ts
       - ./sentry.client.config.ts:/app/sentry.client.config.ts
       - ./sentry.server.config.ts:/app/sentry.server.config.ts
-      # Persist SQLite database
+      # Persist SQLite database (for dev without PostgreSQL)
       - sqlite-data:/app/data
     ports:
       - "3000:3000"
+    # Dev mode uses SQLite by default (no external DB dependency)
+    # Override with: DATABASE_URL=postgresql://mapato:mapato_secret@postgres:5432/mapato
+    depends_on: {}
 
   hermes-worker:
     build:
       target: deps
-    entrypoint: ["npx", "tsx", "watch", "workers/hermes-worker.ts"]
+    command: sh -c "npx prisma generate && npx tsx watch workers/hermes-worker.ts"
     environment:
       - NODE_ENV=development
       - RUN_WORKER=true
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=${DATABASE_URL:-file:/app/data/dev.db}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-dev-secret-change-in-production}
+      # LLM provider keys
+      - NVIDIA_NIM_API_KEY=${NVIDIA_NIM_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # Integration keys needed by Hermes
+      - WATI_API_TOKEN=${WATI_API_TOKEN:-}
+      - WATI_WHATSAPP_NUMBER_ID=${WATI_WHATSAPP_NUMBER_ID:-}
+      - SOKOGATE_API_KEY=${SOKOGATE_API_KEY:-}
+      - SOKOGATE_API_SECRET=${SOKOGATE_API_SECRET:-}
+      # Email
+      - SMTP_HOST=${SMTP_HOST:-smtp.ethereal.email}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
     volumes:
       - ./src:/app/src
       - ./lib:/app/lib
@@ -57,3 +121,15 @@ services:
     profiles:
       - all
       - workers
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ── Development-only: expose service ports to the host ───────────────
+  redis:
+    ports:
+      - "6379:6379"
+
+  chroma:
+    ports:
+      - "8000:8000"

@@ -1,13 +1,9 @@
 // =============================================================================
-// RevStack / Mapato — Database Schema (SQLite — Default for Local Dev)
+// RevStack / Mapato — PostgreSQL Schema (Production / Docker)
 //
-// SQLite is used by default for local development without Docker.
-// For Docker / production, the Dockerfile copies schema.postgres.prisma
-// (PostgreSQL) over this file before running prisma generate.
-//
-// To switch manually:
-//   pnpm db:use:postgres   # switch to PostgreSQL
-//   pnpm db:use:sqlite     # switch back to SQLite
+// Used by docker-compose.yml when running with the PostgreSQL service.
+// For local development without Docker, use schema.prisma (SQLite) instead.
+// Switch with:  cp prisma/schema.postgres.prisma prisma/schema.prisma
 // =============================================================================
 
 generator client {
@@ -15,7 +11,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

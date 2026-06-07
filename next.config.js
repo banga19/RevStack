@@ -54,6 +54,11 @@ const nextConfig = {
         "node:timers": false,
         "node:module": false,
       }
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        "@prisma/client/index-browser": false,
+        "@prisma/client/runtime/index-browser": false,
+      }
     }
     return config
   },
@@ -106,6 +111,7 @@ const nextConfig = {
     "@langchain/community",
     "@langchain/openai",
     "@langchain/langgraph",
+    "@prisma/client",
   ],
 }
 

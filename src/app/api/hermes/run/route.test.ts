@@ -299,7 +299,7 @@ describe("POST /api/hermes/run", () => {
       expect(data.error).toBe("leadId is required and must be a string")
     })
 
-    it("passes an empty-string leadId through to the queue (no trim guard)", async () => {
+    it("rejects an empty-string leadId as invalid", async () => {
       const req = new NextRequest("http://localhost:3000/api/hermes/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -309,9 +309,9 @@ describe("POST /api/hermes/run", () => {
       const response = await POST(req)
       const data = await response.json()
 
-      // Empty string is still a string, so it passes the typeof check
-      expect(response.status).toBe(200)
-      expect(mockQueueAdd).toHaveBeenCalled()
+      expect(response.status).toBe(400)
+      expect(data.error).toBe("leadId is required and must be a string")
+      expect(mockQueueAdd).not.toHaveBeenCalled()
     })
   })
 })

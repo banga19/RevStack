@@ -1,6 +1,7 @@
-#!/usr/bin/env tsx
 /**
  * Hermes Cron Schedule — One-Time BullMQ Repeatable Job Registration
+ *
+ * Run with: npx tsx scripts/schedule-hermes-cron.ts
  *
  * Registers repeatable jobs on the Hermes BullMQ queue so the autonomous
  * sales pipeline runs on a scheduled cadence without needing an external
@@ -18,13 +19,9 @@
  *   npx tsx scripts/schedule-hermes-cron.ts --dry-run
  *
  * Schedules registered:
- *   ┌─────────────────────┬─────────────────┬──────────────────────────────┐
- *   │ Job                 │ Cron Pattern    │ Cadence                      │
- *   ├─────────────────────┼─────────────────┼──────────────────────────────┤
- *   │ quick-health-check  │ 0 */6 * * *    │ Every 6 hours (at :00)       │
- *   │ sweep-leads         │ 0 7 * * *      │ Daily at 7 AM UTC            │
- *   │ retry-failed        │ 0 5 * * *      │ Daily at 5 AM UTC            │
- *   └─────────────────────┴─────────────────┴──────────────────────────────┘
+ *   - quick-health-check  | every 6 hours  | 0 0,6,12,18 * * *
+ *   - sweep-leads         | daily at 7 AM  | 0 7 * * *
+ *   - retry-failed        | daily at 5 AM  | 0 5 * * *
  *
  * Environment:
  *   REDIS_URL   (optional, default: redis://localhost:6379)
@@ -157,7 +154,7 @@ async function main() {
 
   // ── Create queue and register repeatable jobs ────────────
   divider("Registering Repeatable Jobs")
-  const queue = new Queue("hermes-tasks", { connection: redis })
+  const queue = new Queue("hermes-tasks", { connection: redis as any })
 
   let registered = 0
   let skipped = 0

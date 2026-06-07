@@ -23,7 +23,7 @@ const SendTemplateSchema = z.object({
 })
 
 export const watiSendTemplate = tool(
-  async ({ phone, templateName, parameters }) => {
+  async ({ phone, templateName, parameters }: { phone: string; templateName: string; parameters?: string[] }) => {
     try {
       const { watiIntegration } = await import("@/lib/wati-integration")
       const result = await watiIntegration.sendTemplate(phone, templateName, parameters)
@@ -55,7 +55,7 @@ const SendMessageSchema = z.object({
 })
 
 export const watiSendMessage = tool(
-  async ({ phone, message }) => {
+  async ({ phone, message }: { phone: string; message: string }) => {
     try {
       const { watiIntegration } = await import("@/lib/wati-integration")
       const result = await watiIntegration.sendMessage(phone, message)

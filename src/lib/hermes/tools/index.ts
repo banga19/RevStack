@@ -13,27 +13,23 @@
  */
 
 // ── WATI.io WhatsApp ─────────────────────────────────────────
-export { watiSendTemplate, watiSendMessage } from "./wati"
+import { watiSendTemplate, watiSendMessage } from "./wati"
 
 // ── Sokogate Trade Platform ──────────────────────────────────
-export {
+import {
   sokogateSearchProducts,
-  // Alias for README Phase 5 compatibility
-  sokogateSearchProducts as sokogateProductSearch,
   sokogateFindMatches,
   sokogateGetBuyers,
 } from "./sokogate"
 
 // ── Export Readiness Score (ERS) ────────────────────────────
-export {
+import {
   calculateERS,
-  // Alias for README Phase 5 compatibility
-  calculateERS as exportReadinessCalculator,
   getERSReadiness,
 } from "./exportReadiness"
 
 // ── Email ────────────────────────────────────────────────────
-export { emailSendSequence, emailSendWelcome } from "./email"
+import { emailSendSequence, emailSendWelcome } from "./email"
 
 // ============================================================
 // All Tools Array
@@ -57,3 +53,15 @@ export const allHermesTools = [
   emailSendSequence,
   emailSendWelcome,
 ]
+
+export {
+  watiSendTemplate,
+  watiSendMessage,
+  sokogateSearchProducts,
+  sokogateFindMatches,
+  sokogateGetBuyers,
+  calculateERS,
+  getERSReadiness,
+  emailSendSequence,
+  emailSendWelcome,
+}

@@ -25,6 +25,7 @@ WORKDIR /app
 COPY package.json pnpm-workspace.yaml ./
 COPY lib/db/package.json ./lib/db/
 COPY lib/api-spec/package.json ./lib/api-spec/
+COPY scripts/package.json ./scripts/
 
 # Install dependencies
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
@@ -36,6 +37,10 @@ WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# Use PostgreSQL schema for Docker/production builds
+# (The default schema.prisma uses SQLite for local dev without Docker)
+RUN cp prisma/schema.postgres.prisma prisma/schema.prisma
 
 # Generate Prisma client (binary must match the container environment)
 RUN npx prisma generate
@@ -64,6 +69,11 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/next.config.js ./next.config.js
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/.env.example ./.env.example
+COPY --from=builder /app/workers ./workers
+COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/lib ./lib
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
 # Grant permissions to the nextjs user
 RUN chown -R nextjs:nodejs /app

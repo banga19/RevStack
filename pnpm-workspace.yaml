@@ -2,14 +2,20 @@ packages:
   - "artifacts/*"
   - "lib/*"
   - "scripts"
+
+# Force a single version of ioredis to avoid TypeScript type conflicts
+# (bullmq@5.78.0 depends on ioredis@5.10.1, project uses ioredis@5.11.1)
+overrides:
+  ioredis: 5.11.1
+
 allowBuilds:
   '@prisma/client': false
   '@prisma/engines': false
   '@sentry/cli': false
   better-sqlite3: false
-  core-js: set this to true or false
+  core-js: true
   esbuild: false
-  msgpackr-extract: set this to true or false
+  msgpackr-extract: true
   prisma: false
   sharp: false
   unrs-resolver: false

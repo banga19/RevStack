@@ -1,5 +1,5 @@
 # =============================================================================
-# Mapato / RevStack — Docker Compose
+# Mapato / RevStack — Docker Compose (Production)
 #
 # Usage:
 #   docker compose up -d                     # Start all services
@@ -7,11 +7,15 @@
 #   docker compose run --rm app pnpm run setup  # Run DB setup
 #   docker compose logs -f                   # Follow logs
 #   docker compose down                      # Stop all services
+#
+# For local development, add the dev override:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 # =============================================================================
 
 volumes:
   redis-data:
   chroma-data:
+  postgres-data:
   sqlite-data:
 
 networks:
@@ -19,6 +23,25 @@ networks:
     driver: bridge
 
 services:
+  # ── PostgreSQL (Primary database for production) ───────────────────────
+  postgres:
+    image: postgres:16-alpine
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mapato}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mapato_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-mapato}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mapato} -d ${POSTGRES_DB:-mapato}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - mapato-network
+
   # ── Main Next.js Application ──────────────────────────────────────────
   app:
     build:
@@ -31,7 +54,7 @@ services:
       - NODE_ENV=production
       - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required}
-      - DATABASE_URL=${DATABASE_URL:-file:/app/data/dev.db}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://mapato:mapato_secret@postgres:5432/mapato}
       - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL:-http://localhost:3000}
 
       # ── LLM Providers (set at least one) ──────────────────────────
@@ -84,8 +107,10 @@ services:
       - CRON_SECRET=${CRON_SECRET:-}
 
     volumes:
-      - sqlite-data:/app/data
       - ./prisma:/app/prisma
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - mapato-network
@@ -93,8 +118,6 @@ services:
   # ── Redis (for BullMQ job queue — optional, only needed for Hermes) ──
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -110,9 +133,7 @@ services:
 
   # ── Chroma (Vector DB for RAG — optional, only needed for RAG pipeline) ─
   chroma:
-    image: chromadb/chroma:latest
-    ports:
-      - "8000:8000"
+    image: chromadb/chroma:1.5.9
     volumes:
       - chroma-data:/chroma/chroma
     environment:
@@ -143,7 +164,7 @@ services:
       - NODE_ENV=production
       - RUN_WORKER=true
       - REDIS_URL=redis://redis:6379
-      - DATABASE_URL=${DATABASE_URL:-file:/app/data/dev.db}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://mapato:mapato_secret@postgres:5432/mapato}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required}
       # Forward LLM provider keys
       - NVIDIA_NIM_API_KEY=${NVIDIA_NIM_API_KEY:-}
@@ -155,11 +176,16 @@ services:
       - WATI_WHATSAPP_NUMBER_ID=${WATI_WHATSAPP_NUMBER_ID:-}
       - SOKOGATE_API_KEY=${SOKOGATE_API_KEY:-}
       - SOKOGATE_API_SECRET=${SOKOGATE_API_SECRET:-}
+      # Email (needed for Hermes outreach)
+      - SMTP_HOST=${SMTP_HOST:-smtp.ethereal.email}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
     volumes:
-      - sqlite-data:/app/data
-      - ./workers:/app/workers
       - ./prisma:/app/prisma
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped

@@ -4,14 +4,6 @@ import { withAuth } from "@/lib/abac-middleware"
 import { qmeIntegration } from "@/lib/qme-integration"
 import { ragPipeline } from "@/lib/rag-pipeline"
 
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
-  },
-}
-
 export const GET = withAuth(async (request: Request) => {
   const { searchParams } = new URL(request.url)
   const category = searchParams.get('category')

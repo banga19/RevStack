@@ -11,7 +11,10 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "setup": "prisma db push && tsx prisma/seed.ts && tsx prisma/seed-korea.ts"
+    "setup": "prisma db push && tsx prisma/seed.ts && tsx prisma/seed-korea.ts",
+    "db:use:postgres": "cp prisma/schema.postgres.prisma prisma/schema.prisma && prisma generate",
+    "db:use:sqlite": "cp prisma/schema.sqlite.prisma prisma/schema.prisma && prisma generate",
+    "docker:setup": "prisma db push && tsx prisma/seed.ts && tsx prisma/seed-revstack.ts"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",

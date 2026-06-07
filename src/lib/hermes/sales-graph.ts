@@ -285,7 +285,10 @@ async function sendFollowUp(state: typeof SalesState.State): Promise<typeof Sale
     sent = true // Assume sent via email — would use email module in production
   }
 
-  const finalMessage = { ...followUpMessage, status: sent ? "sent" : "skipped" as const }
+  const finalMessage: PipelineMessage = {
+    ...followUpMessage,
+    status: sent ? "sent" : "skipped",
+  }
 
   return {
     ...state,
@@ -310,7 +313,7 @@ async function closePipeline(state: typeof SalesState.State): Promise<typeof Sal
   const outreachMessages = messages.filter((m) => m.channel !== "system")
   const deliveredMessages = outreachMessages.filter((m) => m.status === "sent")
 
-  const summary: string[] = [
+  const summary = [
     `=== Pipeline Complete: ${lead.companyName} ===`,
     `Final Score: ${score}/100`,
     scoreBreakdown ? `Breakdown: ${JSON.stringify(scoreBreakdown)}` : "",
@@ -368,29 +371,35 @@ workflow.addNode("sendFollowUp", sendFollowUp)
 workflow.addNode("closePipeline", closePipeline)
 
 // Add edges — start → score
+// @ts-expect-error - LangGraph addEdge types restrict custom node names, but they work at runtime
 workflow.addEdge("__start__", "scoreLead")
 
 // Score → conditional: decide or close
+  // @ts-expect-error - LangGraph addConditionalEdges types restrict custom node names, but they work at runtime
 workflow.addConditionalEdges("scoreLead", routeFromScored, {
   decideOutreach: "decideOutreach",
   closePipeline: "closePipeline",
 })
 
 // Decide → outreach
+// @ts-expect-error - LangGraph addEdge types restrict custom node names
 workflow.addEdge("decideOutreach", "sendOutreach")
 
 // Outreach → conditional: follow-up or close
+// @ts-expect-error - LangGraph addConditionalEdges types restrict custom node names, but they work at runtime
 workflow.addConditionalEdges("sendOutreach", routeFromOutreach, {
   sendFollowUp: "sendFollowUp",
   closePipeline: "closePipeline",
 })
 
 // Follow-up → close
+// @ts-expect-error - LangGraph addConditionalEdges types restrict custom node names, but they work at runtime
 workflow.addConditionalEdges("sendFollowUp", routeFromFollowUp, {
   closePipeline: "closePipeline",
 })
 
 // Close → end
+// @ts-expect-error - LangGraph addEdge types restrict custom node names
 workflow.addEdge("closePipeline", "__end__")
 
 // ============================================================
