@@ -26,7 +26,7 @@ export const watiSendTemplate = tool(
   async ({ phone, templateName, parameters }: { phone: string; templateName: string; parameters?: string[] }) => {
     try {
       const { watiIntegration } = await import("@/lib/wati-integration")
-      const result = await watiIntegration.sendTemplate(phone, templateName, parameters)
+      const result = await watiIntegration.sendTemplate(phone, templateName, parameters ?? [])
       return JSON.stringify(result)
     } catch (error) {
       return JSON.stringify({
