@@ -141,9 +141,13 @@ describe("Flutterwave Payment → Subscription Activation Pipeline", () => {
     })
 
     it("returns error when Flutterwave is not configured and no sdkOverride provided", async () => {
-      // Explicitly clear env vars that may be set in .env or shell
+      // Explicitly clear ALL env vars that may be set in .env or shell.
+      // getConfig() checks FLUTTERWAVE_SECRET_KEY, FLW_SECRET_KEY,
+      // NEXT_PUBLIC_FLUTTERWAVE_PUBLIC_KEY, and FLW_PUBLIC_KEY.
       vi.stubEnv("FLUTTERWAVE_SECRET_KEY", "")
+      vi.stubEnv("FLW_SECRET_KEY", "")
       vi.stubEnv("NEXT_PUBLIC_FLUTTERWAVE_PUBLIC_KEY", "")
+      vi.stubEnv("FLW_PUBLIC_KEY", "")
 
       vi.mocked(prisma.payment.create).mockResolvedValue(buildPaymentWithUser() as any)
 

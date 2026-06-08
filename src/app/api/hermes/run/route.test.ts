@@ -56,6 +56,7 @@ vi.mock("@/lib/db", () => ({
     lead: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
+      count: vi.fn().mockResolvedValue(42),
     },
     hermesRun: {
       create: vi.fn(),

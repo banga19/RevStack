@@ -203,6 +203,7 @@ export async function initiatePayment(
           return { success: false, error: "Card details are required for card payments" }
         }
 
+        const flwConfig = getConfig()
         const cardPayload = {
           tx_ref: txRef,
           amount: amount.toString(),
@@ -210,9 +211,11 @@ export async function initiatePayment(
           card_number: card.number,
           cvv: card.cvv,
           expiry_month: card.expiryMonth,
-          expiry_year: card.expiryYear,
+          // Normalize to 2-digit year (SDK validates length must be 2)
+          expiry_year: String(Number(card.expiryYear) % 100).padStart(2, "0"),
           email,
-          redirect_url: redirectUrl || `${getConfig().redirectBase}/pricing?payment=success&tx_ref=${txRef}`,
+          enckey: flwConfig.encryptedKey,
+          redirect_url: redirectUrl || `${flwConfig.redirectBase}/pricing?payment=success&tx_ref=${txRef}`,
           meta: {
             payment_id: payment.id,
             user_id: userId,

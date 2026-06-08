@@ -1,7 +1,7 @@
 // Mapato PWA Service Worker
 // Cache name includes version for cache busting
-const CACHE_NAME = "mapato-v2"
-const STATIC_CACHE = "mapato-static-v2"
+const CACHE_NAME = "mapato-v3"
+const STATIC_CACHE = "mapato-static-v3"
 
 // Resources to pre-cache on install
 const PRECACHE_URLS = [
@@ -85,7 +85,9 @@ self.addEventListener("fetch", (event) => {
     return
   }
 
-  // Static assets (JS, CSS, images, fonts) — cache-first strategy
+  // Static assets (JS, CSS, images, fonts) — network-first strategy
+  // Network-first ensures fresh bundles from the dev server are always used,
+  // preventing stale/corrupted JS from being served after server restarts.
   if (
     event.request.destination === "script" ||
     event.request.destination === "style" ||
@@ -95,15 +97,17 @@ self.addEventListener("fetch", (event) => {
   ) {
     event.respondWith(
       caches.open(STATIC_CACHE).then((cache) => {
-        return cache.match(event.request).then((cached) => {
-          if (cached) return cached
-          return fetch(event.request).then((response) => {
+        return fetch(event.request)
+          .then((response) => {
             if (response.ok) {
               cache.put(event.request, response.clone())
             }
             return response
           })
-        })
+          .catch(() => {
+            // Offline fallback — serve from cache
+            return cache.match(event.request) || new Response("", { status: 503 })
+          })
       })
     )
     return

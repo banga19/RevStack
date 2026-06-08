@@ -97,30 +97,79 @@ async function dismissCookieConsent(page: Page) {
   }
 }
 
-async function authenticateViaApi(page: Page) {
-  // Navigate to login to establish a session and get CSRF cookie
+/**
+ * Block service worker and SSE notification stream to prevent them
+ * from interfering with E2E tests (SW causes registration errors,
+ * SSE keeps networkidle from ever settling).
+ */
+async function blockBackgroundRequests(page: Page) {
+  // Block service worker (causes registration errors in headless Chrome)
+  await page.route('**/sw.js', route => route.abort())
+  // Fulfill SSE stream with a close immediately to prevent client crash
+  await page.route('**/api/notifications/stream', route => {
+    route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: 'data: {"type":"connected"}\n\ndata: {"type":"close"}\n\n',
+    })
+  })
+}
+
+function getYearOptions(): string[] {
+  const currentYear = new Date().getFullYear() % 100
+  return Array.from({ length: 10 }, (_, i) => String(currentYear + i))
+}
+
+/**
+ * Authenticate by submitting the credentials form via DOM.
+ * Uses a real form submission (bypasses React router) to avoid navigation
+ * conflicts from the login page's router.refresh() call.
+ */
+async function loginAsTestUser(page: Page) {
+  await blockBackgroundRequests(page)
+
   await page.goto(`${BASE_URL}/login`, { waitUntil: "load" })
-  await dismissCookieConsent(page)
+
+  // Dismiss cookie consent if present
+  const cookieConsent = page.locator("button", { hasText: "Accept All Cookies" })
+  if (await cookieConsent.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await cookieConsent.click()
+    await page.waitForTimeout(500)
+  }
 
   // Get CSRF token
-  const csrfResponse = await page.request.get(`${BASE_URL}/api/auth/csrf`)
-  const { csrfToken } = await csrfResponse.json()
+  const { csrfToken } = await page.evaluate(() =>
+    fetch('/api/auth/csrf').then(r => r.json())
+  )
 
-  // POST credentials to NextAuth callback
-  await page.request.post(`${BASE_URL}/api/auth/callback/credentials`, {
-    headers: { "Content-Type": "application/json" },
-    data: {
-      csrfToken,
-      email: TEST_EMAIL,
-      password: TEST_PASSWORD,
-      callbackUrl: "/dashboard",
-      json: true,
-    },
-  })
+  // Submit credentials via DOM form submission (bypasses React router)
+  await page.evaluate(async ({ email, password, csrfToken }: { email: string; password: string; csrfToken: string }) => {
+    const form = document.createElement('form')
+    form.method = 'POST'
+    form.action = '/api/auth/callback/credentials'
 
-  // Navigate to pricing page (session cookie is now set)
-  await page.goto(`${BASE_URL}/pricing`, { waitUntil: "load" })
-  await dismissCookieConsent(page)
+    const addField = (name: string, value: string) => {
+      const input = document.createElement('input')
+      input.type = 'hidden'
+      input.name = name
+      input.value = value
+      form.appendChild(input)
+    }
+
+    addField('csrfToken', csrfToken)
+    addField('email', email)
+    addField('password', password)
+    addField('callbackUrl', '/dashboard')
+
+    document.body.appendChild(form)
+    form.submit()
+  }, { email: TEST_EMAIL, password: TEST_PASSWORD, csrfToken })
+
+  // Wait for redirect to dashboard (from the form submission)
+  // Note: Next.js 16 dev mode compilation can take 30-60s on first load
+  await page.waitForURL(/dashboard/, { timeout: 90000 })
+  await page.waitForLoadState("networkidle").catch(() => {})
+  await page.waitForTimeout(500)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -129,6 +178,11 @@ async function authenticateViaApi(page: Page) {
 
 test.beforeAll(async () => {
   await seedTestUser()
+})
+
+test.afterEach(async ({ page }) => {
+  // Reset page to prevent state leakage between tests
+  await page.goto("about:blank").catch(() => {})
 })
 
 test.afterAll(async () => {
@@ -142,7 +196,9 @@ test.afterAll(async () => {
 test.describe("Dev-mode simulated checkout flow", () => {
   test("opens pricing → selects card → simulates payment → sees success → redirects to dashboard", async ({ page }) => {
     // ── Step 1: Authenticate and load pricing page ────────────────────
-    await authenticateViaApi(page)
+    await loginAsTestUser(page)
+    await page.goto(`${BASE_URL}/pricing`, { waitUntil: "load" })
+    await dismissCookieConsent(page)
 
     // Wait for session to load and "Choose Plan" to appear
     const choosePlanButton = page.locator("button", { hasText: "Choose Plan" }).first()
@@ -159,38 +215,36 @@ test.describe("Dev-mode simulated checkout flow", () => {
     // ── Step 3: Click "Choose Plan" on Starter ───────────────────────
     await choosePlanButton.click()
 
-    // ── Step 4: Verify the PaymentCheckout dialog opens ──────────────
-    const dialog = page.locator('[role="dialog"]')
-    await expect(dialog).toBeVisible({ timeout: 5000 })
+    // ── Step 4: Verify the PaymentCheckout content opens ──────────────
+    // Use data-testid selectors to avoid strict-mode conflicts
+    const checkoutContent = page.locator('[data-testid="payment-method-selection"]')
+    await expect(checkoutContent).toBeVisible({ timeout: 5000 })
 
     // Dialog header shows plan info
-    await expect(dialog.locator("text=Complete Your Payment")).toBeVisible()
-    await expect(dialog.locator("text=$50/mo")).toBeVisible()
+    await expect(page.locator("text=Complete Your Payment")).toBeVisible()
+    await expect(page.getByText('$50/mo', { exact: true }).first()).toBeVisible()
 
     // ── Step 5: Verify all three payment methods are listed ──────────
-    const methodSelection = dialog.locator('[data-testid="payment-method-selection"]')
-    await expect(methodSelection).toBeVisible()
-    await expect(dialog.locator("text=Credit / Debit Card")).toBeVisible()
-    await expect(dialog.getByText("M-Pesa", { exact: true }).first()).toBeVisible()
-    await expect(dialog.locator("text=Mobile Money")).toBeVisible()
+    await expect(page.locator("text=Credit / Debit Card")).toBeVisible()
+    await expect(page.getByText("M-Pesa", { exact: true }).first()).toBeVisible()
+    await expect(page.locator("text=Mobile Money")).toBeVisible()
 
     // ── Step 6: Select card payment method ───────────────────────────
-    await dialog.locator("button", { hasText: "Credit / Debit Card" }).click()
+    await page.locator("button", { hasText: "Credit / Debit Card" }).click()
 
     // ── Step 7: Verify card payment form appears ─────────────────────
-    const cardForm = dialog.locator('[data-testid="card-payment-form"]')
-    await expect(cardForm).toBeVisible()
-    await expect(cardForm.locator("text=Pay with Card")).toBeVisible()
-    await expect(cardForm.locator("text=$50 — Starter (monthly)")).toBeVisible()
-    await expect(dialog.locator("#cardNumber")).toBeVisible()
-    await expect(dialog.locator("#cvv")).toBeVisible()
+    await expect(page.locator('[data-testid="card-payment-form"]')).toBeVisible()
+    await expect(page.locator("text=Pay with Card")).toBeVisible()
+    await expect(page.locator("text=$50 — Starter (monthly)")).toBeVisible()
+    await expect(page.locator("#cardNumber")).toBeVisible()
+    await expect(page.locator("#cvv")).toBeVisible()
 
     // ── Step 8: Fill in sandbox test card details ────────────────────
-    await dialog.locator("#cardNumber").fill("4242 4242 4242 4242")
-    await dialog.locator("#cvv").fill("123")
+    await page.locator("#cardNumber").fill("4242 4242 4242 4242")
+    await page.locator("#cvv").fill("123")
 
     // Select expiry
-    await dialog.locator("label", { hasText: "Expiry" })
+    await page.locator("label", { hasText: "Expiry" })
       .locator("..")
       .locator("select")
       .first()
@@ -198,25 +252,20 @@ test.describe("Dev-mode simulated checkout flow", () => {
 
     const currentYear = new Date().getFullYear() % 100
     const yearOptions = Array.from({ length: 10 }, (_, i) => String(currentYear + i))
-    await dialog.locator("label", { hasText: "Expiry" })
+    await page.locator("label", { hasText: "Expiry" })
       .locator("..")
       .locator("select")
       .nth(1)
       .selectOption(yearOptions[3])
 
     // Verify Pay button is enabled
-    const payButton = dialog.locator('[data-testid="pay-button"]')
+    const payButton = page.locator('[data-testid="pay-button"]')
     await expect(payButton).toBeEnabled()
     await expect(payButton).toContainText("Pay $50 via Card")
 
     // ── Step 9: Simulate dev-mode payment via route interception ─────
-    // In dev mode (no Flutterwave keys), the backend would auto-simulate
-    // by creating a payment record and returning success. We intercept
-    // the API calls to simulate this behavior.
-
     const MOCK_TX_REF = `devmode-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
 
-    // Intercept the initiate endpoint to return a simulated success
     await page.route("**/api/payments/initiate", async (route: Route) => {
       await route.fulfill({
         status: 200,
@@ -225,13 +274,11 @@ test.describe("Dev-mode simulated checkout flow", () => {
           success: true,
           paymentId: `devmode-pay-${Date.now()}`,
           txRef: MOCK_TX_REF,
-          authUrl: undefined, // No 3DS redirect in dev mode
+          authUrl: undefined,
         }),
       })
     })
 
-    // Intercept the status polling endpoint: return "pending" once,
-    // then "success" on subsequent calls (simulating the 3-second delay)
     let pollCount = 0
     await page.route("**/api/payments/status**", async (route: Route) => {
       pollCount++
@@ -254,20 +301,16 @@ test.describe("Dev-mode simulated checkout flow", () => {
     await payButton.click()
 
     // ── Step 11: Verify processing state appears ─────────────────────
-    const processingState = dialog.locator('[data-testid="payment-processing"]')
-    await expect(processingState).toBeVisible({ timeout: 5000 })
-    await expect(processingState.locator("text=Processing Payment")).toBeVisible()
-    await expect(processingState.locator("text=Processing your card payment")).toBeVisible()
+    await expect(page.locator('[data-testid="payment-processing"]')).toBeVisible({ timeout: 5000 })
+    await expect(page.locator("text=Processing Payment")).toBeVisible()
+    await expect(page.locator("text=Processing your card payment")).toBeVisible()
 
     // ── Step 12: Verify success state after polling resolves ─────────
-    const successState = dialog.locator('[data-testid="payment-success"]')
-    await expect(successState).toBeVisible({ timeout: 30000 })
+    await expect(page.locator('[data-testid="payment-success"]')).toBeVisible({ timeout: 30000 })
 
-    await expect(successState.locator("text=Payment Successful! 🎉")).toBeVisible()
-    await expect(
-      successState.locator("text=Starter (monthly) subscription is now active")
-    ).toBeVisible()
-    await expect(successState.locator("text=Redirecting to dashboard...")).toBeVisible()
+    await expect(page.locator("text=Payment Successful! 🎉")).toBeVisible()
+    await expect(page.locator("text=Starter (monthly) subscription is now active")).toBeVisible()
+    await expect(page.locator("text=Redirecting to dashboard...")).toBeVisible()
 
     // ── Step 13: Wait for redirect to dashboard ──────────────────────
     await page.waitForURL(/dashboard/, { timeout: 15000 })
@@ -276,7 +319,9 @@ test.describe("Dev-mode simulated checkout flow", () => {
 
   test("shows processing then success for M-Pesa payment method", async ({ page }) => {
     // ── Authenticate and open pricing ─────────────────────────────────
-    await authenticateViaApi(page)
+    await loginAsTestUser(page)
+    await page.goto(`${BASE_URL}/pricing`, { waitUntil: "load" })
+    await dismissCookieConsent(page)
 
     const choosePlanButton = page.locator("button", { hasText: "Choose Plan" }).first()
     await expect(choosePlanButton).toBeVisible({ timeout: 15000 })
@@ -284,20 +329,19 @@ test.describe("Dev-mode simulated checkout flow", () => {
     // Open dialog and select M-Pesa
     await choosePlanButton.click()
 
-    const dialog = page.locator('[role="dialog"]')
-    await expect(dialog).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('[data-testid="payment-method-selection"]')).toBeVisible({ timeout: 5000 })
 
-    await dialog.locator("button", { hasText: "M-Pesa" }).click()
+    await page.locator("button", { hasText: "M-Pesa" }).click()
 
     // Verify M-Pesa form
-    await expect(dialog.locator("text=Pay with M-Pesa")).toBeVisible()
-    await expect(dialog.locator("#phone")).toBeVisible()
+    await expect(page.locator("text=Pay with M-Pesa")).toBeVisible()
+    await expect(page.locator("#phone")).toBeVisible()
 
     // Fill phone
-    await dialog.locator("#phone").fill("254712345678")
+    await page.locator("#phone").fill("254712345678")
 
     // Verify Pay button enabled
-    const payButton = dialog.locator("button", { hasText: /Pay \$50 via M-Pesa/ })
+    const payButton = page.locator("button", { hasText: /Pay \$50 via M-Pesa/ })
     await expect(payButton).toBeEnabled()
 
     // Intercept API calls for M-Pesa simulation
@@ -316,7 +360,6 @@ test.describe("Dev-mode simulated checkout flow", () => {
       })
     })
 
-    // Polling: return success after one pending response
     let mpesaPollCount = 0
     await page.route("**/api/payments/status**", async (route: Route) => {
       mpesaPollCount++
@@ -337,49 +380,47 @@ test.describe("Dev-mode simulated checkout flow", () => {
     await payButton.click()
 
     // Verify processing with M-Pesa specific message
-    const processingState = dialog.locator('[data-testid="payment-processing"]')
-    await expect(processingState).toBeVisible({ timeout: 5000 })
-    await expect(processingState.locator("text=M-Pesa STK Push")).toBeVisible()
+    await expect(page.locator('[data-testid="payment-processing"]')).toBeVisible({ timeout: 5000 })
+    await expect(page.locator("text=M-Pesa STK Push")).toBeVisible()
 
     // Verify success
-    const successState = dialog.locator('[data-testid="payment-success"]')
-    await expect(successState).toBeVisible({ timeout: 30000 })
-    await expect(successState.locator("text=Payment Successful! 🎉")).toBeVisible()
+    await expect(page.locator('[data-testid="payment-success"]')).toBeVisible({ timeout: 30000 })
+    await expect(page.locator("text=Payment Successful! 🎉")).toBeVisible()
 
     // Wait for dashboard redirect
     await page.waitForURL(/dashboard/, { timeout: 15000 })
   })
 
   test("shows error state when payment initiation fails", async ({ page }) => {
-    await authenticateViaApi(page)
+    await loginAsTestUser(page)
+    await page.goto(`${BASE_URL}/pricing`, { waitUntil: "load" })
+    await dismissCookieConsent(page)
 
     const choosePlanButton = page.locator("button", { hasText: "Choose Plan" }).first()
     await expect(choosePlanButton).toBeVisible({ timeout: 15000 })
     await choosePlanButton.click()
 
-    const dialog = page.locator('[role="dialog"]')
-    await expect(dialog).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('[data-testid="payment-method-selection"]')).toBeVisible({ timeout: 5000 })
 
     // Select card
-    await dialog.locator("button", { hasText: "Credit / Debit Card" }).click()
+    await page.locator("button", { hasText: "Credit / Debit Card" }).click()
 
     // Fill card details
-    await dialog.locator("#cardNumber").fill("4242 4242 4242 4242")
-    await dialog.locator("label", { hasText: "Expiry" })
+    await page.locator("#cardNumber").fill("4242 4242 4242 4242")
+    const yearOptions = getYearOptions()
+    await page.locator("label", { hasText: "Expiry" })
       .locator("..")
       .locator("select")
       .first()
       .selectOption("12")
-    const currentYear = new Date().getFullYear() % 100
-    const yearOptions = Array.from({ length: 10 }, (_, i) => String(currentYear + i))
-    await dialog.locator("label", { hasText: "Expiry" })
+    await page.locator("label", { hasText: "Expiry" })
       .locator("..")
       .locator("select")
       .nth(1)
       .selectOption(yearOptions[3])
-    await dialog.locator("#cvv").fill("123")
+    await page.locator("#cvv").fill("123")
 
-    // Intercept initiate endpoint to return a failure (simulating declined card)
+    // Intercept initiate endpoint to return a failure
     await page.route("**/api/payments/initiate", async (route: Route) => {
       await route.fulfill({
         status: 400,
@@ -389,11 +430,11 @@ test.describe("Dev-mode simulated checkout flow", () => {
     })
 
     // Click Pay
-    const payButton = dialog.locator('[data-testid="pay-button"]')
+    const payButton = page.locator('[data-testid="pay-button"]')
     await payButton.click()
 
     // Verify error state
-    const errorState = dialog.locator('[data-testid="payment-error"]')
+    const errorState = page.locator('[data-testid="payment-error"]')
     await expect(errorState).toBeVisible({ timeout: 10000 })
     await expect(errorState.locator("text=Payment Failed")).toBeVisible()
     await expect(errorState.locator("text=Card declined. Please try a different card.")).toBeVisible()

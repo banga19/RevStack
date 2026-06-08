@@ -11,6 +11,7 @@ import NextAuth from "next-auth"
 import { getServerSession } from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import Google from "next-auth/providers/google"
+import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/db"
 
 // Server-side analytics logging for auth events
@@ -48,7 +49,6 @@ const authOptions = {
           throw new Error("Invalid email or password")
         }
 
-        const bcrypt = await import("bcryptjs").then((m) => m.default || m)
         const isValid = await bcrypt.compare(password, user.password)
         if (!isValid) {
           throw new Error("Invalid email or password")

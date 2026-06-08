@@ -12,8 +12,10 @@ const nextConfig = {
    * this webpack block and the `--webpack` flag can be removed.
    */
   webpack: (config, { isServer }) => {
-    // Follow symlinks (not needed for npm, but harmless)
-    config.resolve.symlinks = false
+    // symlinks: true (default) — ensures pnpm symlinks are followed correctly.
+    // Setting this to false caused webpack runtime corruption with pnpm's
+    // node_modules structure, producing '_interop_require_wildcard._ is not
+    // a function' and 'forwardRef is not a function' errors in the browser.
 
     if (!isServer) {
       config.resolve.fallback = {

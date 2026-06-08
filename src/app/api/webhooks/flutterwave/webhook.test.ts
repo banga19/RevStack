@@ -137,6 +137,7 @@ describe("POST /api/webhooks/flutterwave", () => {
   describe("signature verification", () => {
     it("returns 500 when webhook secret is not configured", async () => {
       vi.stubEnv("FLUTTERWAVE_WEBHOOK_SECRET", "")
+      vi.stubEnv("FLW_WEBHOOK_HASH", "") // Clear fallback too
 
       const res = await POST(buildRequest({ event: "charge.completed", data: {} }))
       const body = await res.json()

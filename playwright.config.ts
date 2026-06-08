@@ -11,7 +11,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: 1, // Single worker to avoid DB conflicts from seeding
   reporter: "list",
-  timeout: 60000,
+  timeout: 120000,
 
   use: {
     baseURL: process.env.BASE_URL || "http://localhost:3000",

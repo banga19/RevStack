@@ -1,7 +1,7 @@
 "use client"
 
 import { Suspense, useState, useEffect, useRef } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { signIn } from "next-auth/react"
 import { Button } from "@/components/ui/button"
@@ -17,7 +17,6 @@ import { CONTACT_INFO } from "@/lib/contact-info"
 
 function LoginForm() {
   const { t } = useTranslation()
-  const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get("callbackUrl") || searchParams.get("returnTo") || "/dashboard"
 
@@ -56,13 +55,11 @@ function LoginForm() {
       if (result?.ok) {
         // Check if user came from needs assessment
         const fromNeedsAssessment = searchParams.get("needsAssessment") === "true"
-        if (fromNeedsAssessment) {
-          // Redirect back to needs-assessment to link questionnaire
-          router.push("/needs-assessment")
-        } else {
-          router.push(callbackUrl)
-        }
-        router.refresh()
+        // Hard navigation ensures the session cookie is fully recognized
+        // on the destination page (avoids router.refresh() conflicts with
+        // client-side navigation in Next.js 16).
+        const destination = fromNeedsAssessment ? "/needs-assessment" : callbackUrl
+        window.location.href = destination
       }
     } catch (err) {
       setError("An unexpected error occurred. Please try again.")
