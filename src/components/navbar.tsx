@@ -37,7 +37,7 @@ const topNavItems = [
 ]
 
 export function Navbar() {
-  const { pathname } = usePathname()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const router = useRouter()
   const { data: session } = useSession()
