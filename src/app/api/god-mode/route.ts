@@ -4,6 +4,7 @@ import { withAbac } from "@/lib/abac-middleware"
 import { agentOrchestrator } from "@/lib/agent-orchestrator"
 import { agentMemory } from "@/lib/agent-memory"
 import { RESOURCES } from "@/lib/abac"
+import { hermesAgent } from "@/lib/hermes-agent"
 
 // POST /api/god-mode — Start a new God Mode session
 export const POST = withAbac(
@@ -11,36 +12,35 @@ export const POST = withAbac(
   "deploy",
   async (req: NextRequest) => {
     const body = await req.json()
-    const { duration, objective, agents } = body
+    const { objective, duration } = body
 
-    if (!objective || !agents || !Array.isArray(agents) || agents.length === 0) {
+    if (!objective) {
       return NextResponse.json(
-        { error: "Missing required fields: objective, agents" },
+        { error: "Missing required field: objective" },
         { status: 400 }
       )
     }
 
-    const session = await agentOrchestrator.startGodMode({
-      duration: parseInt(duration) || 3600000,
-      objective,
-      agents,
-      checkInterval: 60000,
+    const operation = await hermesAgent.runOperation(objective, {
+      userId: undefined,
     })
 
     return NextResponse.json({
-      session: serializeSession(session),
+      session: serializeHermesOperation(operation),
     })
   }
 )
 
 // GET /api/god-mode — Get all sessions
 export const GET = withAbac(RESOURCES["god-mode"], "read", async () => {
-  const sessions = agentOrchestrator.getAllSessions()
+  const sessions = agentOrchestrator.getAllSessions().map(serializeSession)
+  const operations = hermesAgent.getAllOperations().map(serializeHermesOperation)
   const allReports = agentMemory.getAllReports()
-  const agentStatus = agentOrchestrator.getAgentStatus()
+  const agentStatus = hermesAgent.getSystemStatus()
 
   return NextResponse.json({
-    sessions: sessions.map(serializeSession),
+    sessions,
+    operations,
     reports: allReports.map(serializeReport),
     agentStatus,
   })
@@ -63,18 +63,12 @@ export const PATCH = withAbac(
 
     let success = false
     switch (action) {
-      case "pause":
-        success = await agentOrchestrator.pauseGodMode(sessionId)
-        break
-      case "resume":
-        success = await agentOrchestrator.resumeGodMode(sessionId)
-        break
       case "stop":
-        success = await agentOrchestrator.stopGodMode(sessionId)
+        success = agentOrchestrator.stopGodMode(sessionId)
         break
       default:
         return NextResponse.json(
-          { error: `Unknown action: ${action}` },
+          { error: `Unsupported action for Hermes-backed God Mode: ${action}` },
           { status: 400 }
         )
     }
@@ -93,6 +87,25 @@ export const PATCH = withAbac(
     })
   }
 )
+
+function serializeHermesOperation(operation: any) {
+  return {
+    id: operation.id,
+    status: operation.status,
+    objective: operation.objective,
+    startedAt: operation.startedAt,
+    completedAt: operation.completedAt,
+    plannedActions: operation.plannedActions || [],
+    results: operation.results || [],
+    insights: operation.insights || [],
+    errors: operation.errors || [],
+    progress: typeof operation.completedAt === "number" ? 100 : 0,
+    currentAgent: operation.results?.[0]?.action?.agentType,
+    completedCount: (operation.results || []).filter((r: any) => r.result?.success !== false).length,
+    totalActions: (operation.results || []).length + (operation.plannedActions || []).length,
+    errorsCount: (operation.errors || []).length,
+  }
+}
 
 // Serialize functions to prevent circular references
 function serializeSession(session: any) {
