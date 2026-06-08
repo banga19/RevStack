@@ -5,19 +5,7 @@ import { sendWelcomeEmail } from "@/lib/email"
 import { validateCsrf } from "@/lib/csrf"
 import { appendSignupRow } from "@/lib/google-sheets"
 
-// Server-side analytics logging — replace with your real analytics provider
-function logEvent(event: string, data: Record<string, any>) {
-  // In production, send this to your analytics provider:
-  // Plausible: fetch('https://plausible.io/api/event', { method: 'POST', body: JSON.stringify({...}) })
-  // GA4:      fetch('https://www.google-analytics.com/mp/collect?...', { method: 'POST', body: JSON.stringify({...}) })
-  // Logging to console in dev for now
-  if (process.env.NODE_ENV !== "production") {
-    console.log(`[Analytics] ${event}:`, data)
-  }
-}
-
 export async function POST(req: NextRequest) {
-  // Validate CSRF token
   const csrfCheck = await validateCsrf(req)
   if (!csrfCheck.valid) {
     return NextResponse.json({ error: "Invalid or missing security token. Please refresh the page and try again." }, { status: 403 })
@@ -25,100 +13,74 @@ export async function POST(req: NextRequest) {
 
   try {
     const { name, email, password, phone, termsAccepted } = await req.json()
-
     if (!name || !email || !password) {
-      return NextResponse.json(
-        { error: "Name, email, and password are required" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "Name, email, and password are required" }, { status: 400 })
     }
-
-    // Validate terms acceptance
     if (!termsAccepted) {
-      return NextResponse.json(
-        { error: "You must accept the Terms & Conditions to create an account" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "You must accept the Terms & Conditions to create an account" }, { status: 400 })
     }
-
     if (password.length < 8) {
-      return NextResponse.json(
-        { error: "Password must be at least 8 characters" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 })
     }
 
-    // Check if user already exists
     const existing = await prisma.user.findUnique({ where: { email } })
     if (existing) {
-      return NextResponse.json(
-        { error: "An account with this email already exists" },
-        { status: 409 }
-      )
+      return NextResponse.json({ error: "An account with this email already exists" }, { status: 409 })
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12)
-
-    // Auto-start 3-day free trial on signup — full access to all features
+    const hashedPassword = await bcrypt.hash(password, 10)
     const now = new Date()
     const trialEnd = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
+    const orgSlug = `${email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "-")}-${Date.now().toString(36)}`
 
-    // Create organization for multi-tenant isolation
-    const orgSlug = email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "-") + "-" + Date.now().toString(36)
-    const organization = await prisma.organization.create({
-      data: {
-        name: `${name}'s Company`,
-        slug: orgSlug,
-        plan: "trial",
-      },
+    const [organization, user] = await Promise.all([
+      prisma.organization.create({
+        data: {
+          name: `${name}'s Company`,
+          slug: orgSlug,
+          plan: "trial",
+        },
+      }),
+      prisma.user.create({
+        data: {
+          name,
+          email,
+          password: hashedPassword,
+          phone: phone || null,
+          termsAccepted: true,
+          termsAcceptedAt: now,
+          termsVersion: "1.0",
+          organizationId: "", // placeholder; reassigned below
+          trialStartsAt: now,
+          trialEndsAt: trialEnd,
+          subscriptionStatus: "trial",
+          subscriptionTier: "enterprise",
+          subscriptionPlan: "monthly",
+        },
+      }),
+    ])
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { organizationId: organization.id },
     })
 
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-        phone: phone || null,
+    // Defer email + sheets; do not block signup
+    Promise.all([
+      sendWelcomeEmail(user.email, user.name).catch((err) => console.warn("[signup] welcome email failed", err)),
+      appendSignupRow({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
         termsAccepted: true,
-        termsAcceptedAt: new Date(),
-        termsVersion: "1.0",
-        organizationId: organization.id,
-        // 3-day free trial with full access
-        trialStartsAt: now,
-        trialEndsAt: trialEnd,
+        trialStartedAt: now.toISOString(),
+        trialEndsAt: trialEnd.toISOString(),
         subscriptionStatus: "trial",
-        subscriptionTier: "enterprise",
         subscriptionPlan: "monthly",
-      },
-    })
-
-    // Send welcome email
-    await sendWelcomeEmail(user.email, user.name)
-
-    // Fire-and-forget sheet push (admin review backfill)
-    appendSignupRow({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      termsAccepted: true,
-      trialStartedAt: now.toISOString(),
-      trialEndsAt: trialEnd.toISOString(),
-      subscriptionStatus: "trial",
-      subscriptionPlan: "monthly",
-      createdAt: new Date().toISOString(),
-    }).catch((err) => {
-      console.error("Google Sheets signup append error:", err)
-    })
-
-    // Track sign-up event
-    logEvent("signup", {
-      userId: user.id,
-      email: user.email,
-      method: "credentials",
-      hasPhone: !!phone,
-      trialEndsAt: trialEnd.toISOString(),
-    })
+        createdAt: now.toISOString(),
+      }).catch((err) => console.warn("[signup] sheets append failed", err)),
+    ])
 
     return NextResponse.json(
       {
@@ -137,9 +99,6 @@ export async function POST(req: NextRequest) {
     )
   } catch (error) {
     console.error("Signup error:", error)
-    return NextResponse.json(
-      { error: "Failed to create account" },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: "Failed to create account" }, { status: 500 })
   }
 }

@@ -27,9 +27,6 @@ export function SubscriptionBanner() {
   const [loading, setLoading] = useState(true)
   const [dismissed, setDismissed] = useState<string | null>(null)
 
-  // Admin users always have full free access — no subscription banner
-  if (session?.user?.role === "admin") return null
-
   useEffect(() => {
     fetch("/api/subscription")
       .then((r) => r.json())
@@ -37,6 +34,8 @@ export function SubscriptionBanner() {
       .catch(() => setLoading(false))
   }, [])
 
+  // Admin users always have full free access — no subscription banner
+  if (session?.user?.role === "admin") return null
   if (loading) return null
   if (!data) return null
   if (data.subscription?.status === "active") return null
