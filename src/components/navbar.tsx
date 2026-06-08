@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { signOut, useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { cn, getInitials } from "@/lib/utils"
@@ -37,7 +37,8 @@ const topNavItems = [
 ]
 
 export function Navbar() {
-  const pathname = usePathname()
+  const { pathname } = usePathname()
+  const searchParams = useSearchParams()
   const router = useRouter()
   const { data: session } = useSession()
   const [open, setOpen] = useState(false)
@@ -84,11 +85,12 @@ export function Navbar() {
               href="/admin?tab=godmode"
               className={cn(
                 "px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
-                pathname.startsWith("/admin?tab=godmode")
+                pathname === "/admin" && (searchParams?.get("tab") === "godmode" || !searchParams?.get("tab"))
                   ? "bg-primary/10 text-primary"
                   : "text-amber-600 hover:text-foreground hover:bg-muted"
               )}
             >
+              <Zap className="h-4 w-4 mr-1" />
               GOD MODE
             </Link>
           )}

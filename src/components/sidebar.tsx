@@ -160,6 +160,21 @@ export function Sidebar() {
             </button>
           )}
 
+          {/* Admin GOD MODE shortcut */}
+          {session?.user?.role === "admin" && (
+            <Link
+              href="/admin?tab=godmode"
+              onClick={() => setMobileOpen(false)}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                "text-red-500 hover:bg-red-500/10"
+              )}
+            >
+            <Zap className="h-5 w-5 shrink-0" />
+            {!collapsed && <span>GOD MODE</span>}
+           </Link>
+          )}
+
           {navItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
             return (

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -157,13 +157,24 @@ export default function AdminPage() {
   const { isAdmin, isLoading } = useAbac()
   const { data: session, update } = useSession()
   const router = useRouter()
+  const search = useSearchParams()
   const [users, setUsers] = useState<AdminUser[]>([])
   const [adminData, setAdminData] = useState<AdminData | null>(null)
   const [loading, setLoading] = useState(true)
   const [adminDataLoading, setAdminDataLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState("users")
+  const initialTab = search?.get("tab")
+  const [activeTab, setActiveTab] = useState<string>(
+    ["users", "payments", "trials", "godmode", "hermes", "audit", "followups", "retention"].includes(initialTab || "") ? (initialTab as string) : "users"
+  )
+
+  useEffect(() => {
+    const tab = search?.get("tab")
+    if (tab && ["users", "payments", "trials", "godmode", "hermes", "audit", "followups", "retention"].includes(tab)) {
+      setActiveTab(tab)
+    }
+  }, [search])
   const [runningFollowups, setRunningFollowups] = useState(false)
   const [triggeringUser, setTriggeringUser] = useState<string | null>(null)
 
