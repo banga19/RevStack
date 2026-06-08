@@ -67,10 +67,10 @@ export interface VerifyTransactionResult {
 
 function getConfig() {
   return {
-    publicKey: process.env.FLW_PUBLIC_KEY || "",
-    secretKey: process.env.FLW_SECRET_KEY || "",
-    webhookHash: process.env.FLW_WEBHOOK_HASH || "",
-    encryptedKey: process.env.FLW_ENCRYPTION_KEY || "",
+    publicKey: process.env.NEXT_PUBLIC_FLUTTERWAVE_PUBLIC_KEY || process.env.FLW_PUBLIC_KEY || "",
+    secretKey: process.env.FLUTTERWAVE_SECRET_KEY || process.env.FLW_SECRET_KEY || "",
+    webhookHash: process.env.FLUTTERWAVE_WEBHOOK_SECRET || process.env.FLW_WEBHOOK_HASH || "",
+    encryptedKey: process.env.FLUTTERWAVE_ENCRYPTION_KEY || process.env.FLW_ENCRYPTION_KEY || "",
     // Base URL for Flutterwave API
     baseUrl: "https://api.flutterwave.com/v3",
     // Base URL for redirect after card payment
@@ -89,15 +89,11 @@ function getFlutterwaveInstance() {
 }
 
 // ---------------------------------------------------------------------------
-// Dev/test mode helpers
+// Configuration check — returns true if Flutterwave credentials are present
 // ---------------------------------------------------------------------------
 
-function isDevMode(): boolean {
-  return (
-    process.env.NODE_ENV !== "production" ||
-    !process.env.FLW_SECRET_KEY ||
-    process.env.FLW_SECRET_KEY === "dev-mode"
-  )
+function isConfigured(): boolean {
+  return !!(getConfig().secretKey && getConfig().publicKey)
 }
 
 // ---------------------------------------------------------------------------
@@ -112,7 +108,9 @@ function isDevMode(): boolean {
  * For Card: creates a card charge (may require 3DS/auth redirect).
  */
 export async function initiatePayment(
-  params: InitiatePaymentParams
+  params: InitiatePaymentParams,
+  /** For testing — inject a mock SDK instead of loading flutterwave-node-v3 */
+  sdkOverride?: any
 ): Promise<InitiatePaymentResult> {
   try {
     const { userId, email, amount, currency, paymentMethod, tier, plan, phone, card, redirectUrl } = params
@@ -140,26 +138,16 @@ export async function initiatePayment(
       },
     })
 
-    // ---- DEV MODE: skip real API call ----
-    if (isDevMode()) {
-      console.log(`[Flutterwave] DEV MODE: Simulating ${paymentMethod} payment for ${email}`)
-      console.log(`[Flutterwave] txRef: ${txRef}, amount: ${amount} ${currency}`)
-
-      // Auto-verify in dev mode after 3 seconds (simulated webhook)
-      setTimeout(async () => {
-        await handleSuccessfulPayment(txRef, Math.floor(Math.random() * 1000000) + 100000)
-      }, 3000)
-
+    // ---- Verify Flutterwave is configured ----
+    if (!sdkOverride && !isConfigured()) {
       return {
-        success: true,
-        paymentId: payment.id,
-        txRef,
-        authUrl: undefined,
+        success: false,
+        error: "Flutterwave is not configured. Set FLUTTERWAVE_SECRET_KEY and NEXT_PUBLIC_FLUTTERWAVE_PUBLIC_KEY to process payments.",
       }
     }
 
-    // ---- PRODUCTION: call Flutterwave API ----
-    const flw = getFlutterwaveInstance()
+    // ---- Call Flutterwave API ----
+    const flw = sdkOverride || getFlutterwaveInstance()
 
     switch (paymentMethod) {
       case "mpesa":
@@ -284,11 +272,6 @@ export async function verifyTransaction(
   transactionId: number
 ): Promise<VerifyTransactionResult> {
   try {
-    if (isDevMode()) {
-      console.log(`[Flutterwave] DEV MODE: Verifying transaction ${transactionId}`)
-      return { success: true, status: "successful", transactionId }
-    }
-
     const flw = getFlutterwaveInstance()
     const response = await flw.Transaction.verify({ id: transactionId.toString() })
 
@@ -320,10 +303,6 @@ export async function verifyTransaction(
 export function validateWebhook(headers: Record<string, string | string[] | undefined>): boolean {
   const config = getConfig()
 
-  if (isDevMode()) {
-    return true // Skip validation in dev mode
-  }
-
   const signature = headers["verif-hash"] as string | undefined
   if (!signature || signature !== config.webhookHash) {
     console.error("[Flutterwave] Invalid webhook signature")
@@ -347,7 +326,8 @@ export async function handleWebhookEvent(event: string, data: Record<string, any
         const status = data.status
 
         if (status === "successful") {
-          await handleSuccessfulPayment(txRef, transactionId)
+          const customerId = data.customer?.id
+          await handleSuccessfulPayment(txRef, transactionId, customerId)
           return true
         } else {
           // Payment failed — update record
@@ -377,7 +357,7 @@ export async function handleWebhookEvent(event: string, data: Record<string, any
 // Internal: handle successful payment → activate subscription
 // ---------------------------------------------------------------------------
 
-async function handleSuccessfulPayment(txRef: string, transactionId: number) {
+async function handleSuccessfulPayment(txRef: string, transactionId: number, customerId?: number | string) {
   // Find the payment record
   const payment = await prisma.payment.findUnique({
     where: { flutterwaveTxRef: txRef },
@@ -425,6 +405,24 @@ async function handleSuccessfulPayment(txRef: string, transactionId: number) {
       trialEndsAt: now,
       // Save phone number to user profile if provided during payment
       ...(phone ? { phone } : {}),
+      // Save Flutterwave customer ID for tokenized recurring payments
+      ...(customerId ? { flutterwaveCustomerId: String(customerId) } : {}),
+    },
+  })
+
+  // Create a Subscription record (recurring subscription tracking)
+  await prisma.subscription.create({
+    data: {
+      userId: payment.userId,
+      tier: payment.tier || "starter",
+      plan: payment.plan || "monthly",
+      flutterwaveTxRef: payment.flutterwaveTxRef || txRef,
+      flutterwaveTxId: transactionId,
+      amount: payment.amount,
+      currency: payment.currency,
+      status: "ACTIVE",
+      currentPeriodStart: now,
+      currentPeriodEnd: subscriptionEnd,
     },
   })
 

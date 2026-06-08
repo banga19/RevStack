@@ -1,199 +1,23 @@
-export const planTasks = [
-  // Foundation Phase (Days 1-15)
-  { day: 1, title: "Recon & Initial Outreach to Ultimo Trading", description: "Visit ultimotradingltd.co.ke, do pre-pitch recon, send outreach for lead qualification services", phase: "foundation", category: "outreach", priority: "critical" },
-  { day: 2, title: "Set up core infrastructure", description: "Zoho CRM, Make.com, QMe, Wati.io, Instantly.ai accounts", phase: "foundation", category: "admin", priority: "high" },
-  { day: 3, title: "Build Voiceflow lead qualification chatbot", description: "8-block flow with scoring and 3 exit paths for Ultimo lead capture", phase: "foundation", category: "build", priority: "high" },
-  { day: 4, title: "Build Make.com workflows", description: "5 scenarios: capture, follow-up, booking, no-show, reporting for Ultimo", phase: "foundation", category: "build", priority: "high" },
-  { day: 5, title: "End-to-end system test & go-live", description: "6 tests, fix bugs, deploy QMe + Wati + Instantly sequences", phase: "foundation", category: "build", priority: "critical" },
-  { day: 6, title: "Build Looker Studio dashboard", description: "Lead flow, conversion, pipeline KPIs", phase: "foundation", category: "build", priority: "medium" },
-  { day: 7, title: "First SEO article published", description: "WhatsApp automation for Kenyan SMEs", phase: "foundation", category: "content", priority: "high" },
-  { day: 8, title: "Discovery call with Ultimo Trading", description: "Present pipeline audit, share 5-slide report on lead qualification automation", phase: "foundation", category: "outreach", priority: "critical" },
-  { day: 9, title: "Proposal submission to Ultimo", description: "$2,500/mo retainer proposal + setup fee for lead qualification & WhatsApp follow-up", phase: "foundation", category: "outreach", priority: "critical" },
-  { day: 10, title: "Follow-up sequence to 20 cold prospects", description: "Wholesale, import/export companies in Nairobi via Sokogate connections", phase: "foundation", category: "outreach", priority: "high" },
-  { day: 11, title: "Create Canva one-pager & proposal deck", description: "Problem/solution/ROI template featuring Ultimo case study", phase: "foundation", category: "admin", priority: "medium" },
-  { day: 12, title: "Publish 2nd SEO article", description: "B2B lead generation Kenya", phase: "foundation", category: "content", priority: "medium" },
-  { day: 13, title: "Optimize Voiceflow chatbot from data", description: "Refine scoring thresholds based on conversations", phase: "foundation", category: "build", priority: "medium" },
-  { day: 14, title: "LinkedIn profile & content optimization", description: "Position as AI automation specialist", phase: "foundation", category: "admin", priority: "low" },
-  { day: 15, title: "Review & adjust foundation phase", description: "Metrics review, refine targeting", phase: "foundation", category: "admin", priority: "high" },
+// Seed data — all arrays are intentionally empty so new users start fresh.
+// Populate these with real data as your business grows.
+// To re-populate demo data for testing, revert this file or seed manually.
 
-  // Anchor Phase (Days 16-30)
-  { day: 16, title: "Close Ultimo Trading deal", description: "Contract signing, setup fee collection, kickoff for lead qual automation", phase: "anchor", category: "outreach", priority: "critical" },
-  { day: 17, title: "Ultimo onboarding Day 1", description: "System setup, team training, QMe queue configuration for lead capture", phase: "anchor", category: "build", priority: "critical" },
-  { day: 18, title: "Ultimo onboarding Day 2", description: "Make.com workflow customisation for lead qualification & WhatsApp follow-up", phase: "anchor", category: "build", priority: "critical" },
-  { day: 19, title: "Ultimo go-live & monitoring", description: "System handoff, performance baseline measurement on lead capture rates", phase: "anchor", category: "build", priority: "high" },
-  { day: 20, title: "SEO article #3: WhatsApp Business API guide", description: "", phase: "anchor", category: "content", priority: "medium" },
-  { day: 21, title: "Cold outreach batch #2 (20 prospects)", description: "Logistics & distribution companies via Sokogate sourcing network", phase: "anchor", category: "outreach", priority: "high" },
-  { day: 22, title: "Build case study from Ultimo results", description: "Before/after metrics on lead qualification & response times via WhatsApp", phase: "anchor", category: "content", priority: "high" },
-  { day: 23, title: "SEO article #4: B2B automation ROI Kenya", description: "", phase: "anchor", category: "content", priority: "medium" },
-  { day: 24, title: "Follow-up on cold batch #2 responses", description: "Book discovery calls", phase: "anchor", category: "outreach", priority: "high" },
-  { day: 25, title: "SEO article #5: How QMe improves client onboarding", description: "", phase: "anchor", category: "content", priority: "medium" },
-  { day: 26, title: "Cold outreach batch #3 (20 prospects)", description: "E-commerce & retail companies through Sokogate platform", phase: "anchor", category: "outreach", priority: "high" },
-  { day: 27, title: "Refine outreach messaging from response data", description: "A/B test subject lines, WhatsApp templates for Ultimo-style campaigns", phase: "anchor", category: "admin", priority: "medium" },
-  { day: 28, title: "SEO article #6: No-code CRM setup Kenya", description: "", phase: "anchor", category: "content", priority: "low" },
-  { day: 29, title: "Follow-up on batch #3 & close deals", description: "", phase: "anchor", category: "outreach", priority: "high" },
-  { day: 30, title: "Month 1 review: financials, pipeline, content", description: "$2,500 target check (Ultimo retainer), adjust plan", phase: "anchor", category: "admin", priority: "critical" },
+export const planTasks: any[] = []
 
-  // Growth Phase (Days 31-55)
-  { day: 31, title: "SEO article #7: Automated lead qualification guide", description: "Targeting trading companies like Ultimo Trading", phase: "growth", category: "content", priority: "medium" },
-  { day: 35, title: "Cold outreach batch #4 (30 prospects)", description: "Expanded geographic targeting via Sokogate supplier network", phase: "growth", category: "outreach", priority: "high" },
-  { day: 40, title: "SEO article #10: Scaling B2B sales with AI chatbots", description: "", phase: "growth", category: "content", priority: "medium" },
-  { day: 45, title: "Cold outreach batch #5 (30 prospects)", description: "Referral-introduced warm outreach from Ultimo & Sokogate network", phase: "growth", category: "outreach", priority: "high" },
-  { day: 50, title: "Begin referral system automation", description: "QMe referral queue + Make.com referral workflow", phase: "growth", category: "build", priority: "medium" },
-  { day: 55, title: "Mid-point strategy review", description: "Track to $10k+ MRR target", phase: "growth", category: "admin", priority: "high" },
+export const clients: any[] = []
 
-  // Scale Phase (Days 56-75)
-  { day: 60, title: "Hire freelance content writer", description: "Scale SEO output to 2x", phase: "scale", category: "admin", priority: "medium" },
-  { day: 65, title: "Launch referral partner program", description: "5% commission on referrals", phase: "scale", category: "outreach", priority: "high" },
-  { day: 70, title: "SEO content bank reaches 25+ articles", description: "Compound traffic growth", phase: "scale", category: "content", priority: "medium" },
-  { day: 75, title: "Final review & scale planning", description: "$22,500 MRR assessment, Year 2 strategy", phase: "scale", category: "admin", priority: "critical" },
-]
+export const clientProducts: any[] = []
 
-export const clients = [
-  {
-    name: "Sokogate",
-    company: "sokogate.com",
-    email: "partners@sokogate.com",
-    phone: "+254 XXX XXX XXX",
-    status: "active",
-    tier: "enterprise",
-    monthlyRetainer: 0,
-    setupFee: 0,
-    source: "targeted-outreach",
-    corridor: "china-africa",
-    ersScore: 95,
-    ersBreakdown: JSON.stringify({ documentation: 25, compliance: 25, exportHistory: 25, capacityVerified: 20 }),
-    notes: "Bulk product sourcing marketplace connecting Kenyan wholesalers to global suppliers. Platform partner for sourcing products via sokogate.com."
-  },
-  {
-    name: "Ultimo Trading Ltd",
-    company: "ultimotradingltd.co.ke",
-    email: "bangali@ultimotradingltd.co.ke",
-    phone: "+254 XXX XXX XXX",
-    status: "active",
-    tier: "enterprise",
-    monthlyRetainer: 2500,
-    setupFee: 3000,
-    source: "targeted-outreach",
-    corridor: "korea-africa",
-    ersScore: 82,
-    ersBreakdown: JSON.stringify({ documentation: 20, compliance: 18, exportHistory: 22, capacityVerified: 22 }),
-    notes: "Anchor client. Running full lead qualification, capture, and follow-up automation via email & WhatsApp. Targeting Korea market via Sokogate 2026 AfCFTA program."
-  },
-  {
-    name: "Prospect 1",
-    company: "East African Wholesalers",
-    email: "info@eastafricanwholesalers.co.ke",
-    status: "lead",
-    tier: "growth",
-    monthlyRetainer: 1150,
-    source: "cold-outreach",
-    corridor: "africa-africa",
-    ersScore: 45,
-    ersBreakdown: JSON.stringify({ documentation: 10, compliance: 5, exportHistory: 15, capacityVerified: 15 }),
-    notes: "Import/export company using Sokogate for sourcing. Initial contact made, awaiting discovery call."
-  },
-  {
-    name: "Prospect 2",
-    company: "Nairobi Logistics Hub",
-    email: "hello@nbi-logistics.co.ke",
-    status: "qualified",
-    tier: "growth",
-    monthlyRetainer: 1150,
-    source: "cold-outreach",
-    corridor: "korea-africa",
-    ersScore: 58,
-    ersBreakdown: JSON.stringify({ documentation: 15, compliance: 8, exportHistory: 15, capacityVerified: 20 }),
-    notes: "Logistics company interested in WhatsApp automation for shipment notifications & lead follow-up. Potential Korea corridor partner."
-  },
-  {
-    name: "Prospect 3",
-    company: "Kenya Trade Network",
-    email: "info@ktn.co.ke",
-    status: "lead",
-    tier: "starter",
-    monthlyRetainer: 385,
-    source: "seo",
-    corridor: "korea-africa",
-    ersScore: 32,
-    ersBreakdown: JSON.stringify({ documentation: 8, compliance: 2, exportHistory: 12, capacityVerified: 10 }),
-    notes: "Found through website. Small import/export consultancy using Sokogate sourcing. Low ERS — needs compliance support for Korea."
-  },
-  {
-    name: "TechRetail Kenya",
-    company: "TechRetail Kenya Ltd",
-    email: "partners@techretail.co.ke",
-    status: "onboarding",
-    tier: "growth",
-    monthlyRetainer: 1150,
-    setupFee: 1500,
-    source: "referral",
-    corridor: "africa-africa",
-    ersScore: 40,
-    ersBreakdown: JSON.stringify({ documentation: 10, compliance: 5, exportHistory: 10, capacityVerified: 15 }),
-    notes: "Referral from Ultimo via Sokogate network. Electronics distributor needing lead qualification automation."
-  },
-]
+export const complianceRecords: any[] = []
 
-export const clientProducts = [
-  { clientName: "Ultimo Trading Ltd", name: "Kenyan Arabica Coffee", category: "agriculture", description: "Single-origin specialty coffee beans, Grade AA", certifications: "HACCP, Organic", exportVolume: "2000", unit: "kg/month", pricing: "$8.50/kg FOB Mombasa" },
-  { clientName: "Ultimo Trading Ltd", name: "Kenyan Black Tea", category: "agriculture", description: "Premium CTC black tea, orthodox grade", certifications: "HACCP, Halal", exportVolume: "5000", unit: "kg/month", pricing: "$3.20/kg FOB Mombasa" },
-  { clientName: "Sokogate", name: "Bulk Sourcing Platform", category: "technology", description: "B2B marketplace connecting African wholesalers to global suppliers", certifications: "", exportVolume: "", unit: "", pricing: "Subscription / Commission" },
-  { clientName: "East African Wholesalers", name: "Macadamia Nuts", category: "agriculture", description: "Raw and roasted macadamia nuts, Grade 1", certifications: "HACCP", exportVolume: "1000", unit: "kg/month", pricing: "$12.00/kg FOB" },
-  { clientName: "East African Wholesalers", name: "Shea Butter", category: "agriculture", description: "Unrefined shea butter, food grade", certifications: "", exportVolume: "3000", unit: "kg/month", pricing: "$4.50/kg FOB" },
-]
+export const tradeFinanceApps: any[] = []
 
-export const complianceRecords = [
-  { clientName: "Ultimo Trading Ltd", productName: "Kenyan Arabica Coffee", certificationType: "haccp", status: "obtained", issuer: "KEBS", appliedAt: "2025-11-01", obtainedAt: "2026-01-15", expiresAt: "2027-01-15" },
-  { clientName: "Ultimo Trading Ltd", productName: "Kenyan Arabica Coffee", certificationType: "organic", status: "obtained", issuer: "Ecocert", notes: "Organic certification for coffee export", appliedAt: "2025-10-01", obtainedAt: "2026-02-01", expiresAt: "2027-02-01" },
-  { clientName: "Ultimo Trading Ltd", productName: "Kenyan Black Tea", certificationType: "haccp", status: "obtained", issuer: "KEBS", appliedAt: "2025-11-01", obtainedAt: "2026-01-15", expiresAt: "2027-01-15" },
-  { clientName: "Ultimo Trading Ltd", productName: "Kenyan Black Tea", certificationType: "halal", status: "obtained", issuer: "Halal Authority Kenya", appliedAt: "2025-12-01", obtainedAt: "2026-02-15", expiresAt: "2027-02-15" },
-  { clientName: "Ultimo Trading Ltd", certificationType: "korean-import", status: "in-progress", issuer: "Korea FDA", notes: "Korean phytosanitary compliance for coffee & tea — documentation submitted", appliedAt: "2026-03-01" },
-  { clientName: "Sokogate", certificationType: "haccp", status: "obtained", issuer: "KEBS", notes: "Platform-level HACCP compliance for listed food products", obtainedAt: "2025-06-01", expiresAt: "2027-06-01" },
-  { clientName: "East African Wholesalers", productName: "Macadamia Nuts", certificationType: "haccp", status: "in-progress", issuer: "KEBS", notes: "Application submitted, awaiting inspection", appliedAt: "2026-02-15" },
-  { clientName: "East African Wholesalers", productName: "Shea Butter", certificationType: "halal", status: "not-started", notes: "Needed for Middle East / Korea market entry" },
-]
+export const revenueEntries: any[] = []
 
-export const tradeFinanceApps = [
-  { clientName: "Ultimo Trading Ltd", program: "afdb-afawa", amount: 50000, currency: "USD", status: "under-review", notes: "Working capital for Korea-bound coffee & tea shipment", appliedAt: "2026-03-15" },
-  { clientName: "Ultimo Trading Ltd", program: "sokogate-pay-escrow", amount: 15000, currency: "USD", status: "approved", notes: "Escrow facility for Korea trade corridor test transaction", appliedAt: "2026-02-01", approvedAt: "2026-03-01" },
-  { clientName: "Sokogate", program: "sokogate-pay-escrow", amount: 100000, currency: "USD", status: "approved", notes: "Platform-level escrow facility for B2B transactions", appliedAt: "2025-06-01", approvedAt: "2025-07-01", disbursedAt: "2025-08-01" },
-  { clientName: "East African Wholesalers", program: "letter-of-credit", amount: 25000, currency: "USD", status: "draft", notes: "LC for macadamia nuts export to Korea" },
-]
+export const campaignTemplates: any[] = []
 
-export const revenueEntries = [
-  { date: new Date("2026-01-15"), clientName: "Ultimo Trading Ltd", amount: 3000, type: "setup-fee", category: "enterprise", note: "Setup fee - lead qualification chatbot + WhatsApp workflows + onboarding" },
-  { date: new Date("2026-02-01"), clientName: "Ultimo Trading Ltd", amount: 2500, type: "retainer", category: "enterprise", note: "Month 1 retainer - lead capture & follow-up automation" },
-  { date: new Date("2026-03-01"), clientName: "Ultimo Trading Ltd", amount: 2500, type: "retainer", category: "enterprise", note: "Month 2 retainer - lead qualification & WhatsApp outreach" },
-  { date: new Date("2026-03-15"), clientName: "TechRetail Kenya Ltd", amount: 1500, type: "setup-fee", category: "growth", note: "Setup fee" },
-  { date: new Date("2026-04-01"), clientName: "Ultimo Trading Ltd", amount: 2500, type: "retainer", category: "enterprise", note: "Month 3 retainer - lead qualification & email/WhatsApp follow-up" },
-  { date: new Date("2026-04-01"), clientName: "TechRetail Kenya Ltd", amount: 1150, type: "retainer", category: "growth", note: "Month 1 retainer" },
-]
+export const contentArticles: any[] = []
 
-export const campaignTemplates = [
-  { name: "WhatsApp Lead Capture Flow", channel: "whatsapp", type: "warm", content: "Hi {{name}}, welcome! We saw you're interested in trading products. We can help qualify leads and manage follow-ups automatically. At ultimotradingltd.co.ke, we handle lead capture via WhatsApp using automated sequences." },
-  { name: "Cold Outreach - Wholesale Sourcing", channel: "email", type: "cold", content: "Hi {{name}},\nI noticed {{company}} is in the wholesale space. With sokogate.com, businesses access bulk product sourcing from global suppliers. And at ultimotradingltd.co.ke, we handle lead qualification and follow-up via email & WhatsApp automation. Open to a 15-min chat?" },
-  { name: "Warm Follow-up - LinkedIn", channel: "linkedin", type: "warm", content: "Hi {{name}}, following up on our connection. We help B2B trading companies source products via sokogate.com and automate lead follow-up using WhatsApp & email (like we do at ultimotradingltd.co.ke). Keen to share a case study?" },
-  { name: "WhatsApp Nurture - Lead Qual", channel: "whatsapp", type: "warm", content: "Hi {{name}}, it's Alex from AI Business Automation. Just checking if you had a chance to explore sokogate.com for product sourcing. We can also set up automated lead qualification & follow-up via WhatsApp — just like our Ultimo Trading system." },
-  { name: "Email Re-engagement", channel: "email", type: "re-engagement", content: "Subject: Still interested in lead automation?\n\nHi {{name}},\nIt's been a few weeks. We've since onboarded 2 more trading companies via the Sokogate network. ultimotradingltd.co.ke is our reference for lead qualification via email & WhatsApp. Happy to share updated ROI data." },
-]
+export const documents: any[] = []
 
-export const contentArticles = [
-  { title: "WhatsApp Automation for Kenyan SMEs: The Complete 2026 Guide", keyword: "WhatsApp automation Kenya", status: "published", week: 1, month: 1, wordCount: 2200, views: 340, leadsGenerated: 2 },
-  { title: "B2B Lead Generation in Kenya: How to Automate Your Pipeline", keyword: "B2B lead generation Kenya", status: "published", week: 2, month: 1, wordCount: 1800, views: 280, leadsGenerated: 1 },
-  { title: "WhatsApp Business API vs Wati.io vs Twilio: Kenya Guide", keyword: "WhatsApp Business API Kenya", status: "scheduled", week: 3, month: 1, wordCount: 2500, views: 0, leadsGenerated: 0 },
-  { title: "The ROI of B2B Automation for Kenyan Trading Companies", keyword: "B2B automation ROI Kenya", status: "scheduled", week: 4, month: 1, wordCount: 2000, views: 0, leadsGenerated: 0 },
-  { title: "Sokogate: How Bulk Product Sourcing Works for Kenyan Wholesalers", keyword: "bulk product sourcing Kenya", status: "scheduled", week: 5, month: 2, wordCount: 1800, views: 0, leadsGenerated: 0 },
-  { title: "Lead Qualification via WhatsApp: Ultimo Trading Case Study", keyword: "WhatsApp lead qualification", status: "idea", week: 6, month: 2 },
-  { title: "Automated Lead Qualification: A Practical Guide", keyword: "automated lead qualification", status: "idea", week: 7, month: 2 },
-]
-
-export const documents = []
-
-export const financialSnapshots = [
-  { month: 1, year: 2026, revenue: 3000, costs: 312, profit: 2688, clients: 1, pipelineValue: 5000 },
-  { month: 2, year: 2026, revenue: 2500, costs: 312, profit: 2188, clients: 1, pipelineValue: 7300 },
-  { month: 3, year: 2026, revenue: 4000, costs: 412, profit: 3588, clients: 2, pipelineValue: 9600 },
-  { month: 4, year: 2026, revenue: 3650, costs: 412, profit: 3238, clients: 2, pipelineValue: 12000 },
-  { month: 5, year: 2026, revenue: 5950, costs: 512, profit: 5438, clients: 3, pipelineValue: 15000 },
-  { month: 6, year: 2026, revenue: 7100, costs: 512, profit: 6588, clients: 4, pipelineValue: 18500 },
-]
+export const financialSnapshots: any[] = []

@@ -21,7 +21,7 @@ export const GET = withAuth(async (_req, { session }) => {
 
   const now = new Date()
   const trialStart = user.trialStartsAt || user.createdAt
-  const trialEnd = user.trialEndsAt || new Date(trialStart.getTime() + 14 * 24 * 60 * 60 * 1000)
+  const trialEnd = user.trialEndsAt || new Date(trialStart.getTime() + 3 * 24 * 60 * 60 * 1000)
   const daysRemaining = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
   const isTrialExpired = daysRemaining <= 0 && user.subscriptionStatus === "trial"
 
@@ -82,6 +82,7 @@ export const POST = withAuth(async (req: NextRequest, { session }) => {
     return NextResponse.json({ error: "Invalid plan. Must be: monthly or yearly" }, { status: 400 })
   }
 
+  // Trial expires after 3 days from now
   const now = new Date()
   const subscriptionEnd = new Date(now)
   if (plan === "monthly") {

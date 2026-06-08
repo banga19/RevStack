@@ -159,7 +159,7 @@ export default function PricingPage() {
           <p className="text-muted-foreground max-w-xl mx-auto">
             {trialStatus?.isExpired
               ? "Subscribe to keep using Mapato and unlock your automation pipeline."
-              : "Start with a 14-day free trial — no credit card required. Subscribe when you're ready."}
+              : "Start with a 3-day free trial — no credit card required. Subscribe when you're ready."}
           </p>
         </div>
 
@@ -240,7 +240,7 @@ export default function PricingPage() {
         {trialStatus?.isActive && (
           <div className="mt-8 p-4 rounded-xl bg-primary/5 border border-primary/10 text-center">
             <p className="text-sm text-muted-foreground">
-              You&apos;re currently on a <strong>14-day free trial</strong> with <strong className="text-primary">{trialStatus.daysRemaining} days remaining</strong>.
+               You&apos;re currently on a <strong>3-day free trial</strong> with <strong className="text-primary">{trialStatus.daysRemaining} day{trialStatus.daysRemaining !== 1 ? "s" : ""} remaining</strong>.
               Subscribe before the trial ends to keep your data and automation running.
             </p>
           </div>

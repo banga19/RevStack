@@ -67,8 +67,8 @@ export async function checkSubscriptionAccess(userId: string): Promise<Subscript
 
   const now = new Date()
   const trialEnd = user.trialEndsAt || (user.trialStartsAt
-    ? new Date(user.trialStartsAt.getTime() + 14 * 24 * 60 * 60 * 1000)
-    : new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000))
+    ? new Date(user.trialStartsAt.getTime() + 3 * 24 * 60 * 60 * 1000)
+    : new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000))
 
   const daysRemaining = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
   const isTrialExpired = daysRemaining <= 0 && user.subscriptionStatus === "trial"
@@ -107,7 +107,7 @@ export async function checkSubscriptionAccess(userId: string): Promise<Subscript
   if (isTrialExpired || user.subscriptionStatus === "expired") {
     return {
       allowed: false,
-      message: "Your 14-day free trial has ended. Subscribe to a plan to continue using Mapato.",
+      message: "Your 3-day free trial has ended. Subscribe to a plan to continue using Mapato.",
       code: "expired",
       details: { status: "expired", tier: user.subscriptionTier, daysRemaining: 0, isExpired: true, isAdmin: false },
     }

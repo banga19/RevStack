@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { withAbac, withAuth } from "@/lib/abac-middleware"
 import { RESOURCES } from "@/lib/abac"
+import { appendKoreanBuyerInquiryRow } from "@/lib/google-sheets"
 
 export const GET = withAbac(RESOURCES.admin, "read", async (req: NextRequest) => {
   const { searchParams } = new URL(req.url)
@@ -37,6 +38,21 @@ export async function POST(req: NextRequest) {
         monthlyVolume: body.monthlyVolume || null,
         additionalRequests: body.additionalRequests || null,
       },
+    })
+
+    // Save to Google Sheets for admin review
+    appendKoreanBuyerInquiryRow({
+      companyName: inquiry.companyName,
+      contactName: inquiry.contactName,
+      email: inquiry.email,
+      phone: inquiry.phone,
+      jobTitle: inquiry.jobTitle,
+      commodityInterest: inquiry.commodityInterest,
+      monthlyVolume: inquiry.monthlyVolume,
+      additionalRequests: inquiry.additionalRequests,
+      createdAt: inquiry.createdAt.toISOString(),
+    }).catch((err) => {
+      console.error("Google Sheets Korea inquiry append error:", err)
     })
 
     return NextResponse.json(inquiry, { status: 201 })

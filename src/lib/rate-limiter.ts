@@ -101,6 +101,9 @@ export function getDefaultLimits(): RateLimitConfig[] {
     // ── Admin — restricted ─────────────────────────────────
     { pathPrefix: "/api/admin", max: 30, windowMs: 60_000 },       // 30 requests/min
 
+    // ── Webhooks — strict but handles burst traffic ────────
+    { pathPrefix: "/api/webhooks", max: 30, windowMs: 60_000 },    // 30 req/min (burst-tolerant)
+
     // ── Inquiries (public-facing) ──────────────────────────
     { pathPrefix: "/api/korea/inquiries", max: 20, windowMs: 60_000 }, // 20 POST/min
 

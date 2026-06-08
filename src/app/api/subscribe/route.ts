@@ -3,6 +3,19 @@ import { prisma } from "@/lib/db"
 import { validateCsrf } from "@/lib/csrf"
 import { appendSubscriberRow } from "@/lib/google-sheets"
 
+/**
+ * Newsletter / Email Subscriber Endpoint
+ *
+ * This is called from the landing page email capture form.
+ * It creates a Subscriber record and appends to Google Sheets for admin review.
+ * Does NOT require authentication or an active subscription.
+ *
+ * Payment subscription initiation goes through:
+ *   PaymentCheckout component → /api/payments/initiate
+ *
+ * Subscription lifecycle management goes through:
+ *   /api/subscription (GET, POST, PATCH, DELETE)
+ */
 export async function POST(req: NextRequest) {
   try {
     // CSRF is optional for public subscribe (landing page form).

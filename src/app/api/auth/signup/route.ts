@@ -59,9 +59,9 @@ export async function POST(req: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 12)
 
-    // Auto-start 14-day free trial on signup — full access to all features
+    // Auto-start 3-day free trial on signup — full access to all features
     const now = new Date()
-    const trialEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000)
+    const trialEnd = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
 
     // Create organization for multi-tenant isolation
     const orgSlug = email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "-") + "-" + Date.now().toString(36)
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
         termsAcceptedAt: new Date(),
         termsVersion: "1.0",
         organizationId: organization.id,
-        // 14-day free trial with full access
+        // 3-day free trial with full access
         trialStartsAt: now,
         trialEndsAt: trialEnd,
         subscriptionStatus: "trial",
@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
         trial: {
           startedAt: now.toISOString(),
           endsAt: trialEnd.toISOString(),
-          daysRemaining: 14,
+          daysRemaining: 3,
         },
       },
       { status: 201 }

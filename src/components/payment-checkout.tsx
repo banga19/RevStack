@@ -200,7 +200,7 @@ export function PaymentCheckout({ tierId, tierName, amount, billingCycle, onClos
   // -------------------------------------------------------------------
   if (payment.step === "success") {
     return (
-      <div className="text-center py-8">
+      <div className="text-center py-8" data-testid="payment-success">
         <div className="flex justify-center mb-6">
           <div className="p-4 rounded-full bg-emerald-500/10">
             <CheckCircle2 className="h-16 w-16 text-emerald-500 animate-in zoom-in-50 duration-500" />
@@ -223,7 +223,7 @@ export function PaymentCheckout({ tierId, tierName, amount, billingCycle, onClos
   // -------------------------------------------------------------------
   if (payment.step === "processing") {
     return (
-      <div className="text-center py-8">
+      <div className="text-center py-8" data-testid="payment-processing">
         <div className="flex justify-center mb-6">
           <div className="p-4 rounded-full bg-primary/10">
             <Loader2 className="h-12 w-12 text-primary animate-spin" />
@@ -249,7 +249,7 @@ export function PaymentCheckout({ tierId, tierName, amount, billingCycle, onClos
   // -------------------------------------------------------------------
   if (payment.step === "error") {
     return (
-      <div className="text-center py-8">
+      <div className="text-center py-8" data-testid="payment-error">
         <div className="flex justify-center mb-6">
           <div className="p-4 rounded-full bg-destructive/10">
             <AlertCircle className="h-12 w-12 text-destructive" />
@@ -258,7 +258,7 @@ export function PaymentCheckout({ tierId, tierName, amount, billingCycle, onClos
         <h3 className="text-xl font-bold mb-2">Payment Failed</h3>
         <p className="text-destructive mb-6">{payment.error}</p>
         <div className="flex gap-3 justify-center">
-          <Button variant="outline" onClick={backToMethod}>
+          <Button variant="outline" onClick={backToMethod} data-testid="back-button">
             <ArrowLeft className="h-4 w-4 mr-2" /> Try Again
           </Button>
           <Button variant="ghost" onClick={onClose}>
@@ -274,7 +274,7 @@ export function PaymentCheckout({ tierId, tierName, amount, billingCycle, onClos
   // -------------------------------------------------------------------
   if (payment.step === "method") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" data-testid="payment-method-selection">
         <div className="text-center mb-2">
           <h3 className="text-xl font-bold">Complete Your Payment</h3>
           <p className="text-muted-foreground text-sm mt-1">
@@ -320,7 +320,7 @@ export function PaymentCheckout({ tierId, tierName, amount, billingCycle, onClos
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3 mb-2">
-          <button onClick={backToMethod} className="p-1 hover:bg-muted rounded-lg transition-colors">
+          <button onClick={backToMethod} className="p-1 hover:bg-muted rounded-lg transition-colors" data-testid="back-button">
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
@@ -377,9 +377,9 @@ export function PaymentCheckout({ tierId, tierName, amount, billingCycle, onClos
     const years = Array.from({ length: 10 }, (_, i) => String(currentYear + i))
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" data-testid="card-payment-form">
         <div className="flex items-center gap-3 mb-2">
-          <button onClick={backToMethod} className="p-1 hover:bg-muted rounded-lg transition-colors">
+          <button onClick={backToMethod} className="p-1 hover:bg-muted rounded-lg transition-colors" data-testid="back-button">
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
@@ -462,6 +462,7 @@ export function PaymentCheckout({ tierId, tierName, amount, billingCycle, onClos
               cardDetails.cvv.length < 3
             }
             className="w-full h-12 text-base"
+            data-testid="pay-button"
           >
             <Sparkles className="h-5 w-5 mr-2" />
             Pay ${amount} via Card
@@ -473,3 +474,4 @@ export function PaymentCheckout({ tierId, tierName, amount, billingCycle, onClos
 
   return null
 }
+

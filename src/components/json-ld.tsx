@@ -93,7 +93,7 @@ const FAQ_ITEMS = [
   {
     question: "How much does Mapato cost?",
     answer:
-      "Mapato starts at $50/month (Starter) with plans up to $500/month (Enterprise). All plans include a 14-day free trial with full access. Success fees start from 10% of revenue generated — half of what comparable platforms charge.",
+      "Mapato starts at $50/month (Starter) with plans up to $500/month (Enterprise). All plans include a 3-day free trial with full access. Success fees start from 10% of revenue generated — half of what comparable platforms charge.",
   },
   {
     question: "Does Mapato work with WhatsApp?",

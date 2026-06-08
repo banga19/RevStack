@@ -565,17 +565,21 @@ export default function PipelinePage() {
                           </div>
                         ) : stageClients.map((client, index) => (
                           <Draggable key={client.id} draggableId={client.id} index={index}>
-                            {(provided, snapshot) => (
-                              <Card
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                className={cn(
-                                  "group transition-all duration-200",
-                                  snapshot.isDragging && "shadow-xl rotate-2 scale-105 z-50",
-                                  snapshot.isDragging ? "bg-card" : "hover:shadow-md"
-                                )}
-                              >
-                                <CardContent className="p-3">
+                            {(provided, snapshot) => {
+                              const { style, ...draggableProps } = provided.draggableProps
+                              return (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...draggableProps}
+                                  style={style as any}
+                                  className={cn(
+                                    "rounded-lg border bg-card text-card-foreground shadow-sm transition-all duration-200",
+                                    "group transition-all duration-200",
+                                    snapshot.isDragging && "shadow-xl rotate-2 scale-105 z-50",
+                                    snapshot.isDragging ? "bg-card" : "hover:shadow-md"
+                                  )}
+                                >
+                                  <CardContent className="p-3">
                                   <div className="flex items-start justify-between mb-2">
                                     <div className="flex items-center gap-2 min-w-0">
                                       <div
@@ -614,9 +618,9 @@ export default function PipelinePage() {
                                     <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => openEdit(client)}><Edit3 className="h-3 w-3 mr-1" /> Edit</Button>
                                     <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10" onClick={() => setDeleteConfirm(client.id)}><Trash2 className="h-3 w-3 mr-1" /> Delete</Button>
                                   </div>
-                                </CardContent>
-                              </Card>
-                            )}
+</CardContent>
+                               </div>
+                             )}
                           </Draggable>
                         ))}
                         {provided.placeholder}

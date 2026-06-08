@@ -44,6 +44,33 @@ export interface SubscriberRow {
   createdAt: string
 }
 
+export interface KoreanBuyerInquiryRow {
+  companyName: string
+  contactName: string
+  email: string
+  phone?: string | null
+  jobTitle?: string | null
+  commodityInterest?: string | null
+  monthlyVolume?: string | null
+  additionalRequests?: string | null
+  createdAt: string
+}
+
+export interface LeadRow {
+  id: string
+  companyName: string
+  contactName: string
+  email: string
+  phone?: string | null
+  whatsapp?: string | null
+  industry?: string | null
+  country?: string | null
+  notes?: string | null
+  source?: string | null
+  userId: string
+  createdAt: string
+}
+
 export interface QuestionnaireRow {
   tempId: string
   userId?: string | null
@@ -71,6 +98,8 @@ const SHEET_NAMES = {
   onboarding: "Onboarding",
   subscribers: "Newsletter Subscribers",
   questionnaires: "Needs Assessments",
+  koreanInquiries: "Korea Buyer Inquiries",
+  leads: "Leads",
 } as const
 
 // ---------------------------------------------------------------------------
@@ -286,6 +315,63 @@ export async function appendSubscriberRow(row: SubscriberRow) {
     row.email,
     row.name ?? "",
     row.source ?? "landing-page",
+    row.createdAt,
+  ], sid)
+}
+
+/**
+ * Append a new Korean buyer inquiry row to the "Korea Buyer Inquiries" sheet tab.
+ * Creates the tab and headers automatically if they don't exist.
+ */
+export async function appendKoreanBuyerInquiryRow(row: KoreanBuyerInquiryRow) {
+  const sheets = getSheets()
+  if (!sheets) return
+  const sid = SPREADSHEET_MUST_EXIST()
+
+  const tabName = SHEET_NAMES.koreanInquiries
+  const headers = [
+    "Company Name", "Contact Name", "Email", "Phone", "Job Title",
+    "Commodity Interest", "Monthly Volume", "Additional Requests", "Created At",
+  ]
+  await appendRow(sheets, tabName, headers, [
+    row.companyName,
+    row.contactName,
+    row.email,
+    row.phone ?? "",
+    row.jobTitle ?? "",
+    row.commodityInterest ?? "",
+    row.monthlyVolume ?? "",
+    row.additionalRequests ?? "",
+    row.createdAt,
+  ], sid)
+}
+
+/**
+ * Append a new lead row to the "Leads" sheet tab.
+ * Creates the tab and headers automatically if they don't exist.
+ */
+export async function appendLeadRow(row: LeadRow) {
+  const sheets = getSheets()
+  if (!sheets) return
+  const sid = SPREADSHEET_MUST_EXIST()
+
+  const tabName = SHEET_NAMES.leads
+  const headers = [
+    "ID", "Company Name", "Contact Name", "Email", "Phone", "WhatsApp",
+    "Industry", "Country", "Notes", "Source", "User ID", "Created At",
+  ]
+  await appendRow(sheets, tabName, headers, [
+    row.id,
+    row.companyName,
+    row.contactName,
+    row.email,
+    row.phone ?? "",
+    row.whatsapp ?? "",
+    row.industry ?? "",
+    row.country ?? "",
+    row.notes ?? "",
+    row.source ?? "",
+    row.userId,
     row.createdAt,
   ], sid)
 }

@@ -60,7 +60,7 @@ export const POST = withAuth(async (req: NextRequest, { session }) => {
 
   // Reset trial dates so the 14-day free trial starts NOW (after onboarding completion)
   const trialStart = new Date()
-  const trialEnd = new Date(trialStart.getTime() + 14 * 24 * 60 * 60 * 1000)
+  const trialEnd = new Date(trialStart.getTime() + 3 * 24 * 60 * 60 * 1000)
   await prisma.user.update({
     where: { id: dbUser.id },
     data: {

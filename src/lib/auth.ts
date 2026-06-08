@@ -1,4 +1,14 @@
+/**
+ * NextAuth v4 configuration for RevStack (Mapato).
+ *
+ * NOTE: next-auth v4's `NextAuth()` returns an async handler function directly,
+ * NOT an object with `{ handlers, auth, signIn, signOut }` as in v5.
+ * We export { GET, POST } for the App Router route handler and provide
+ * a convenience `auth()` function using `getServerSession`.
+ */
+
 import NextAuth from "next-auth"
+import { getServerSession } from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import Google from "next-auth/providers/google"
 import { prisma } from "@/lib/db"
@@ -10,7 +20,11 @@ function logEvent(event: string, data: Record<string, any>) {
   }
 }
 
-export const { handlers, signIn, signOut, auth } = NextAuth({
+// ═══════════════════════════════════════════════════════════════════════════
+// Auth configuration (shared between handler and getServerSession)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const authOptions = {
   providers: [
     Credentials({
       name: "credentials",
@@ -70,9 +84,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         })
 
         if (!existingUser) {
-          // Auto-create account for Google users with 14-day trial
+          // Auto-create account for Google users with 3-day trial
           const now = new Date()
-          const trialEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000)
+          const trialEnd = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
           await prisma.user.create({
             data: {
               name: user.name || "Google User",
@@ -83,7 +97,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               termsAccepted: true,
               termsAcceptedAt: now,
               termsVersion: "1.0",
-              // 14-day free trial with full access
+              // 3-day free trial with full access
               trialStartsAt: now,
               trialEndsAt: trialEnd,
               subscriptionStatus: "trial",
@@ -145,4 +159,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   session: {
     strategy: "jwt",
   },
-})
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Exports
+// ═══════════════════════════════════════════════════════════════════════════
+
+// next-auth v4: NextAuth(options) returns an async handler function
+const handler = NextAuth(authOptions)
+
+// For App Router route handler (app/api/auth/[...nextauth]/route.ts)
+export { handler as GET, handler as POST }
+
+// Server-side session helper (wraps getServerSession for convenience).
+// In next-auth v4, we use getServerSession() with the auth options.
+export async function auth() {
+  return getServerSession(authOptions)
+}

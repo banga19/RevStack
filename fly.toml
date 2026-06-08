@@ -1,0 +1,44 @@
+# =============================================================================
+# Fly.io Deployment Configuration — RevStack Hermes Worker
+#
+# Deploy:
+#   fly launch --name revstack-worker --region iad --no-deploy
+#   fly volumes create chroma_data --size 1 --region iad
+#   fly secrets set DATABASE_URL=<supabase-connection-string>
+#   fly secrets set REDIS_URL=<upstash-redis-url>
+#   fly secrets set FLUTTERWAVE_SECRET_KEY=<key>
+#   fly secrets set FLUTTERWAVE_ENCRYPTION_KEY=<key>
+#   fly secrets set FLUTTERWAVE_WEBHOOK_SECRET=<secret>
+#   fly deploy
+#
+# Note: Create the app with `fly launch` first, then replace this fly.toml
+# and run `fly deploy` to apply the configuration.
+# =============================================================================
+
+app = "revstack-worker"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile.worker"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256
+
+[mounts]
+  source = "chroma_data"
+  destination = "/chroma"
+
+[env]
+  NODE_ENV = "production"
+  RUN_WORKER = "true"
+  CHROMA_DB_PATH = "/chroma"
+
+# No HTTP service block — the worker is a background process, not a web server.
+# Health is monitored by Fly.io machine checks (auto-restart on crash).
+# If you need a health endpoint, add a simple HTTP listener to the worker process.
+
+[metrics]
+  port = 9091
+  path = "/metrics"

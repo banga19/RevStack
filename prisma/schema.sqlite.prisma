@@ -51,6 +51,8 @@ model User {
   subscriptionEndsAt DateTime?
   phone          String?  // phone number for M-Pesa payments & WhatsApp follow-ups
   billingEmail   String?  // email for invoices (defaults to user email)
+  flutterwaveCustomerId String? @unique
+  paymentMethods    Json?          // Store tokenized payment methods
 
   lastLoginAt   DateTime?  // Last login timestamp for retention tracking
 
@@ -63,9 +65,29 @@ model User {
   clients              Client[]
   koreanTargets        KoreanCorporateTarget[]
   payments             Payment[]
+  subscriptions        Subscription[]
   followUpLogs         FollowUpLog[]
   leads                Lead[]
   retainers            Retainer[]
+}
+
+// Subscription — recurring subscription tied to a Flutterwave charge
+model Subscription {
+  id                      String    @id @default(cuid())
+  userId                  String
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tier                    String    // starter, growth, enterprise
+  plan                    String    // monthly, yearly
+  flutterwaveTxRef        String    @unique
+  flutterwaveTxId         Int?      @unique
+  amount                  Float
+  currency                String
+  status                  String    @default("active") // active, past_due, cancelled, expired
+  currentPeriodStart      DateTime
+  currentPeriodEnd        DateTime
+  cancelAtPeriodEnd       Boolean   @default(false)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 }
 
 // Payment transactions — M-Pesa, Mobile Money, Visa/Mastercard

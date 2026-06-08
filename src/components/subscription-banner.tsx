@@ -56,7 +56,7 @@ export function SubscriptionBanner() {
             {isUrgent ? (
               <strong className="font-semibold">⚠️ Your trial ends in {trial.daysRemaining} day{trial.daysRemaining !== 1 ? "s" : ""}!</strong>
             ) : (
-              <>You&apos;re on a <strong>14-day free trial</strong> — <strong>{trial.daysRemaining} day{trial.daysRemaining !== 1 ? "s" : ""}</strong> remaining</>
+              <>You&apos;re on a <strong>3-day free trial</strong> — <strong>{trial.daysRemaining} day{trial.daysRemaining !== 1 ? "s" : ""}</strong> remaining</>
             )}
             <span className="hidden sm:inline text-muted-foreground ml-1">{isUrgent ? "Subscribe to keep your data active." : `We recommend the ${tierName} plan.`}</span>
           </span>

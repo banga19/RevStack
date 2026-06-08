@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { withAuth } from "@/lib/abac-middleware"
+import { appendLeadRow } from "@/lib/google-sheets"
 
 export const GET = withAuth(async (req: NextRequest, { session }) => {
   const { searchParams } = new URL(req.url)
@@ -40,6 +41,25 @@ export const POST = withAuth(async (req: NextRequest, { session }) => {
       userId: session.user.id,
     },
   })
+
+  // Save to Google Sheets for admin review
+  appendLeadRow({
+    id: lead.id,
+    companyName: lead.companyName,
+    contactName: lead.contactName,
+    email: lead.email,
+    phone: lead.phone,
+    whatsapp: lead.whatsapp,
+    industry: lead.industry,
+    country: lead.country,
+    notes: lead.notes,
+    source: lead.source,
+    userId: lead.userId,
+    createdAt: lead.createdAt.toISOString(),
+  }).catch((err) => {
+    console.error("Google Sheets lead append error:", err)
+  })
+
   await prisma.activity.create({
     data: {
       type: "lead_created",

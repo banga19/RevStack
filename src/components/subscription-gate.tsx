@@ -107,7 +107,7 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
           loading: false,
           blocked: false,
           expired: false,
-          daysRemaining: data.trial?.daysRemaining || 14,
+           daysRemaining: data.trial?.daysRemaining || 3,
           tier: data.subscription?.tier,
           status: data.subscription?.status,
         })
@@ -153,7 +153,7 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
             </div>
             <CardTitle className="text-2xl">Your Trial Has Ended</CardTitle>
             <CardDescription className="text-base mt-2">
-              Your 14-day free trial has expired. Subscribe to a plan to regain access to all features.
+              Your 3-day free trial has expired. Subscribe to a plan to regain access to all features.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pt-4">
