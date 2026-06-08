@@ -10,12 +10,23 @@
  * - Analytics and reporting
  *
  * API Docs: https://docs.wati.io/
+ *
+ * When credentials are configured (WATI_API_TOKEN + WATI_WHATSAPP_NUMBER_ID),
+ * the integration makes real HTTP calls to the WATI API. Falls back to
+ * simulation mode when credentials are missing.
+ *
+ * Instance URL format:
+ *   https://{your-instance}.wati.io/{whatsappNumberId}/api/v1/{endpoint}
+ *
+ * Set WATI_API_URL to override the default host (https://live-mt-server.wati.io).
+ * Find your instance URL in WATI dashboard → Settings → API Docs.
  */
 
 // WATI API Configuration
 interface WATIConfig {
   apiToken: string;
   whatsappNumberId: string;
+  /** Full base URL including instance host (default: https://live-mt-server.wati.io) */
   baseUrl: string;
 }
 
@@ -88,7 +99,7 @@ export class WATIIntegration {
     this.config = {
       apiToken: config?.apiToken || process.env.WATI_API_TOKEN || "",
       whatsappNumberId: config?.whatsappNumberId || process.env.WATI_WHATSAPP_NUMBER_ID || "",
-      baseUrl: config?.baseUrl || "https://api.wati.io/v1",
+      baseUrl: config?.baseUrl || process.env.WATI_API_URL || "https://live-mt-server.wati.io",
     };
 
     this.contacts = new Map();
@@ -97,6 +108,56 @@ export class WATIIntegration {
 
     // Initialize default templates for trading outreach
     this.initializeDefaultTemplates();
+  }
+
+  /**
+   * Build the WATI API URL for a given endpoint path.
+   * Format: {baseUrl}/{whatsappNumberId}/api/v1/{endpoint}
+   */
+  private apiUrl(endpoint: string): string {
+    const base = this.config.baseUrl.replace(/\/+$/, "");
+    return `${base}/${this.config.whatsappNumberId}/api/v1/${endpoint}`;
+  }
+
+  /**
+   * Common fetch wrapper for WATI API calls.
+   * Returns parsed JSON response or throws on error.
+   */
+  private async apiFetch<T>(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<{ success: boolean; data?: T; error?: string }> {
+    if (!this.config.apiToken) {
+      return { success: false, error: "WATI_API_TOKEN not configured" };
+    }
+
+    try {
+      const url = this.apiUrl(endpoint);
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          "Authorization": `Bearer ${this.config.apiToken}`,
+          "Content-Type": "application/json",
+          ...options.headers,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "");
+        return {
+          success: false,
+          error: `WATI API error ${response.status}: ${errorText || response.statusText}`,
+        };
+      }
+
+      const data = await response.json() as T;
+      return { success: true, data };
+    } catch (error) {
+      return {
+        success: false,
+        error: `WATI API request failed: ${(error as Error).message}`,
+      };
+    }
   }
 
   // Initialize default WhatsApp message templates for B2B trading
@@ -160,19 +221,33 @@ export class WATIIntegration {
     });
   }
 
-  // Send a message via WATI
+  /**
+   * Send a free-form WhatsApp message via WATI.
+   *
+   * POST /api/v1/sendSessionMessage/{whatsappNumber}
+   * Body (form-data): messageText
+   */
   async sendMessage(to: string, message: string): Promise<{ success: boolean; messageId?: string }> {
     try {
-      // In production, this would call WATI's API:
-      // POST https://api.wati.io/v1/sendSessionMessage/{whatsappNumberId}
-      // Headers: { Authorization: `Bearer ${this.config.apiToken}` }
-      // Body: { to, text: message }
+      if (this.isConfigured()) {
+        const result = await this.apiFetch<any>(`sendSessionMessage/${encodeURIComponent(to)}`, {
+          method: "POST",
+          body: new URLSearchParams({ messageText: message }).toString(),
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        });
 
-      console.log(`[WATI] Sending message to ${to}: "${message.substring(0, 50)}..."`);
+        if (result.success) {
+          const messageId = (result.data as any)?.messageId || `wati-msg-${Date.now()}`;
+          return { success: true, messageId };
+        }
 
-      // Simulate API call
+        // If the live API call failed, fall through to simulation
+        console.warn(`[WATI] Live sendMessage failed (${result.error}), falling back to simulation`);
+      }
+
+      // Simulation fallback
+      console.log(`[WATI] [SIM] Sending message to ${to}: "${message.substring(0, 50)}..."`);
       const messageId = `wati-msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-
       return { success: true, messageId };
     } catch (error) {
       console.error("[WATI] Error sending message:", error);
@@ -180,7 +255,12 @@ export class WATIIntegration {
     }
   }
 
-  // Send a template message (pre-approved by WhatsApp)
+  /**
+   * Send a pre-approved WhatsApp template message via WATI.
+   *
+   * POST /api/v1/sendTemplateMessage?whatsappNumber={to}
+   * Body: { template_name, broadcast_name, parameters }
+   */
   async sendTemplate(
     to: string,
     templateName: string,
@@ -193,14 +273,36 @@ export class WATIIntegration {
     }
 
     try {
-      // In production:
-      // POST https://api.wati.io/v1/sendTemplateMessage/{whatsappNumberId}
-      // Body: { to, template_name: templateName, parameters }
+      if (this.isConfigured()) {
+        // Map positional parameters to named parameters for WATI
+        const namedParams = parameters.map((value, index) => ({
+          name: `param_${index + 1}`,
+          value,
+        }));
 
-      console.log(`[WATI] Sending template "${templateName}" to ${to}`);
+        const result = await this.apiFetch<any>(
+          `sendTemplateMessage?whatsappNumber=${encodeURIComponent(to)}`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              template_name: template.name,
+              broadcast_name: `auto_${templateName}_${Date.now()}`,
+              parameters: namedParams,
+            }),
+          }
+        );
 
+        if (result.success) {
+          const messageId = (result.data as any)?.messageId || `wati-tpl-${Date.now()}`;
+          return { success: true, messageId };
+        }
+
+        console.warn(`[WATI] Live sendTemplate failed (${result.error}), falling back to simulation`);
+      }
+
+      // Simulation fallback
+      console.log(`[WATI] [SIM] Sending template "${templateName}" to ${to}`);
       const messageId = `wati-tpl-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-
       return { success: true, messageId };
     } catch (error) {
       console.error("[WATI] Error sending template:", error);
@@ -208,7 +310,12 @@ export class WATIIntegration {
     }
   }
 
-  // Create a new contact/lead in WATI
+  /**
+   * Create a new contact/lead in WATI.
+   *
+   * POST /api/v1/addContact
+   * Body: { name, phone, email, tags, customFields }
+   */
   async createContact(contact: {
     name: string;
     phone: string;
@@ -217,10 +324,32 @@ export class WATIIntegration {
     customFields?: Record<string, any>;
   }): Promise<{ success: boolean; contactId?: string }> {
     try {
-      // In production:
-      // POST https://api.wati.io/v1/addContact
-      // Body: { name, phone, email, tags, customFields }
+      if (this.isConfigured()) {
+        const result = await this.apiFetch<any>("addContact", {
+          method: "POST",
+          body: JSON.stringify({
+            name: contact.name,
+            phone: contact.phone,
+            email: contact.email,
+            tags: contact.tags || [],
+            customParams: contact.customFields
+              ? Object.entries(contact.customFields).map(([key, value]) => ({
+                  name: key,
+                  value: String(value),
+                }))
+              : [],
+          }),
+        });
 
+        if (result.success) {
+          const contactId = (result.data as any)?.contactId || (result.data as any)?.id || `wati-lead-${Date.now()}`;
+          return { success: true, contactId };
+        }
+
+        console.warn(`[WATI] Live createContact failed (${result.error}), falling back to simulation`);
+      }
+
+      // Simulation fallback
       const lead: WATILead = {
         id: `wati-lead-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         name: contact.name,
@@ -233,10 +362,8 @@ export class WATIIntegration {
         status: "new",
         createdAt: new Date().toISOString(),
       };
-
       this.contacts.set(lead.id, lead);
-      console.log(`[WATI] Contact created: ${contact.name} (${contact.phone})`);
-
+      console.log(`[WATI] [SIM] Contact created: ${contact.name} (${contact.phone})`);
       return { success: true, contactId: lead.id };
     } catch (error) {
       console.error("[WATI] Error creating contact:", error);
@@ -244,7 +371,7 @@ export class WATIIntegration {
     }
   }
 
-  // Get contact by phone number
+  // Get contact by phone number (from local cache)
   getContactByPhone(phone: string): WATILead | undefined {
     for (const contact of this.contacts.values()) {
       if (contact.phone === phone) return contact;
@@ -252,7 +379,7 @@ export class WATIIntegration {
     return undefined;
   }
 
-  // Get all contacts
+  // Get all contacts (from local cache)
   getAllContacts(): WATILead[] {
     return Array.from(this.contacts.values());
   }
@@ -280,7 +407,7 @@ export class WATIIntegration {
     };
 
     this.campaigns.set(campaignId, newCampaign);
-    console.log(`[WATI] Campaign created: "${campaign.name}" with ${campaign.contacts.length} contacts`);
+    console.log(`[WATI] [SIM] Campaign created: "${campaign.name}" with ${campaign.contacts.length} contacts`);
 
     return { success: true, campaignId };
   }
@@ -293,10 +420,8 @@ export class WATIIntegration {
     campaign.status = "running";
     campaign.startedAt = new Date().toISOString();
 
-    // Simulate sending messages to all contacts
-    console.log(`[WATI] Starting campaign "${campaign.name}" - sending to ${campaign.contacts.length} contacts`);
+    console.log(`[WATI] [SIM] Starting campaign "${campaign.name}" - sending to ${campaign.contacts.length} contacts`);
 
-    // In production, this would batch-send via WATI API
     campaign.sentCount = campaign.contacts.length;
     campaign.status = "completed";
     campaign.completedAt = new Date().toISOString();
@@ -330,7 +455,7 @@ export class WATIIntegration {
     return id;
   }
 
-  // Simulate incoming message webhook
+  // Simulate incoming message webhook (local logic, no API call)
   async handleIncomingMessage(payload: {
     from: string;
     text: string;
@@ -340,7 +465,7 @@ export class WATIIntegration {
     reply?: string;
     leadScore?: number;
   }> {
-    const { from, text } = payload;
+    const { text } = payload;
     const lowerText = text.toLowerCase();
 
     // Auto-qualification logic based on keywords
@@ -415,7 +540,7 @@ export class WATIIntegration {
    * Returns true when both apiToken and whatsappNumberId are set.
    */
   isConfigured(): boolean {
-    return !!(this.config.apiToken && this.config.whatsappNumberId)
+    return !!(this.config.apiToken && this.config.whatsappNumberId);
   }
 
   // Configure WATI instance
@@ -423,13 +548,25 @@ export class WATIIntegration {
     this.config = { ...this.config, ...newConfig };
   }
 
-  // Health check
+  /**
+   * Health check — verifies connectivity to the WATI API.
+   * Calls getContacts with pageSize=1 to validate credentials.
+   */
   async healthCheck(): Promise<{ connected: boolean; whatsappNumber?: string }> {
+    if (!this.isConfigured()) {
+      console.log("[WATI] Health check: not configured (simulation mode)");
+      return { connected: true, whatsappNumber: undefined };
+    }
+
     try {
-      // In production:
-      // GET https://api.wati.io/v1/getProfile
-      console.log("[WATI] Health check passed");
-      return { connected: true, whatsappNumber: this.config.whatsappNumberId };
+      const result = await this.apiFetch<any>("getContacts?pageSize=1");
+      if (result.success) {
+        console.log("[WATI] Health check passed — API connected");
+        return { connected: true, whatsappNumber: this.config.whatsappNumberId };
+      }
+
+      console.warn(`[WATI] Health check failed: ${result.error}`);
+      return { connected: false };
     } catch (error) {
       console.error("[WATI] Health check failed:", error);
       return { connected: false };

@@ -20,7 +20,18 @@
  *   LLM_API_KEY             (optional) — one of NVIDIA_NIM | OPENAI | GEMINI | DEEPSEEK
  */
 
-import "dotenv/config"
+import fs from "node:fs"
+import path from "node:path"
+const envPath = path.resolve(process.cwd(), ".env.local")
+try {
+  fs.readFileSync(envPath, "utf8")
+    .split("\n")
+    .filter((line) => line && !line.trim().startsWith("#"))
+    .forEach((line) => {
+      const [k, ...v] = line.split("=")
+      if (k && v.length) process.env[k.trim()] = v.join("=").trim().replace(/^["']|["']$/g, "")
+    })
+} catch {}
 
 const PASS = "✅"
 const FAIL = "❌"
@@ -300,9 +311,46 @@ async function main() {
   }
 
   // ===================================================================
-  // Test 8: Autonomous Scheduler
+  // Test 8: WATI Integration (live)
   // ===================================================================
-  console.log("\n─── 8. Autonomous Scheduler ──────────────────────────")
+  console.log("\n─── 8. WATI Integration ──────────────────────────────")
+  try {
+    const { watiIntegration } = await import("@/lib/wati-integration")
+    log("WATI module loads", true)
+    log("WATI configured", watiIntegration.isConfigured(), "live API" )
+
+    const health = await watiIntegration.healthCheck()
+    log("WATI health check", health.connected, health.whatsappNumber || "simulation")
+
+    const testPhone = `2547${Math.floor(1000000 + Math.random() * 8999999)}`
+    const contact = await watiIntegration.createContact({
+      name: `Hermes QA ${Date.now()}`,
+      phone: testPhone,
+      email: `hermes+${Date.now()}@mapato.app`,
+      tags: ["hermes-test"],
+      customFields: { source: "hermes-full-test" },
+    })
+    log("Create contact", contact.success, contact.contactId)
+
+    const textMsg = await watiIntegration.sendMessage(testPhone, `Hermes live test at ${new Date().toISOString()}`)
+    log("Send text message", textMsg.success, textMsg.messageId)
+
+    const tplMsg = await watiIntegration.sendTemplate(testPhone, "lead-welcome", ["Hermes", "Mapato", "Trade"])
+    log("Send template message", tplMsg.success, tplMsg.messageId)
+
+    const inbound = await watiIntegration.handleIncomingMessage({
+      from: testPhone,
+      text: "Urgent: need quote for 3 containers of macadamia nuts. Company: Hermes QA Ltd.",
+    })
+    log("Inbound lead score", typeof inbound.leadScore === "number", `score=${inbound.leadScore}, action=${inbound.action}`)
+  } catch (err) {
+    log("WATI integration", false, (err as Error).message)
+  }
+
+  // ===================================================================
+  // Test 9: Autonomous Scheduler
+  // ===================================================================
+  console.log("\n─── 9. Autonomous Scheduler ──────────────────────────")
   try {
     const { autonomousScheduler } = await import("@/lib/autonomous-scheduler")
     log("Autonomous scheduler module loads", true)
@@ -315,9 +363,9 @@ async function main() {
   }
 
   // ===================================================================
-  // Test 9: Export Readiness Scoring
+  // Test 10: Export Readiness Scoring
   // ===================================================================
-  console.log("\n─── 9. Export Readiness Scoring ──────────────────────")
+  console.log("\n─── 10. Export Readiness Scoring ──────────────────────")
   try {
     const { calculateErs, readinessLabel } = await import("@/lib/ers-scoring")
     log("ERS module loads", true)

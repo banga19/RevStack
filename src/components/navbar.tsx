@@ -79,6 +79,19 @@ export function Navbar() {
               </Link>
             )
           })}
+          {session?.user?.role === "admin" && (
+            <Link
+              href="/admin?tab=godmode"
+              className={cn(
+                "px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                pathname.startsWith("/admin?tab=godmode")
+                  ? "bg-primary/10 text-primary"
+                  : "text-amber-600 hover:text-foreground hover:bg-muted"
+              )}
+            >
+              GOD MODE
+            </Link>
+          )}
         </nav>
 
         <div className="flex items-center gap-2">
