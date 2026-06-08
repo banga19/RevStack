@@ -17,6 +17,10 @@
 import { Queue, Worker, type Job } from "bullmq"
 import IORedis from "ioredis"
 import { prisma } from "@/lib/db"
+import {
+  emitHermesRunCompleted,
+  emitSweepCompleted,
+} from "@/lib/hermes-notifications"
 
 // ============================================================
 // Redis Connection
@@ -147,6 +151,15 @@ async function processLead(leadId: string, userId?: string): Promise<void> {
         completedAt: new Date(),
       },
     })
+
+    // Emit real-time notification
+    emitHermesRunCompleted(run.userId, {
+      id: run.id,
+      taskType: run.taskType,
+      status: "completed",
+      leadsProcessed: 1,
+      errorMessage: null,
+    })
   } catch (error) {
     // Mark the run as failed
     await prisma.hermesRun.update({
@@ -156,6 +169,15 @@ async function processLead(leadId: string, userId?: string): Promise<void> {
         errorMessage: (error as Error).message,
         completedAt: new Date(),
       },
+    })
+
+    // Emit real-time notification
+    emitHermesRunCompleted(run.userId, {
+      id: run.id,
+      taskType: run.taskType,
+      status: "failed",
+      leadsProcessed: 0,
+      errorMessage: (error as Error).message,
     })
 
     throw error // re-throw so BullMQ handles retry
@@ -198,6 +220,15 @@ async function sweepLeads(userId?: string): Promise<void> {
       console.error(`[Hermes Queue] Failed to enqueue lead ${leads[i].id}:`, result.reason)
     }
   }
+
+  // Emit sweep completed notification
+  const succeeded = results.filter((r) => r.status === "fulfilled").length
+  const failed = results.filter((r) => r.status === "rejected").length
+  emitSweepCompleted(userId, {
+    total: leads.length,
+    completed: succeeded,
+    failed,
+  })
 }
 
 /**

@@ -328,17 +328,43 @@ model OutreachCampaign {
   type       String   // cold, warm, follow-up, re-engagement
   status     String   @default("draft") // draft, active, paused, completed
   templateId String?
+  subject    String?  // email subject line for single-step campaigns
+  messageBody String? // main message body for single-step campaigns
+  scheduleType  String? @default("immediate") // immediate, scheduled
+  targetCount   Int?     @default(0)
   sentCount  Int      @default(0)
   replyCount Int      @default(0)
+  openedCount Int?    @default(0)
+  clickedCount Int?   @default(0)
+  bounceCount Int?    @default(0)
   bookedCount Int     @default(0)
-  convertedToClientName String?  // name of client they converted to
-  convertedAt DateTime?          // when this lead converted to a client
+  convertedToClientName String?
+  convertedAt DateTime?
   startedAt  DateTime?
   completedAt DateTime?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   client Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  steps  CampaignStep[]
+}
+
+// CampaignStep — individual message steps in a multi-step outreach campaign
+model CampaignStep {
+  id          String   @id @default(cuid())
+  campaignId  String
+  campaign    OutreachCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  stepNumber  Int
+  channel     String   // whatsapp, email
+  subject     String?  // email subject line
+  messageBody String   // message content
+  delayDays   Int      @default(0) // days after previous step
+  status      String   @default("pending") // pending, sent, scheduled, skipped
+  sentAt      DateTime?
+  openedCount Int?     @default(0)
+  replyCount  Int?     @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model ContentArticle {
@@ -568,6 +594,42 @@ model Activity {
   entityId    String?
   userId      String?
   createdAt   DateTime @default(now())
+}
+
+// AgentInsight — persisted agent memory insights that survive restarts
+model AgentInsight {
+  id              String   @id @default(cuid())
+  agentType       String   // lead, trade, compliance, onboarding, revenue, orchestrator
+  title           String
+  description     String
+  category        String   @default("insight") // pattern, anomaly, optimization, insight, alert
+  relevanceScore  Float    @default(0.8)
+  metadata        String?  // JSON string — arbitrary metadata
+  appliedCount    Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([agentType])
+  @@index([category])
+  @@index([createdAt])
+}
+
+// AgentReport — persisted agent performance reports
+model AgentReport {
+  id              String   @id @default(cuid())
+  agentType       String   // lead, trade, compliance, onboarding, revenue, orchestrator
+  title           String
+  summary         String
+  actions         String   // JSON array of { action, result, impact }
+  metrics         String   // JSON object of metric key-value pairs
+  insightRefs     String   // JSON array of insight IDs referenced
+  nextActions     String   // JSON array of suggested next action strings
+  periodStart     DateTime
+  periodEnd       DateTime
+  createdAt       DateTime @default(now())
+
+  @@index([agentType])
+  @@index([createdAt])
 }
 
 // HermesRun — tracks AI agent execution runs

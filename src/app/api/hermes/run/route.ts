@@ -23,6 +23,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { withAbac } from "@/lib/abac-middleware"
 import { RESOURCES } from "@/lib/abac"
 import { hermesQueue } from "@/lib/hermes/queue"
+import { emitSweepStarted } from "@/lib/hermes-notifications"
+import { prisma } from "@/lib/db"
 
 // ============================================================
 // POST — Trigger a Hermes job
@@ -33,10 +35,24 @@ export const POST = withAbac(RESOURCES["hermes-runs"], "admin", async (req: Next
 
   // ── Sweep: enqueue all unprocessed leads ────────────────
   if (searchParams.has("sweep")) {
+    // Count leads for the notification
+    const leadCount = await prisma.lead.count({
+      where: {
+        OR: [
+          { status: "new" },
+          { status: "qualified" },
+        ],
+      },
+    })
+
     await hermesQueue.add("sweep-leads", {
       allLeads: true,
       userId: session.user.id,
     })
+
+    // Emit real-time notification
+    emitSweepStarted(session.user.id, leadCount)
+
     return NextResponse.json({
       queued: true,
       jobType: "sweep-leads",

@@ -49,6 +49,45 @@ async function getTransporter(): Promise<nodemailer.Transporter> {
  * @param email - User's email address
  * @param name - User's name
  */
+/**
+ * Send a custom email with arbitrary subject and body content.
+ * Useful for campaign messages, follow-ups, and transactional emails.
+ */
+export async function sendCustomEmail(
+  to: string,
+  subject: string,
+  bodyHtml?: string,
+  bodyText?: string
+) {
+  try {
+    const mailTransport = await getTransporter()
+
+    const mailOptions = {
+      from: '"Mapato" <noreply@mapato.app>',
+      to,
+      subject: subject.substring(0, 998),
+      text: bodyText || bodyHtml?.replace(/<[^>]*>/g, "") || subject,
+      html: bodyHtml || undefined,
+    }
+
+    const info = await mailTransport.sendMail(mailOptions)
+
+    if (process.env.NODE_ENV !== "production" && !process.env.SMTP_USER) {
+      console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info))
+    }
+
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    console.error("Error sending email:", error)
+    return { success: false, error: (error as Error).message }
+  }
+}
+
+/**
+ * Send a welcome email to a new user
+ * @param email - User's email address
+ * @param name - User's name
+ */
 export async function sendWelcomeEmail(email: string, name: string) {
   try {
     const mailTransport = await getTransporter();

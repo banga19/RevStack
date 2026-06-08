@@ -11,6 +11,7 @@ import { StringOutputParser } from "@langchain/core/output_parsers"
 import { ChatPromptTemplate } from "@langchain/core/prompts"
 import { Document } from "@langchain/core/documents"
 import { z } from "zod"
+import { prisma } from "./db"
 import { createLlm, createEmbeddings } from "./model-provider"
 
 // ============================================================
@@ -71,6 +72,7 @@ class AgentMemorySystem {
   private llm: ChatOpenAI
   private reportHistory: Map<string, AgentReport[]>
   private listeners: Array<(memory: AgentMemory) => void>
+  private readyPromise: Promise<void>
 
   constructor() {
     this.memory = {
@@ -87,6 +89,93 @@ class AgentMemorySystem {
     this.llm = createLlm({ temperature: 0.7 })
     this.reportHistory = new Map()
     this.listeners = []
+
+    // Seed from database on construction
+    this.readyPromise = this.loadFromDatabase()
+  }
+
+  /**
+   * Load persisted insights and reports from the database into memory.
+   * Called once on construction so that in-memory vector store is seeded
+   * with historical data for semantic search.
+   */
+  private async loadFromDatabase(): Promise<void> {
+    try {
+      // Load persisted insights
+      const dbInsights = await prisma.agentInsight.findMany({
+        orderBy: { createdAt: "asc" },
+      })
+
+      const vectorDocs: Document[] = []
+
+      for (const dbInsight of dbInsights) {
+        const insight: AgentInsight = {
+          id: dbInsight.id,
+          agentType: dbInsight.agentType as AgentType,
+          timestamp: dbInsight.createdAt.getTime(),
+          title: dbInsight.title,
+          description: dbInsight.description,
+          category: dbInsight.category as AgentInsight["category"],
+          relevanceScore: dbInsight.relevanceScore,
+          metadata: dbInsight.metadata ? JSON.parse(dbInsight.metadata) : {},
+          appliedCount: dbInsight.appliedCount,
+        }
+
+        this.memory.insights.push(insight)
+
+        vectorDocs.push(
+          new Document({
+            pageContent: `${insight.title}: ${insight.description}`,
+            metadata: {
+              insightId: insight.id,
+              agentType: insight.agentType,
+              category: insight.category,
+              timestamp: insight.timestamp,
+            },
+          })
+        )
+      }
+
+      // Batch-add all documents to the vector store
+      if (vectorDocs.length > 0) {
+        await this.vectorStore.addDocuments(vectorDocs)
+      }
+
+      this.memory.context.insightsDiscovered = this.memory.insights.length
+
+      // Load persisted reports
+      const dbReports = await prisma.agentReport.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 200, // Keep recent reports in memory
+      })
+
+      for (const dbReport of dbReports) {
+        const report: AgentReport = {
+          id: dbReport.id,
+          agentType: dbReport.agentType as AgentType,
+          timestamp: dbReport.createdAt.getTime(),
+          period: {
+            start: dbReport.periodStart.getTime(),
+            end: dbReport.periodEnd.getTime(),
+          },
+          title: dbReport.title,
+          summary: dbReport.summary,
+          actions: JSON.parse(dbReport.actions),
+          metrics: JSON.parse(dbReport.metrics),
+          insights: JSON.parse(dbReport.insightRefs),
+          nextActions: JSON.parse(dbReport.nextActions),
+        }
+
+        const existing = this.reportHistory.get(dbReport.agentType) || []
+        existing.push(report)
+        this.reportHistory.set(dbReport.agentType, existing)
+      }
+
+      this.memory.lastUpdated = Date.now()
+    } catch (error) {
+      console.warn("[AgentMemory] Failed to load from database:", error)
+      // Non-fatal — in-memory fallback still works
+    }
   }
 
   // ==========================================================
@@ -100,6 +189,14 @@ class AgentMemorySystem {
     category: AgentInsight["category"] = "insight",
     metadata: Record<string, any> = {}
   ): Promise<AgentInsight> {
+    await this.readyPromise
+
+    // Check for duplicate insights (in-memory + DB)
+    const isDuplicate = this.memory.insights.some(
+      (i) => i.title.toLowerCase() === title.toLowerCase()
+    )
+    if (isDuplicate) return this.memory.insights.find((i) => i.title.toLowerCase() === title.toLowerCase())!
+
     const insight: AgentInsight = {
       id: `insight-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       agentType,
@@ -112,11 +209,24 @@ class AgentMemorySystem {
       appliedCount: 0,
     }
 
-    // Check for duplicate insights
-    const isDuplicate = this.memory.insights.some(
-      (i) => i.title.toLowerCase() === title.toLowerCase()
-    )
-    if (isDuplicate) return this.memory.insights.find((i) => i.title.toLowerCase() === title.toLowerCase())!
+    // Persist to database
+    try {
+      await prisma.agentInsight.create({
+        data: {
+          id: insight.id,
+          agentType: insight.agentType,
+          title: insight.title,
+          description: insight.description,
+          category: insight.category,
+          relevanceScore: insight.relevanceScore,
+          metadata: JSON.stringify(insight.metadata),
+          appliedCount: insight.appliedCount,
+        },
+      })
+    } catch (error) {
+      console.warn("[AgentMemory] Failed to persist insight:", error)
+      // Non-fatal — in-memory is still available
+    }
 
     this.memory.insights.push(insight)
     this.memory.context.insightsDiscovered++
@@ -140,6 +250,7 @@ class AgentMemorySystem {
   }
 
   async searchInsights(query: string, k: number = 5): Promise<AgentInsight[]> {
+    await this.readyPromise
     const results = await this.vectorStore.similaritySearch(query, k)
     return results
       .map((doc) => this.memory.insights.find((i) => i.id === doc.metadata.insightId))
@@ -174,6 +285,7 @@ class AgentMemorySystem {
     metrics: Record<string, number>,
     insightIds: string[] = []
   ): Promise<AgentReport> {
+    await this.readyPromise
     const relevantInsights = insightIds
       .map((id) => this.memory.insights.find((i) => i.id === id))
       .filter((i): i is AgentInsight => i !== undefined)
@@ -240,7 +352,28 @@ Suggest 3-5 next actions this agent should take.`,
       nextActions,
     }
 
-    // Store report
+    // Persist to database
+    try {
+      await prisma.agentReport.create({
+        data: {
+          id: report.id,
+          agentType: report.agentType,
+          title: report.title,
+          summary: report.summary,
+          actions: JSON.stringify(report.actions),
+          metrics: JSON.stringify(report.metrics),
+          insightRefs: JSON.stringify(insightIds),
+          nextActions: JSON.stringify(report.nextActions),
+          periodStart: new Date(report.period.start),
+          periodEnd: new Date(report.period.end),
+        },
+      })
+    } catch (error) {
+      console.warn("[AgentMemory] Failed to persist report:", error)
+      // Non-fatal
+    }
+
+    // Store in memory
     const existing = this.reportHistory.get(agentType) || []
     existing.unshift(report)
     this.reportHistory.set(agentType, existing.slice(0, 50)) // Keep last 50 reports

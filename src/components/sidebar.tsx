@@ -10,6 +10,7 @@ import { useTheme } from "@/lib/theme-provider"
 import { useLanguage } from "@/lib/i18n/language-context"
 import { LanguageToggle } from "@/components/language-toggle"
 import { useOrganization } from "@/components/auth-provider"
+import { useNotifications } from "@/components/notification-provider"
 import {
   LayoutDashboard,
   CalendarCheck,
@@ -38,6 +39,7 @@ import {
   MessageSquare,
   Bot,
   BarChart3,
+  Bell,
 } from "lucide-react"
 
 const navItems = [
@@ -56,7 +58,8 @@ const navItems = [
   { href: "/korea/inquiries", label: "Buyer Inquiries", icon: Mail },
   { href: "/trade", label: "Trade & Export", icon: Globe },
   { href: "/financial", label: "Financial Model", icon: DollarSign },
-  { href: "/outreach", label: "Outreach", icon: Send },
+  { href: "/campaigns", label: "Campaign Builder", icon: Send },
+  { href: "/outreach", label: "Outreach", icon: MessageSquare },
   { href: "/content", label: "Content Calendar", icon: Newspaper },
   { href: "/docs", label: "Platform Guides", icon: BookOpen },
 ]
@@ -67,6 +70,7 @@ const authPages = ["/", "/login", "/signup", "/onboarding", "/needs-assessment",
 export function Sidebar() {
   const pathname = usePathname()
   const { data: session } = useSession()
+  const sse = useNotifications()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
@@ -124,6 +128,38 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
+          {/* Notification Bell */}
+          {!collapsed && sse.status === "connected" && (
+            <button
+              onClick={() => {
+                if (sse.unreadCount > 0) {
+                  sse.clearNotifications()
+                }
+              }}
+              className={cn(
+                "flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 mb-1",
+                sse.unreadCount > 0
+                  ? "bg-primary/10 text-primary"
+                  : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}
+            >
+              <div className="relative">
+                <Bell className="h-5 w-5 shrink-0" />
+                {sse.unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-4 h-4 text-[9px] font-bold rounded-full bg-red-500 text-white">
+                    {sse.unreadCount > 9 ? "9+" : sse.unreadCount}
+                  </span>
+                )}
+              </div>
+              <span>Notifications</span>
+              {sse.unreadCount > 0 && (
+                <span className="ml-auto text-xs bg-red-500/10 text-red-500 px-1.5 py-0.5 rounded-full font-medium">
+                  {sse.unreadCount} new
+                </span>
+              )}
+            </button>
+          )}
+
           {navItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
             return (

@@ -8,6 +8,7 @@ import { AuthenticatedShell } from "@/components/authenticated-shell"
 import { CookieConsent } from "@/components/cookie-consent"
 import { PushNotificationManager } from "@/components/push-notification-manager"
 import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
+import { NotificationProvider } from "@/components/notification-provider"
 
 export function ClientShell({ children }: { children: React.ReactNode }) {
   return (
@@ -15,7 +16,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       <TooltipProvider>
         <AuthProvider>
           <LanguageProvider>
-            <AuthenticatedShell>{children}</AuthenticatedShell>
+            <NotificationProvider>
+              <AuthenticatedShell>{children}</AuthenticatedShell>
+            </NotificationProvider>
             <CookieConsent />
             <PushNotificationManager />
             <PwaInstallPrompt />
