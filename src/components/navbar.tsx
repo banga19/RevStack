@@ -25,6 +25,7 @@ import {
   DollarSign,
   BookOpen,
   Flag,
+  Zap,
 } from "lucide-react"
 
 const topNavItems = [
