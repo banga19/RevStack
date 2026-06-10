@@ -13,6 +13,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 
 vi.mock("./db", () => ({
   prisma: {
+    user: {
+      findUnique: vi.fn(),
+    },
+    onboardingResponse: {
+      findFirst: vi.fn(),
+    },
+    preAuthQuestionnaire: {
+      findFirst: vi.fn(),
+    },
     client: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
@@ -1476,5 +1485,95 @@ describe("revstackPageDataAgentAction — client-health page type", () => {
 
     expect(data.totalScored).toBe(15)
     expect(data.scoredClients).toHaveLength(12)
+  })
+})
+
+// ============================================================
+// Personalization: getUserPersonalizationContext + cache
+// ============================================================
+
+describe("User Personalization", () => {
+  let personalizationCacheClear: () => void
+
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    vi.resetModules()
+    const mod = await import("./agent-service-bridge")
+    personalizationCacheClear = () => mod.personalizationCache.clear()
+    personalizationCacheClear()
+  })
+
+  it("loads context from DB and merges onboarding + questionnaire data", async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValueOnce({
+      id: "u-1",
+      name: "Alice",
+      email: "alice@example.com",
+      subscriptionTier: "starter",
+      subscriptionStatus: "active",
+    } as any)
+    vi.mocked(prisma.onboardingResponse.findFirst).mockResolvedValueOnce({
+      id: "o-1",
+      userId: "u-1",
+      businessName: "Acme",
+      industry: "trading-wholesale",
+      companySize: "small-agency",
+      primaryGoal: "korea-export",
+      secondaryGoals: "compliance",
+      currentChallenges: "certification",
+      targetAudience: "enterprise",
+      servicesNeeded: "trade-finance",
+      budgetRange: "1000-2500",
+      timeline: "1-3-months",
+      referralSource: "linkedin",
+    } as any)
+    vi.mocked(prisma.preAuthQuestionnaire.findFirst).mockResolvedValue(null as any)
+
+    const { getUserPersonalizationContext } = await import("./agent-service-bridge")
+    const result = await getUserPersonalizationContext("u-1")
+
+    expect(result).not.toBeNull()
+    expect(result!.businessName).toBe("Acme")
+    expect(result!.industry).toBe("trading-wholesale")
+    expect(result!.primaryGoal).toBe("korea-export")
+    expect(result!.subscriptionTier).toBe("starter")
+  })
+
+  it("calls DB once within TTL, then uses cache", async () => {
+    const mockUser = { id: "u-1", name: "Bob", email: "b@b.com", subscriptionTier: "growth", subscriptionStatus: "active" }
+    vi.mocked(prisma.user.findUnique).mockResolvedValueOnce(mockUser as any)
+    vi.mocked(prisma.onboardingResponse.findFirst).mockResolvedValueOnce({
+      id: "o-1", userId: "u-1", businessName: "BobCo", industry: "ecommerce", primaryGoal: "generate-leads", companySize: "small-agency", budgetRange: "under-1000", timeline: "asap",
+    } as any)
+    vi.mocked(prisma.preAuthQuestionnaire.findFirst).mockResolvedValue(null as any)
+
+    const { getCachedUserPersonalization } = await import("./agent-service-bridge")
+    const first = await getCachedUserPersonalization("u-1", 60_000)
+    expect(first?.businessName).toBe("BobCo")
+    expect(prisma.user.findUnique).toHaveBeenCalledTimes(1)
+
+    const second = await getCachedUserPersonalization("u-1", 60_000)
+    expect(second?.businessName).toBe("BobCo")
+    expect(prisma.user.findUnique).toHaveBeenCalledTimes(1) // still 1 — served from cache
+  })
+
+  it("invalidates and reloads after invalidation", async () => {
+    const mockUser = { id: "u-1", name: "Carol", email: "c@c.com", subscriptionTier: "trial", subscriptionStatus: "trial" }
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser as any)
+    vi.mocked(prisma.onboardingResponse.findFirst).mockResolvedValue({
+      id: "o-1", userId: "u-1", businessName: "CarolCo", industry: "agriculture", primaryGoal: "afcfta",
+    } as any)
+    vi.mocked(prisma.preAuthQuestionnaire.findFirst).mockResolvedValue(null as any)
+
+    const { getCachedUserPersonalization, invalidatePersonalizationCache } = await import("./agent-service-bridge")
+    const first = await getCachedUserPersonalization("u-1", 60_000)
+    expect(first?.businessName).toBe("CarolCo")
+
+    // Invalidate
+    invalidatePersonalizationCache("u-1")
+
+    // Next call should reload from DB
+    const second = await getCachedUserPersonalization("u-1", 60_000)
+    expect(second?.businessName).toBe("CarolCo")
+    expect(prisma.user.findUnique).toHaveBeenCalledTimes(2)
   })
 })

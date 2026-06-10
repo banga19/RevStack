@@ -241,14 +241,21 @@ async function checkRevenueReport(isDailySweep: boolean): Promise<TriggerResult>
 }
 
 /**
- * Check 7: Users who completed onboarding recently — trigger personalized welcome flow
+ * Check 7: Users who completed onboarding recently — safety-net for API trigger.
+ *
+ * The onboarding API already fires a personalized welcome immediately on signup.
+ * This scheduler acts as a safety net for users whose trigger may have been lost
+ * (process crash, transient error). We skip users who completed in the last 5
+ * minutes to avoid duplicate operations, and cap at 30 minutes so this doesn't
+ * become a re-run of older work.
  */
 async function checkFreshOnboarding(): Promise<TriggerResult> {
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
   const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000)
   const recentlyOnboarded = await prisma.onboardingResponse.findMany({
     where: {
       completed: true,
-      createdAt: { gte: thirtyMinutesAgo },
+      createdAt: { gte: thirtyMinutesAgo, lte: fiveMinutesAgo },
     },
     select: { userId: true, businessName: true, primaryGoal: true, industry: true },
     take: 5,
@@ -261,11 +268,11 @@ async function checkFreshOnboarding(): Promise<TriggerResult> {
   const names = recentlyOnboarded.map((o) => o.businessName).join(", ")
   return {
     shouldTrigger: true,
-    objective: `${recentlyOnboarded.length} user(s) completed onboarding in the last 30 minutes (${names}). ` +
-      `Run personalized welcome workflows: ` +
+    objective: `Safety-net: ${recentlyOnboarded.length} user(s) completed onboarding 5–30 minutes ago (${names}). ` +
+      `The API trigger may have missed them. Run personalized welcome workflows: ` +
       recentlyOnboarded.map((o) => `${o.businessName} goal="${o.primaryGoal || "general"}" in ${o.industry}`).join("; ") +
       `. Route each user to the most relevant agent based on their primary goal.`,
-    alert: `${recentlyOnboarded.length} new user(s) onboarded — personalized welcome triggered.`,
+    alert: `${recentlyOnboarded.length} new user(s) onboarding safety-net triggered.`,
     metrics: { freshOnboarding: recentlyOnboarded.length },
   }
 }
