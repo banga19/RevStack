@@ -22,6 +22,13 @@ vi.mock("./db", () => ({
     },
     clientCompliance: { findMany: vi.fn() },
     revenueEntry: { aggregate: vi.fn() },
+    invoice: { findMany: vi.fn() },
+    lead: { findMany: vi.fn() },
+    retainer: { findMany: vi.fn() },
+    followup: { findMany: vi.fn() },
+    message: { findMany: vi.fn() },
+    hermesRun: { findMany: vi.fn() },
+    activity: { findMany: vi.fn() },
   },
 }))
 
@@ -171,6 +178,8 @@ import {
   complianceAgentAction,
   onboardingAgentAction,
   revenueAgentAction,
+  revstackAgentAction,
+  revstackPageDataAgentAction,
 } from "./agent-service-bridge"
 
 // ============================================================
@@ -348,10 +357,12 @@ describe("executeAgentServiceAction (Router)", () => {
   })
 
   it("routes to onboarding agent when agentType is 'onboarding'", async () => {
+    const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
     vi.mocked(prisma.client.findMany).mockResolvedValueOnce([{
       ...mockClient,
       status: "onboarding",
       user: { name: "Admin", email: "admin@mapato.app" },
+      updatedAt: tenDaysAgo,
     } as any])
     vi.mocked(qmeIntegration.addWorkflowTrigger).mockReturnValue("trigger-1")
     vi.mocked(voiceflowIntegration.startDialog).mockResolvedValue({
@@ -614,5 +625,856 @@ describe("revenueAgentAction", () => {
     expect(result.metrics?.total_revenue).toBe(75000)
     expect(result.metrics?.active_clients).toBe(5)
     expect(makeIntegration.triggerDailyReport).toHaveBeenCalled()
+  })
+})
+
+// ============================================================
+// Tests: revstackAgentAction — Dashboard Analytics (invoices, clientHealth)
+// ============================================================
+
+describe("revstackAgentAction — invoices section", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it("fetches recent invoices with client info and computes metrics", async () => {
+    // Mock all the queries revstackAgentAction runs for the 'all' section
+    vi.mocked(prisma.lead.findMany).mockResolvedValue([])
+    vi.mocked(prisma.client.findMany).mockResolvedValue([])
+    vi.mocked(prisma.retainer.findMany).mockResolvedValue([])
+    vi.mocked(prisma.followup.findMany).mockResolvedValue([])
+    vi.mocked(prisma.message.findMany).mockResolvedValue([])
+    vi.mocked(prisma.hermesRun.findMany).mockResolvedValue([])
+    vi.mocked(prisma.activity.findMany).mockResolvedValue([])
+
+    // Mock invoices with various statuses
+    vi.mocked(prisma.invoice.findMany).mockResolvedValue([
+      {
+        id: "inv-1",
+        retainerId: "ret-1",
+        clientId: "client-1",
+        invoiceNumber: "INV-ULTI-001",
+        amountUsd: 4500,
+        currency: "USD",
+        status: "overdue",
+        dueDate: new Date("2026-05-01"),
+        issuedAt: new Date("2026-04-01"),
+        paidAt: null,
+        notes: null,
+        userId: "user-1",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        client: { name: "Ultimo Trading Ltd", company: "Ultimo Trading" },
+      },
+      {
+        id: "inv-2",
+        retainerId: "ret-2",
+        clientId: "client-2",
+        invoiceNumber: "INV-SOKO-001",
+        amountUsd: 2500,
+        currency: "USD",
+        status: "sent",
+        dueDate: new Date("2026-06-15"),
+        issuedAt: new Date("2026-06-01"),
+        paidAt: null,
+        notes: null,
+        userId: "user-1",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        client: { name: "Soko Fresh Produce", company: "Soko Fresh" },
+      },
+      {
+        id: "inv-3",
+        retainerId: "ret-3",
+        clientId: "client-3",
+        invoiceNumber: "INV-EAST-001",
+        amountUsd: 3000,
+        currency: "USD",
+        status: "paid",
+        dueDate: new Date("2026-05-01"),
+        issuedAt: new Date("2026-04-15"),
+        paidAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days ago → within 30 days, counted
+        notes: null,
+        userId: "user-1",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        client: { name: "East Africa Logistics Hub", company: "EA Logistics" },
+      },
+    ] as any)
+
+    // Action "invoices" triggers only the invoices section
+    const result = await revstackAgentAction("invoices", mockContext)
+
+    expect(result.success).toBe(true)
+
+    // Parse the details JSON to check invoice data
+    const data = JSON.parse(result.details!)
+
+    // Should have 3 invoices in the list
+    expect(data.invoices).toHaveLength(3)
+    expect(data.invoices[0].invoiceNumber).toBe("INV-ULTI-001")
+    expect(data.invoices[0].client.name).toBe("Ultimo Trading Ltd")
+
+    // Invoice metrics
+    expect(data.invoiceMetrics).toBeDefined()
+    // overdue(4500) + sent(2500) = 7000 outstanding (paid 3000 excluded)
+    expect(data.invoiceMetrics.totalOutstanding).toBe(7000)
+    expect(data.invoiceMetrics.overdueCount).toBe(1)
+    // paid 3000 within 30 days
+    expect(data.invoiceMetrics.paidThisMonth).toBe(3000)
+    expect(data.invoiceMetrics.totalInvoices).toBe(3)
+
+    // Should have fetched invoices with client include
+    expect(prisma.invoice.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: { issuedAt: "desc" },
+        take: 8,
+        include: { client: { select: { name: true, company: true } } },
+      })
+    )
+  })
+
+  it("handles empty invoice list gracefully", async () => {
+    vi.mocked(prisma.lead.findMany).mockResolvedValue([])
+    vi.mocked(prisma.client.findMany).mockResolvedValue([])
+    vi.mocked(prisma.retainer.findMany).mockResolvedValue([])
+    vi.mocked(prisma.followup.findMany).mockResolvedValue([])
+    vi.mocked(prisma.message.findMany).mockResolvedValue([])
+    vi.mocked(prisma.hermesRun.findMany).mockResolvedValue([])
+    vi.mocked(prisma.activity.findMany).mockResolvedValue([])
+    vi.mocked(prisma.invoice.findMany).mockResolvedValue([])
+
+    const result = await revstackAgentAction("invoices", mockContext)
+
+    expect(result.success).toBe(true)
+    const data = JSON.parse(result.details!)
+    expect(data.invoices).toHaveLength(0)
+    expect(data.invoiceMetrics.totalOutstanding).toBe(0)
+    expect(data.invoiceMetrics.overdueCount).toBe(0)
+    expect(data.invoiceMetrics.paidThisMonth).toBe(0)
+    expect(data.invoiceMetrics.totalInvoices).toBe(0)
+  })
+
+  it("computes paidThisMonth only for invoices paid within 30 days", async () => {
+    vi.mocked(prisma.lead.findMany).mockResolvedValue([])
+    vi.mocked(prisma.client.findMany).mockResolvedValue([])
+    vi.mocked(prisma.retainer.findMany).mockResolvedValue([])
+    vi.mocked(prisma.followup.findMany).mockResolvedValue([])
+    vi.mocked(prisma.message.findMany).mockResolvedValue([])
+    vi.mocked(prisma.hermesRun.findMany).mockResolvedValue([])
+    vi.mocked(prisma.activity.findMany).mockResolvedValue([])
+
+    vi.mocked(prisma.invoice.findMany).mockResolvedValue([
+      // Paid within 30 days → counted
+      {
+        id: "inv-recent", invoiceNumber: "INV-RECENT", amountUsd: 1000,
+        status: "paid", paidAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), // 10 days ago
+        client: { name: "Client A", company: "Co A" },
+        retainerId: "r1", clientId: "c1", currency: "USD", dueDate: new Date(),
+        issuedAt: new Date(), notes: null, userId: "u1", createdAt: new Date(), updatedAt: new Date(),
+      },
+      // Paid over 30 days ago → NOT counted
+      {
+        id: "inv-old", invoiceNumber: "INV-OLD", amountUsd: 2000,
+        status: "paid", paidAt: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000), // 45 days ago
+        client: { name: "Client B", company: "Co B" },
+        retainerId: "r1", clientId: "c1", currency: "USD", dueDate: new Date(),
+        issuedAt: new Date(), notes: null, userId: "u1", createdAt: new Date(), updatedAt: new Date(),
+      },
+      // Paid but paidAt is null → NOT counted
+      {
+        id: "inv-null-paid", invoiceNumber: "INV-NULL", amountUsd: 500,
+        status: "paid", paidAt: null,
+        client: { name: "Client C", company: "Co C" },
+        retainerId: "r1", clientId: "c1", currency: "USD", dueDate: new Date(),
+        issuedAt: new Date(), notes: null, userId: "u1", createdAt: new Date(), updatedAt: new Date(),
+      },
+    ] as any)
+
+    const result = await revstackAgentAction("invoices", mockContext)
+
+    expect(result.success).toBe(true)
+    const data = JSON.parse(result.details!)
+    // recent(1000) + over30(2000) + nullPaid(500) = 3500 total
+    expect(data.invoiceMetrics.totalOutstanding).toBe(0) // none are outstanding (all paid)
+    // Only the 10-day-old paid invoice counts
+    expect(data.invoiceMetrics.paidThisMonth).toBe(1000)
+  })
+
+  it("classifies draft/sent/overdue as outstanding, paid as not", async () => {
+    vi.mocked(prisma.lead.findMany).mockResolvedValue([])
+    vi.mocked(prisma.client.findMany).mockResolvedValue([])
+    vi.mocked(prisma.retainer.findMany).mockResolvedValue([])
+    vi.mocked(prisma.followup.findMany).mockResolvedValue([])
+    vi.mocked(prisma.message.findMany).mockResolvedValue([])
+    vi.mocked(prisma.hermesRun.findMany).mockResolvedValue([])
+    vi.mocked(prisma.activity.findMany).mockResolvedValue([])
+
+    vi.mocked(prisma.invoice.findMany).mockResolvedValue([
+      { id: "i1", invoiceNumber: "INV-1", amountUsd: 100, status: "draft", paidAt: null, client: { name: "A", company: "A Inc" }, retainerId: "r1", clientId: "c1", currency: "USD", dueDate: new Date(), issuedAt: new Date(), notes: null, userId: "u1", createdAt: new Date(), updatedAt: new Date() },
+      { id: "i2", invoiceNumber: "INV-2", amountUsd: 200, status: "sent", paidAt: null, client: { name: "B", company: "B Inc" }, retainerId: "r1", clientId: "c1", currency: "USD", dueDate: new Date(), issuedAt: new Date(), notes: null, userId: "u1", createdAt: new Date(), updatedAt: new Date() },
+      { id: "i3", invoiceNumber: "INV-3", amountUsd: 300, status: "overdue", paidAt: null, client: { name: "C", company: "C Inc" }, retainerId: "r1", clientId: "c1", currency: "USD", dueDate: new Date(), issuedAt: new Date(), notes: null, userId: "u1", createdAt: new Date(), updatedAt: new Date() },
+      { id: "i4", invoiceNumber: "INV-4", amountUsd: 400, status: "paid", paidAt: new Date(), client: { name: "D", company: "D Inc" }, retainerId: "r1", clientId: "c1", currency: "USD", dueDate: new Date(), issuedAt: new Date(), notes: null, userId: "u1", createdAt: new Date(), updatedAt: new Date() },
+      { id: "i5", invoiceNumber: "INV-5", amountUsd: 500, status: "cancelled", paidAt: null, client: { name: "E", company: "E Inc" }, retainerId: "r1", clientId: "c1", currency: "USD", dueDate: new Date(), issuedAt: new Date(), notes: null, userId: "u1", createdAt: new Date(), updatedAt: new Date() },
+    ] as any)
+
+    const result = await revstackAgentAction("invoices", mockContext)
+
+    expect(result.success).toBe(true)
+    const data = JSON.parse(result.details!)
+    // draft(100) + sent(200) + overdue(300) = 600 outstanding
+    expect(data.invoiceMetrics.totalOutstanding).toBe(600)
+    // only 1 overdue
+    expect(data.invoiceMetrics.overdueCount).toBe(1)
+    // paid(400) within 30 days
+    expect(data.invoiceMetrics.paidThisMonth).toBe(400)
+  })
+})
+
+describe("revstackAgentAction — clientHealth section", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  /**
+   * Create a mock client with controllable fields for health scoring tests.
+   * The 5 scoring dimensions are:
+   *   revenue    0-30 (retainer value / 100, capped at 30)
+   *   engagement 0-25 (days since last followup: <7=25, <14=18, <30=10, <60=5, else 0)
+   *   compliance 0-20 (none=10, expiring=5, mixed=15, all good=20)
+   *   status     0-15 (active=15, onboarding=8, qualified=5)
+   *   tenure     0-10 (>365d=10, >180d=8, >90d=6, >30d=4, else 2)
+   *   total:     0-100
+   */
+  function makeMockClient(overrides: Record<string, any> = {}) {
+    return {
+      id: "client-1",
+      name: "Test Client",
+      company: "Test Co",
+      status: "active",
+      createdAt: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000), // ~6 months
+      retainers: [{ amountUsd: 2000, billingCycle: "monthly" }],
+      complianceRecords: [{ status: "obtained", expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000) }], // 60 days from now
+      followups: [{ createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) }], // 3 days ago
+      ...overrides,
+      email: overrides.email || "test@example.com",
+      corridor: overrides.corridor || null,
+      tier: overrides.tier || null,
+      ersScore: overrides.ersScore || null,
+      ersBreakdown: overrides.ersBreakdown || null,
+      notes: overrides.notes || null,
+      monthlyRetainer: overrides.monthlyRetainer || null,
+      phone: overrides.phone || null,
+      userId: overrides.userId || "user-1",
+      updatedAt: overrides.updatedAt || new Date(),
+    }
+  }
+
+  it("scores a healthy client at 70+ (all 5 factors max or near-max)", async () => {
+    vi.mocked(prisma.lead.findMany).mockResolvedValue([])
+    vi.mocked(prisma.retainer.findMany).mockResolvedValue([])
+    vi.mocked(prisma.followup.findMany).mockResolvedValue([])
+    vi.mocked(prisma.message.findMany).mockResolvedValue([])
+    vi.mocked(prisma.hermesRun.findMany).mockResolvedValue([])
+    vi.mocked(prisma.activity.findMany).mockResolvedValue([])
+    vi.mocked(prisma.invoice.findMany).mockResolvedValue([])
+
+    // Active client, high retainer, recent contact, all compliance, 6mo tenure
+    vi.mocked(prisma.client.findMany).mockResolvedValue([
+      makeMockClient({
+        name: "Healthy Client",
+        company: "Health Co",
+        status: "active",
+        createdAt: new Date(Date.now() - 400 * 24 * 60 * 60 * 1000), // >365 days → tenure=10
+        retainers: [{ amountUsd: 3000, billingCycle: "monthly" }], // 3000/100=30 → revenue=30
+        complianceRecords: [
+          { status: "obtained", expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) }, // not expiring
+        ],
+        followups: [{ createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) }], // 2 days ago → engagement=25
+      }),
+    ] as any)
+
+    const result = await revstackAgentAction("client-health", mockContext)
+
+    expect(result.success).toBe(true)
+    const data = JSON.parse(result.details!)
+
+    expect(data.clientHealth.totalScored).toBe(1)
+    expect(data.clientHealth.healthyCount).toBe(1)
+    expect(data.clientHealth.highRiskCount).toBe(0)
+
+    const scored = data.clientHealth.scoredClients[0]
+    expect(scored.name).toBe("Healthy Client")
+    expect(scored.tier).toBe("healthy")
+    expect(scored.score).toBeGreaterThanOrEqual(70)
+    // revenue=30, engagement=25, compliance=20, status=15, tenure=10 = 100
+    expect(scored.score).toBe(100)
+    expect(scored.factors).toEqual({
+      revenue: 30,
+      engagement: 25,
+      compliance: 20,
+      status: 15,
+      tenure: 10,
+    })
+  })
+
+  it("classifies a low-engagement client as high-risk (< 45)", async () => {
+    vi.mocked(prisma.lead.findMany).mockResolvedValue([])
+    vi.mocked(prisma.retainer.findMany).mockResolvedValue([])
+    vi.mocked(prisma.followup.findMany).mockResolvedValue([])
+    vi.mocked(prisma.message.findMany).mockResolvedValue([])
+    vi.mocked(prisma.hermesRun.findMany).mockResolvedValue([])
+    vi.mocked(prisma.activity.findMany).mockResolvedValue([])
+    vi.mocked(prisma.invoice.findMany).mockResolvedValue([])
+
+    vi.mocked(prisma.client.findMany).mockResolvedValue([
+      makeMockClient({
+        name: "At-Risk Client",
+        company: "Risky Co",
+        status: "qualified", // status=5
+        createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days → tenure=2 (30 is NOT > 30, so falls to >30? branch)
+        retainers: [], // no retainer → revenue=0
+        complianceRecords: [], // no records → compliance=10
+        followups: [{ createdAt: new Date(Date.now() - 100 * 24 * 60 * 60 * 1000) }], // 100 days ago → engagement=0
+      }),
+    ] as any)
+
+    const result = await revstackAgentAction("client-health", mockContext)
+
+    expect(result.success).toBe(true)
+    const data = JSON.parse(result.details!)
+
+    expect(data.clientHealth.healthyCount).toBe(0)
+    expect(data.clientHealth.highRiskCount).toBe(1)
+
+    const scored = data.clientHealth.scoredClients[0]
+    expect(scored.name).toBe("At-Risk Client")
+    expect(scored.tier).toBe("high-risk")
+    // revenue=0, engagement=0, compliance=10, status=5, tenure=2 = 17
+    expect(scored.score).toBeLessThan(45)
+    expect(scored.score).toBe(17)
+  })
+
+  it("classifies a medium-risk client (45-69)", async () => {
+    vi.mocked(prisma.lead.findMany).mockResolvedValue([])
+    vi.mocked(prisma.retainer.findMany).mockResolvedValue([])
+    vi.mocked(prisma.followup.findMany).mockResolvedValue([])
+    vi.mocked(prisma.message.findMany).mockResolvedValue([])
+    vi.mocked(prisma.hermesRun.findMany).mockResolvedValue([])
+    vi.mocked(prisma.activity.findMany).mockResolvedValue([])
+    vi.mocked(prisma.invoice.findMany).mockResolvedValue([])
+
+    vi.mocked(prisma.client.findMany).mockResolvedValue([
+      makeMockClient({
+        name: "Medium Client",
+        company: "Medium Co",
+        status: "active", // status=15
+        createdAt: new Date(Date.now() - 91 * 24 * 60 * 60 * 1000), // 91 days → tenure=6 (> 90)
+        retainers: [{ amountUsd: 1000, billingCycle: "monthly" }], // 1000/100=10 → revenue=10
+        complianceRecords: [
+          { status: "obtained", expiresAt: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000) }, // expiring → compliance=5
+        ],
+        followups: [{ createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000) }], // 20 days → engagement=10
+      }),
+    ] as any)
+
+    const result = await revstackAgentAction("client-health", mockContext)
+
+    expect(result.success).toBe(true)
+    const data = JSON.parse(result.details!)
+
+    expect(data.clientHealth.mediumRiskCount).toBe(1)
+    const scored = data.clientHealth.scoredClients[0]
+    expect(scored.tier).toBe("medium")
+    // revenue=10, engagement=10, compliance=5, status=15, tenure=6 = 46
+    expect(scored.score).toBe(46)
+  })
+
+  it("sorts clients: high-risk first, then by score ascending", async () => {
+    vi.mocked(prisma.lead.findMany).mockResolvedValue([])
+    vi.mocked(prisma.retainer.findMany).mockResolvedValue([])
+    vi.mocked(prisma.followup.findMany).mockResolvedValue([])
+    vi.mocked(prisma.message.findMany).mockResolvedValue([])
+    vi.mocked(prisma.hermesRun.findMany).mockResolvedValue([])
+    vi.mocked(prisma.activity.findMany).mockResolvedValue([])
+    vi.mocked(prisma.invoice.findMany).mockResolvedValue([])
+
+    const now = Date.now()
+    vi.mocked(prisma.client.findMany).mockResolvedValue([
+      // Medium risk (score ~49)
+      makeMockClient({
+        name: "Medium Client", id: "c-medium",
+        status: "active",
+        createdAt: new Date(now - 200 * 24 * 60 * 60 * 1000),
+        retainers: [{ amountUsd: 500, billingCycle: "monthly" }],
+        complianceRecords: [{ status: "obtained", expiresAt: new Date(now + 60 * 24 * 60 * 60 * 1000) }],
+        followups: [{ createdAt: new Date(now - 10 * 24 * 60 * 60 * 1000) }],
+      }),
+      // Healthy (score ~100)
+      makeMockClient({
+        name: "Healthy Client", id: "c-healthy",
+        status: "active",
+        createdAt: new Date(now - 400 * 24 * 60 * 60 * 1000),
+        retainers: [{ amountUsd: 3000, billingCycle: "monthly" }],
+        complianceRecords: [{ status: "obtained", expiresAt: new Date(now + 90 * 24 * 60 * 60 * 1000) }],
+        followups: [{ createdAt: new Date(now - 2 * 24 * 60 * 60 * 1000) }],
+      }),
+      // High-risk (score ~19)
+      makeMockClient({
+        name: "High-Risk Client", id: "c-highrisk",
+        status: "qualified",
+        createdAt: new Date(now - 30 * 24 * 60 * 60 * 1000),
+        retainers: [],
+        complianceRecords: [],
+        followups: [{ createdAt: new Date(now - 100 * 24 * 60 * 60 * 1000) }],
+      }),
+    ] as any)
+
+    const result = await revstackAgentAction("client-health", mockContext)
+
+    expect(result.success).toBe(true)
+    const data = JSON.parse(result.details!)
+
+    const names = data.clientHealth.scoredClients.map((c: any) => c.name)
+    // High-risk first, then by score ascending
+    expect(names[0]).toBe("High-Risk Client")
+    expect(names[1]).toBe("Medium Client")
+    expect(names[2]).toBe("Healthy Client")
+
+    // Scores should be ascending within same tier
+    expect(data.clientHealth.scoredClients[0].score).toBeLessThan(
+      data.clientHealth.scoredClients[1].score
+    )
+  })
+
+  it("handles empty client list gracefully", async () => {
+    vi.mocked(prisma.lead.findMany).mockResolvedValue([])
+    vi.mocked(prisma.retainer.findMany).mockResolvedValue([])
+    vi.mocked(prisma.followup.findMany).mockResolvedValue([])
+    vi.mocked(prisma.message.findMany).mockResolvedValue([])
+    vi.mocked(prisma.hermesRun.findMany).mockResolvedValue([])
+    vi.mocked(prisma.activity.findMany).mockResolvedValue([])
+    vi.mocked(prisma.invoice.findMany).mockResolvedValue([])
+    vi.mocked(prisma.client.findMany).mockResolvedValue([])
+
+    const result = await revstackAgentAction("client-health", mockContext)
+
+    expect(result.success).toBe(true)
+    const data = JSON.parse(result.details!)
+    expect(data.clientHealth.totalScored).toBe(0)
+    expect(data.clientHealth.scoredClients).toHaveLength(0)
+    expect(data.clientHealth.healthyCount).toBe(0)
+    expect(data.clientHealth.mediumRiskCount).toBe(0)
+    expect(data.clientHealth.highRiskCount).toBe(0)
+    expect(data.clientHealth.averageScore).toBe(0)
+  })
+
+  it("applies engagement curve correctly at each threshold", async () => {
+    vi.mocked(prisma.lead.findMany).mockResolvedValue([])
+    vi.mocked(prisma.retainer.findMany).mockResolvedValue([])
+    vi.mocked(prisma.followup.findMany).mockResolvedValue([])
+    vi.mocked(prisma.message.findMany).mockResolvedValue([])
+    vi.mocked(prisma.hermesRun.findMany).mockResolvedValue([])
+    vi.mocked(prisma.activity.findMany).mockResolvedValue([])
+    vi.mocked(prisma.invoice.findMany).mockResolvedValue([])
+
+    const now = Date.now()
+    vi.mocked(prisma.client.findMany).mockResolvedValue([
+      makeMockClient({ name: "Engaged", followups: [{ createdAt: new Date(now - 3 * 24 * 60 * 60 * 1000) }] }), // <7 → 25
+      makeMockClient({ name: "Moderate", followups: [{ createdAt: new Date(now - 10 * 24 * 60 * 60 * 1000) }] }), // <14 → 18
+      makeMockClient({ name: "Distant", followups: [{ createdAt: new Date(now - 20 * 24 * 60 * 60 * 1000) }] }), // <30 → 10
+      makeMockClient({ name: "Lapsed", followups: [{ createdAt: new Date(now - 45 * 24 * 60 * 60 * 1000) }] }), // <60 → 5
+      makeMockClient({ name: "Silent", followups: [{ createdAt: new Date(now - 100 * 24 * 60 * 60 * 1000) }] }), // ≥60 → 0
+      makeMockClient({ name: "New", followups: [] }), // no followup → 0
+    ] as any)
+
+    const result = await revstackAgentAction("client-health", mockContext)
+
+    expect(result.success).toBe(true)
+    const data = JSON.parse(result.details!)
+
+    const getScore = (name: string) =>
+      data.clientHealth.scoredClients.find((c: any) => c.name === name)!
+
+    expect(getScore("Engaged").factors.engagement).toBe(25)
+    expect(getScore("Moderate").factors.engagement).toBe(18)
+    expect(getScore("Distant").factors.engagement).toBe(10)
+    expect(getScore("Lapsed").factors.engagement).toBe(5)
+    expect(getScore("Silent").factors.engagement).toBe(0)
+    expect(getScore("New").factors.engagement).toBe(0)
+  })
+})
+
+// ============================================================
+// Tests: revstackPageDataAgentAction — invoices and client-health page types
+// ============================================================
+
+describe("revstackPageDataAgentAction — invoices page type", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it("fetches invoices with client details", async () => {
+    vi.mocked(prisma.invoice.findMany).mockResolvedValue([
+      {
+        id: "inv-1", retainerId: "ret-1", clientId: "c1", invoiceNumber: "INV-001",
+        amountUsd: 4500, currency: "USD", status: "overdue",
+        dueDate: new Date(), issuedAt: new Date(), paidAt: null,
+        notes: null, userId: "u1", createdAt: new Date(), updatedAt: new Date(),
+        client: { name: "Ultimo Trading", company: "Ultimo Trading Ltd" },
+      },
+      {
+        id: "inv-2", retainerId: "ret-2", clientId: "c2", invoiceNumber: "INV-002",
+        amountUsd: 2500, currency: "USD", status: "sent",
+        dueDate: new Date(), issuedAt: new Date(), paidAt: null,
+        notes: null, userId: "u1", createdAt: new Date(), updatedAt: new Date(),
+        client: { name: "Soko Fresh", company: "Soko Fresh Produce" },
+      },
+    ] as any)
+
+    const result = await revstackPageDataAgentAction("invoices|list", mockContext)
+
+    expect(result.success).toBe(true)
+    const data = JSON.parse(result.details!)
+    expect(data).toHaveLength(2)
+    expect(data[0].invoiceNumber).toBe("INV-001")
+    expect(data[0].client.name).toBe("Ultimo Trading")
+    expect(data[1].client.company).toBe("Soko Fresh Produce")
+    expect(result.metrics?.count).toBe(2)
+  })
+
+  it("filters invoices by status", async () => {
+    vi.mocked(prisma.invoice.findMany).mockResolvedValue([
+      {
+        id: "inv-sent", retainerId: "r1", clientId: "c1", invoiceNumber: "INV-003",
+        amountUsd: 1000, currency: "USD", status: "sent",
+        dueDate: new Date(), issuedAt: new Date(), paidAt: null,
+        notes: null, userId: "u1", createdAt: new Date(), updatedAt: new Date(),
+        client: { name: "Client A", company: "Co A" },
+      },
+    ] as any)
+
+    await revstackPageDataAgentAction('invoices|list|{"status":"sent"}', mockContext)
+
+    expect(prisma.invoice.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { status: "sent" },
+        include: { client: { select: { name: true, company: true } } },
+      })
+    )
+  })
+
+  it("filters invoices by clientId", async () => {
+    vi.mocked(prisma.invoice.findMany).mockResolvedValue([])
+
+    await revstackPageDataAgentAction('invoices|list|{"clientId":"c-123"}', mockContext)
+
+    expect(prisma.invoice.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { clientId: "c-123" },
+      })
+    )
+  })
+
+  it("filters by status=all passes no status filter", async () => {
+    vi.mocked(prisma.invoice.findMany).mockResolvedValue([])
+
+    await revstackPageDataAgentAction('invoices|list|{"status":"all"}', mockContext)
+
+    expect(prisma.invoice.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {},
+      })
+    )
+  })
+
+  it("handles empty invoice list gracefully", async () => {
+    vi.mocked(prisma.invoice.findMany).mockResolvedValue([])
+
+    const result = await revstackPageDataAgentAction("invoices|list", mockContext)
+
+    expect(result.success).toBe(true)
+    const data = JSON.parse(result.details!)
+    expect(data).toHaveLength(0)
+    expect(result.metrics?.count).toBe(0)
+  })
+
+  it("respects custom limit parameter", async () => {
+    vi.mocked(prisma.invoice.findMany).mockResolvedValue([])
+
+    await revstackPageDataAgentAction('invoices|list|{"limit":5}', mockContext)
+
+    expect(prisma.invoice.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 5 })
+    )
+  })
+})
+
+describe("revstackPageDataAgentAction — client-health page type", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  /**
+   * Helper to create a mock client for health scoring tests.
+   * The 5 scoring dimensions:
+   *   revenue    0-30 (retainer value / 100, capped at 30)
+   *   engagement 0-25 (days since last followup: <7=25, <14=18, <30=10, <60=5, else 0)
+   *   compliance 0-20 (none=10, expiring=5, mixed=15, all good=20)
+   *   status     0-15 (active=15, onboarding=8, qualified=5)
+   *   tenure     0-10 (>365d=10, >180d=8, >90d=6, >30d=4, else 2)
+   *   total:     0-100
+   */
+  function makeMockClient(overrides: Record<string, any> = {}) {
+    return {
+      id: "client-1",
+      name: "Test Client",
+      company: "Test Co",
+      status: "active",
+      createdAt: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000),
+      retainers: [{ amountUsd: 2000, billingCycle: "monthly" }],
+      complianceRecords: [{ status: "obtained", expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000) }],
+      followups: [{ createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) }],
+      ...overrides,
+      email: overrides.email || "test@example.com",
+      corridor: overrides.corridor || null,
+      tier: overrides.tier || null,
+      ersScore: overrides.ersScore || null,
+      ersBreakdown: overrides.ersBreakdown || null,
+      notes: overrides.notes || null,
+      monthlyRetainer: overrides.monthlyRetainer || null,
+      phone: overrides.phone || null,
+      userId: overrides.userId || "user-1",
+      updatedAt: overrides.updatedAt || new Date(),
+    }
+  }
+
+  it("scores a healthy client at 70+ (max factors)", async () => {
+    vi.mocked(prisma.client.findMany).mockResolvedValue([
+      makeMockClient({
+        name: "Healthy Client",
+        status: "active",
+        createdAt: new Date(Date.now() - 400 * 24 * 60 * 60 * 1000), // >365d → tenure=10
+        retainers: [{ amountUsd: 3000, billingCycle: "monthly" }], // 3000/100=30 → revenue=30
+        complianceRecords: [
+          { status: "obtained", expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) }, // not expiring
+        ],
+        followups: [{ createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) }], // 2d → engagement=25
+      }),
+    ] as any)
+
+    const result = await revstackPageDataAgentAction("client-health|list", mockContext)
+
+    expect(result.success).toBe(true)
+    const data = JSON.parse(result.details!)
+
+    expect(data.totalScored).toBe(1)
+    expect(data.healthyCount).toBe(1)
+    expect(data.highRiskCount).toBe(0)
+
+    const scored = data.scoredClients[0]
+    expect(scored.name).toBe("Healthy Client")
+    expect(scored.tier).toBe("healthy")
+    expect(scored.score).toBe(100)
+    expect(scored.factors).toEqual({
+      revenue: 30, engagement: 25, compliance: 20, status: 15, tenure: 10,
+    })
+  })
+
+  it("classifies low-engagement client as high-risk (< 45)", async () => {
+    vi.mocked(prisma.client.findMany).mockResolvedValue([
+      makeMockClient({
+        name: "At-Risk Client",
+        status: "qualified", // status=5
+        createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30d → tenure=2 (30 is NOT > 30)
+        retainers: [], // revenue=0
+        complianceRecords: [], // compliance=10
+        followups: [{ createdAt: new Date(Date.now() - 100 * 24 * 60 * 60 * 1000) }], // 100d → engagement=0
+      }),
+    ] as any)
+
+    const result = await revstackPageDataAgentAction("client-health|list", mockContext)
+
+    expect(result.success).toBe(true)
+    const data = JSON.parse(result.details!)
+
+    expect(data.healthyCount).toBe(0)
+    expect(data.highRiskCount).toBe(1)
+
+    const scored = data.scoredClients[0]
+    expect(scored.tier).toBe("high-risk")
+    // revenue=0, engagement=0, compliance=10, status=5, tenure=2 = 17
+    expect(scored.score).toBe(17)
+  })
+
+  it("classifies a medium-risk client (45-69)", async () => {
+    vi.mocked(prisma.client.findMany).mockResolvedValue([
+      makeMockClient({
+        name: "Medium Client",
+        status: "active", // status=15
+        createdAt: new Date(Date.now() - 91 * 24 * 60 * 60 * 1000), // 91d → tenure=6 (> 90)
+        retainers: [{ amountUsd: 1000, billingCycle: "monthly" }], // 1000/100=10 → revenue=10
+        complianceRecords: [
+          { status: "obtained", expiresAt: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000) }, // expiring → compliance=5
+        ],
+        followups: [{ createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000) }], // 20d → engagement=10
+      }),
+    ] as any)
+
+    const result = await revstackPageDataAgentAction("client-health|list", mockContext)
+
+    expect(result.success).toBe(true)
+    const data = JSON.parse(result.details!)
+
+    expect(data.mediumRiskCount).toBe(1)
+    const scored = data.scoredClients[0]
+    expect(scored.tier).toBe("medium")
+    // revenue=10, engagement=10, compliance=5, status=15, tenure=6 = 46
+    expect(scored.score).toBe(46)
+  })
+
+  it("sorts clients: high-risk first, then by score ascending", async () => {
+    const now = Date.now()
+    vi.mocked(prisma.client.findMany).mockResolvedValue([
+      // Medium risk
+      makeMockClient({
+        name: "Medium Client", id: "c-medium",
+        status: "active",
+        createdAt: new Date(now - 200 * 24 * 60 * 60 * 1000),
+        retainers: [{ amountUsd: 500, billingCycle: "monthly" }],
+        complianceRecords: [{ status: "obtained", expiresAt: new Date(now + 60 * 24 * 60 * 60 * 1000) }],
+        followups: [{ createdAt: new Date(now - 10 * 24 * 60 * 60 * 1000) }],
+      }),
+      // Healthy
+      makeMockClient({
+        name: "Healthy Client", id: "c-healthy",
+        status: "active",
+        createdAt: new Date(now - 400 * 24 * 60 * 60 * 1000),
+        retainers: [{ amountUsd: 3000, billingCycle: "monthly" }],
+        complianceRecords: [{ status: "obtained", expiresAt: new Date(now + 90 * 24 * 60 * 60 * 1000) }],
+        followups: [{ createdAt: new Date(now - 2 * 24 * 60 * 60 * 1000) }],
+      }),
+      // High-risk
+      makeMockClient({
+        name: "High-Risk Client", id: "c-highrisk",
+        status: "qualified",
+        createdAt: new Date(now - 30 * 24 * 60 * 60 * 1000),
+        retainers: [],
+        complianceRecords: [],
+        followups: [{ createdAt: new Date(now - 100 * 24 * 60 * 60 * 1000) }],
+      }),
+    ] as any)
+
+    const result = await revstackPageDataAgentAction("client-health|list", mockContext)
+
+    expect(result.success).toBe(true)
+    const data = JSON.parse(result.details!)
+
+    const names = data.scoredClients.map((c: any) => c.name)
+    expect(names[0]).toBe("High-Risk Client")
+    expect(names[1]).toBe("Medium Client")
+    expect(names[2]).toBe("Healthy Client")
+    expect(data.scoredClients[0].score).toBeLessThan(data.scoredClients[1].score)
+  })
+
+  it("handles empty client list gracefully", async () => {
+    vi.mocked(prisma.client.findMany).mockResolvedValue([])
+
+    const result = await revstackPageDataAgentAction("client-health|list", mockContext)
+
+    expect(result.success).toBe(true)
+    const data = JSON.parse(result.details!)
+    expect(data.totalScored).toBe(0)
+    expect(data.scoredClients).toHaveLength(0)
+    expect(data.healthyCount).toBe(0)
+    expect(data.mediumRiskCount).toBe(0)
+    expect(data.highRiskCount).toBe(0)
+    expect(data.averageScore).toBe(0)
+  })
+
+  it("applies engagement curve correctly at each threshold", async () => {
+    const now = Date.now()
+    vi.mocked(prisma.client.findMany).mockResolvedValue([
+      makeMockClient({ name: "Engaged", followups: [{ createdAt: new Date(now - 3 * 24 * 60 * 60 * 1000) }] }),
+      makeMockClient({ name: "Moderate", followups: [{ createdAt: new Date(now - 10 * 24 * 60 * 60 * 1000) }] }),
+      makeMockClient({ name: "Distant", followups: [{ createdAt: new Date(now - 20 * 24 * 60 * 60 * 1000) }] }),
+      makeMockClient({ name: "Lapsed", followups: [{ createdAt: new Date(now - 45 * 24 * 60 * 60 * 1000) }] }),
+      makeMockClient({ name: "Silent", followups: [{ createdAt: new Date(now - 100 * 24 * 60 * 60 * 1000) }] }),
+      makeMockClient({ name: "New", followups: [] }),
+    ] as any)
+
+    const result = await revstackPageDataAgentAction("client-health|list", mockContext)
+
+    expect(result.success).toBe(true)
+    const data = JSON.parse(result.details!)
+
+    const getScore = (name: string) =>
+      data.scoredClients.find((c: any) => c.name === name)!.factors.engagement
+
+    expect(getScore("Engaged")).toBe(25)
+    expect(getScore("Moderate")).toBe(18)
+    expect(getScore("Distant")).toBe(10)
+    expect(getScore("Lapsed")).toBe(5)
+    expect(getScore("Silent")).toBe(0)
+    expect(getScore("New")).toBe(0)
+  })
+
+  it("applies compliance score correctly: no records=10, expiring=5, mixed=15, good=20", async () => {
+    const now = Date.now()
+    vi.mocked(prisma.client.findMany).mockResolvedValue([
+      makeMockClient({ name: "No Compliance", complianceRecords: [] }),
+      makeMockClient({
+        name: "Good Compliance",
+        complianceRecords: [{ status: "obtained", expiresAt: new Date(now + 90 * 24 * 60 * 60 * 1000) }],
+      }),
+      makeMockClient({
+        name: "Mixed Compliance",
+        complianceRecords: [
+          { status: "obtained", expiresAt: new Date(now + 60 * 24 * 60 * 60 * 1000) },
+          { status: "obtained", expiresAt: new Date(now + 10 * 24 * 60 * 60 * 1000) },
+        ],
+      }),
+      makeMockClient({
+        name: "Expiring Compliance",
+        complianceRecords: [
+          { status: "obtained", expiresAt: new Date(now + 5 * 24 * 60 * 60 * 1000) },
+          { status: "obtained", expiresAt: new Date(now + 10 * 24 * 60 * 60 * 1000) },
+        ],
+      }),
+    ] as any)
+
+    const result = await revstackPageDataAgentAction("client-health|list", mockContext)
+
+    expect(result.success).toBe(true)
+    const data = JSON.parse(result.details!)
+
+    const getScore = (name: string) =>
+      data.scoredClients.find((c: any) => c.name === name)!.factors.compliance
+
+    expect(getScore("No Compliance")).toBe(10)
+    expect(getScore("Good Compliance")).toBe(20)
+    expect(getScore("Mixed Compliance")).toBe(15)
+    expect(getScore("Expiring Compliance")).toBe(5)
+  })
+
+  it("limits scored clients to 12", async () => {
+    // Create 15 mock clients
+    const manyClients = Array.from({ length: 15 }, (_, i) =>
+      makeMockClient({
+        name: `Client ${i + 1}`,
+        id: `c-${i}`,
+        status: "active",
+        createdAt: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000),
+      })
+    )
+    vi.mocked(prisma.client.findMany).mockResolvedValue(manyClients as any)
+
+    const result = await revstackPageDataAgentAction("client-health|list", mockContext)
+
+    expect(result.success).toBe(true)
+    const data = JSON.parse(result.details!)
+
+    expect(data.totalScored).toBe(15)
+    expect(data.scoredClients).toHaveLength(12)
   })
 })

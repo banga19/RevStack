@@ -18,8 +18,8 @@
  */
 
 import { prisma } from "./db"
+import { centralBrain } from "./hermes-central-brain"
 import { hermesAgent } from "./hermes-agent"
-import { agentMemory } from "./agent-memory"
 import { qualifyLead } from "./qualify-lead"
 
 // ============================================================
@@ -161,18 +161,112 @@ async function checkPendingFollowups(): Promise<TriggerResult> {
 }
 
 /**
- * Check 5: Revenue report generation (triggered once daily)
+ * Check 5: Invoice generation for active retainers due for billing
+ */
+async function checkInvoiceGeneration(): Promise<TriggerResult> {
+  const now = new Date()
+
+  // Count active retainers where billing is due
+  const activeRetainers = await prisma.retainer.findMany({
+    where: { status: "active" },
+    select: { id: true, nextBillingDate: true, startDate: true, billingCycle: true, createdAt: true },
+  })
+
+  let dueCount = 0
+  for (const retainer of activeRetainers) {
+    const nextBilling = retainer.nextBillingDate
+      ? new Date(retainer.nextBillingDate)
+      : computeTriggerNextBilling(retainer.startDate, retainer.billingCycle, retainer.createdAt)
+
+    if (nextBilling && nextBilling <= now) {
+      dueCount++
+    }
+  }
+
+  if (dueCount === 0) {
+    return { shouldTrigger: false, metrics: { retainersDue: 0 } }
+  }
+
+  return {
+    shouldTrigger: dueCount >= 1,
+    objective: `${dueCount} retainers are due for billing. Generate invoices for each active retainer, ` +
+      `update next billing dates, and log invoice activity entries.`,
+    alert: `${dueCount} retainer invoice(s) due for generation — RevStack Operations agent dispatched.`,
+    metrics: { retainersDue: dueCount },
+  }
+}
+
+/**
+ * Helper to compute next billing date from startDate + billingCycle.
+ */
+function computeTriggerNextBilling(
+  startDate: string,
+  billingCycle: string,
+  createdAt: Date
+): Date | null {
+  try {
+    const start = new Date(startDate)
+    if (isNaN(start.getTime())) return new Date(createdAt)
+
+    const now = new Date()
+    const next = new Date(start)
+
+    while (next <= now) {
+      if (billingCycle === "monthly") next.setMonth(next.getMonth() + 1)
+      else if (billingCycle === "quarterly") next.setMonth(next.getMonth() + 3)
+      else if (billingCycle === "annual") next.setFullYear(next.getFullYear() + 1)
+      else break
+    }
+
+    return next
+  } catch {
+    return new Date(createdAt)
+  }
+}
+
+/**
+ * Check 6: Revenue report generation (triggered once daily)
  */
 async function checkRevenueReport(isDailySweep: boolean): Promise<TriggerResult> {
   if (!isDailySweep) {
-    return { shouldTrigger: false, metrics: { } }
+    return { shouldTrigger: false, metrics: {} }
   }
 
   return {
     shouldTrigger: true,
     objective: `Generate daily revenue report: calculate MRR from active retainers, ` +
       `compute pipeline value, count new leads and clients, and store summary in RAG knowledge base.`,
-    metrics: { },
+    metrics: {},
+  }
+}
+
+/**
+ * Check 7: Users who completed onboarding recently — trigger personalized welcome flow
+ */
+async function checkFreshOnboarding(): Promise<TriggerResult> {
+  const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000)
+  const recentlyOnboarded = await prisma.onboardingResponse.findMany({
+    where: {
+      completed: true,
+      createdAt: { gte: thirtyMinutesAgo },
+    },
+    select: { userId: true, businessName: true, primaryGoal: true, industry: true },
+    take: 5,
+  })
+
+  if (recentlyOnboarded.length === 0) {
+    return { shouldTrigger: false, metrics: { freshOnboarding: 0 } }
+  }
+
+  const names = recentlyOnboarded.map((o) => o.businessName).join(", ")
+  return {
+    shouldTrigger: true,
+    objective: `${recentlyOnboarded.length} user(s) completed onboarding in the last 30 minutes (${names}). ` +
+      `Run personalized welcome workflows: ` +
+      recentlyOnboarded.map((o) => `${o.businessName} goal="${o.primaryGoal || "general"}" in ${o.industry}`).join("; ") +
+      `. Route each user to the most relevant agent based on their primary goal.`,
+    alert: `${recentlyOnboarded.length} new user(s) onboarded — personalized welcome triggered.`,
+    metrics: { freshOnboarding: recentlyOnboarded.length },
   }
 }
 
@@ -226,6 +320,7 @@ export async function runAutonomousSweep(
     { name: "stuck-onboarding", priority: "high", check: checkStuckOnboarding },
     { name: "pending-followups", priority: "medium", check: checkPendingFollowups },
     { name: "revenue-report", priority: "low", check: () => checkRevenueReport(isDailySweep) },
+    { name: "invoice-generation", priority: "medium", check: checkInvoiceGeneration },
   ]
 
   // Evaluate all triggers
@@ -254,6 +349,20 @@ export async function runAutonomousSweep(
             trigger: trigger.name,
             status: operation.status,
           })
+
+          // Broadcast dispatch event through Central Brain
+          centralBrain.sendMessage({
+            source: "autonomous-scheduler",
+            target: "*",
+            type: "sweep:operation_dispatched",
+            payload: {
+              trigger: trigger.name,
+              operationId: operation.id,
+              priority: trigger.priority,
+              objective: result.objective.substring(0, 200),
+            },
+            priority: trigger.priority === "critical" ? "critical" : trigger.priority === "high" ? "high" : "medium",
+          })
         } catch (opError) {
           errors.push(`Failed to trigger ${trigger.name}: ${(opError as Error).message}`)
         }
@@ -268,10 +377,10 @@ export async function runAutonomousSweep(
     alerts.push(`[Error] ${error}`)
   }
 
-  // Store sweep summary in agent memory
+  // Store sweep summary in agent memory via Central Brain
   if (triggeredOperations.length > 0) {
     try {
-      await agentMemory.addInsight(
+      await centralBrain.addInsight(
         "orchestrator",
         `Autonomous sweep: ${triggeredOperations.length} operations triggered`,
         `Sweep triggered ${triggeredOperations.length} operations: ` +
@@ -313,6 +422,7 @@ export async function runQuickHealthCheck(
     { name: "new-leads", priority: "high", check: checkNewLeads },
     { name: "expiring-compliance", priority: "critical", check: checkExpiringCompliance },
     { name: "stuck-onboarding", priority: "high", check: checkStuckOnboarding },
+    { name: "fresh-onboarding", priority: "medium", check: checkFreshOnboarding },
   ]
 
   for (const trigger of quickTriggers) {

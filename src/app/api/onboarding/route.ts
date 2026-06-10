@@ -3,6 +3,9 @@ import { prisma } from "@/lib/db"
 import { withAuth } from "@/lib/abac-middleware"
 import { appendOnboardingRow } from "@/lib/google-sheets"
 import { getSuggestionFromBudget } from "@/lib/pricing"
+import { centralBrain } from "@/lib/hermes-central-brain"
+import { invalidatePersonalizationCache } from "@/lib/agent-service-bridge"
+import { hermesAgent } from "@/lib/hermes-agent"
 
 // Server-side analytics logging
 function logEvent(event: string, data: Record<string, any>) {
@@ -79,6 +82,46 @@ export const POST = withAuth(async (req: NextRequest, { session }) => {
     suggestedTier,
     trialStartsNow: true,
   })
+
+  // ── Trigger: personalization sync ─────────────────────────────────
+  centralBrain.sendMessage({
+    source: "api-onboarding",
+    target: "*",
+    type: "user:personalization_updated",
+    priority: "medium",
+    payload: {
+      userId: dbUser.id,
+      businessName: body.businessName,
+      industry: body.industry,
+      primaryGoal: body.primaryGoal,
+      servicesNeeded: body.servicesNeeded,
+      budgetRange: body.budgetRange,
+      timeline: body.timeline,
+      suggestedTier,
+      suggestedMonthlyRetainer,
+      event: "onboarding_completed",
+    },
+    correlationId: `personalization-${dbUser.id}-${Date.now()}`,
+  })
+  invalidatePersonalizationCache(dbUser.id)
+
+  centralBrain
+    .addInsight(
+      "onboarding",
+      `New user onboarded: ${body.businessName}`,
+      `Primary goal: ${body.primaryGoal ?? "general"} | Industry: ${body.industry} | Services needed: ${body.servicesNeeded ?? "not specified"} | Budget: ${body.budgetRange ?? "not specified"}`,
+      "insight",
+      { userId: dbUser.id, businessName: body.businessName, primaryGoal: body.primaryGoal, industry: body.industry, source: "onboarding-trigger" }
+    )
+    .then(() => {
+      hermesAgent
+        .runOperation(
+          `Personalized welcome path for new user ${body.businessName} (${body.industry}): goal="${body.primaryGoal ?? "general"}", services="${body.servicesNeeded ?? "not specified"}", budget="${body.budgetRange ?? "open"}", tier="${suggestedTier ?? "trial"}". Route to appropriate agent workflow based on primary goal.`,
+          { userId: dbUser.id }
+        )
+        .catch(() => {})
+    })
+    .catch(() => {})
 
   let sheetsOk = true
   let sheetsError: string | null = null

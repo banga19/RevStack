@@ -4,26 +4,73 @@
  * Hermes is the top-level orchestrator that:
  * 1. Uses RAG pipeline to retrieve business context about the current state
  * 2. Plans a multi-agent workflow using LangChain LLM reasoning
- * 3. Delegates execution to agent-service-bridge (WATI, Zoho, QMe, etc.)
+ * 3. Delegates execution to the Hermes Central Brain, which routes all
+ *    agent communication through the MessageBus and CommunicationLog
  * 4. Stores insights and learns across sessions via agent memory
  * 5. Uses LangGraph StateGraph for stateful, auditable execution
  *
- * Unlike God Mode (which is session/task based), Hermes is context-aware:
- * it queries the business knowledge base before planning, adapts its plan
- * based on real-time data, and stores patterns for future runs.
+ * ALL agent communication is routed through HermesCentralBrain:
+ *   - Action execution: centralBrain.executeAction()
+ *   - Insight sharing: centralBrain.addInsight() / centralBrain.analyzePattern()
+ *   - Report generation: centralBrain.generateReport()
+ *   - Memory search: centralBrain.searchInsights()
+ *   - Inter-agent messaging: centralBrain.sendMessage()
  */
 
 import { StringOutputParser } from "@langchain/core/output_parsers"
 import { ChatPromptTemplate } from "@langchain/core/prompts"
 import { Annotation, StateGraph } from "@langchain/langgraph"
-import { agentMemory, type AgentType, type AgentInsight, type AgentReport } from "./agent-memory"
+import { centralBrain } from "./hermes-central-brain"
+import { type AgentType, type AgentInsight } from "./agent-memory"
 import { createPlannerLlm, createAnalystLlm } from "./model-provider"
 import { ragPipeline } from "./rag-pipeline"
-import {
-  executeAgentServiceAction,
-  type ServiceActionResult,
-} from "./agent-service-bridge"
-import { trackGodModeDeployed, trackFeatureUsed } from "./analytics"
+import { type ServiceActionResult, getAgentRegistrations } from "./agent-service-bridge"
+import { invalidatePersonalizationCache } from "./agent-service-bridge"
+import { trackFeatureUsed } from "./analytics"
+import type { HermesRun as DbHermesRun } from "@prisma/client"
+
+// ============================================================
+// Persistence
+// ============================================================
+
+type DbHermesRunWrite = Pick<DbHermesRun, "taskType" | "status" | "input" | "output" | "errorMessage" | "leadsProcessed" | "messagesQueued" | "userId" | "completedAt">
+
+async function persistDbOperation(input: DbHermesRunWrite): Promise<DbHermesRun> {
+  const { prisma } = await import("./db")
+  return prisma.hermesRun.create({ data: input })
+}
+
+async function updateDbOperation(id: string, data: Partial<DbHermesRunWrite>): Promise<DbHermesRun | null> {
+  const { prisma } = await import("./db")
+  return prisma.hermesRun.update({ where: { id }, data })
+}
+
+async function hydrateOperationsFromDb(): Promise<Map<string, HermesOperation>> {
+  const operations = new Map<string, HermesOperation>()
+  try {
+    const { prisma } = await import("./db")
+    const runs = await prisma.hermesRun.findMany({ take: 500, orderBy: { createdAt: "desc" } })
+    for (const run of runs) {
+      const id = run.id
+      operations.set(id, {
+        id,
+        objective: run.input ? JSON.parse(run.input as string).objective || "" : "",
+        status: run.status as HermesOperationStatus,
+        context: "",
+        plannedActions: [],
+        results: [],
+        insights: [],
+        errors: run.errorMessage ? [run.errorMessage] : [],
+        startedAt: run.createdAt.getTime(),
+        completedAt: run.completedAt?.getTime(),
+        userId: run.userId || undefined,
+      })
+    }
+  } catch (error) {
+    console.warn("[Hermes] Hydration skipped:", (error as Error).message)
+  }
+  return operations
+}
 
 // ============================================================
 // Types
@@ -45,10 +92,12 @@ export interface HermesActionResult {
   duration: number // ms
 }
 
+export type HermesOperationStatus = "planning" | "running" | "paused" | "completed" | "failed"
+
 export interface HermesOperation {
   id: string
   objective: string
-  status: "planning" | "running" | "completed" | "failed"
+  status: HermesOperationStatus
   context: string
   plannedActions: HermesPlannedAction[]
   results: HermesActionResult[]
@@ -74,6 +123,7 @@ const HermesState = Annotation.Root({
   completed: Annotation<boolean>,
   operationId: Annotation<string>,
   startTime: Annotation<number>,
+  userId: Annotation<string | undefined>(),
 })
 
 // ============================================================
@@ -97,8 +147,8 @@ async function retrieveContext(state: typeof HermesState.State) {
     // Search the RAG knowledge base for documents relevant to the objective
     const docs = await ragPipeline.searchDocuments(state.objective, { k: 5 })
 
-    // Also search agent memory for relevant past insights
-    const insights = await agentMemory.searchInsights(state.objective, 3)
+    // Also search agent memory for relevant past insights via Central Brain
+    const insights = await centralBrain.searchInsights(state.objective, 3)
 
     let context = ""
 
@@ -141,6 +191,7 @@ async function planWorkflow(state: typeof HermesState.State) {
     "compliance — Compliance Agent: Reviews expiring certifications via QMe document processing, sends Make.com compliance alerts, runs Voiceflow checks",
     "onboarding — Onboarding Agent: Follows up with stuck clients via email, creates QMe document workflows, syncs to Zoho CRM, triggers Make.com sequences",
     "revenue — Revenue Agent: Computes financial metrics, stores in RAG knowledge base, syncs to Zoho CRM deals, triggers Make.com reporting",
+    "revstack-ops — RevStack Operations Agent: Generates invoices from active retainers due for billing, scores client health on engagement/compliance/revenue dimensions",
   ].join("\n")
 
   const planningPrompt = ChatPromptTemplate.fromMessages([
@@ -172,7 +223,7 @@ async function planWorkflow(state: typeof HermesState.State) {
 
     const parts = clean.split("|").map((p) => p.trim())
     const agentType = parts[0]?.toLowerCase() as AgentType
-    const validAgents: AgentType[] = ["lead", "trade", "compliance", "onboarding", "revenue", "orchestrator"]
+    const validAgents: AgentType[] = ["lead", "trade", "compliance", "onboarding", "revenue", "orchestrator", "revstack-ops"]
 
     parsed.push({
       agentType: validAgents.includes(agentType) ? agentType : "orchestrator",
@@ -247,15 +298,16 @@ async function executeAction(state: typeof HermesState.State) {
     const actionStart = Date.now()
 
     try {
-      // Execute via the service bridge — this calls real integrations
-      const result = await executeAgentServiceAction(
+      // Execute via the Central Brain — routes through MessageBus + CommunicationLog
+      const result = await centralBrain.executeAction(
         action.agentType,
         action.action,
         {
           sessionId: state.operationId,
           objective: state.objective,
           startTime: state.startTime,
-        }
+        },
+        { correlationId: state.operationId, userId: state.userId }
       )
 
       const executionResult: HermesActionResult = {
@@ -266,10 +318,10 @@ async function executeAction(state: typeof HermesState.State) {
 
       results.push(executionResult)
 
-      // Analyze the result for insights via agent memory
+      // Analyze the result for insights via Central Brain
       if (result.success && result.details) {
         try {
-          const insight = await agentMemory.analyzePattern(
+          const insight = await centralBrain.analyzePattern(
             result.details.substring(0, 2000),
             action.agentType
           )
@@ -320,7 +372,7 @@ async function finalizeOperation(state: typeof HermesState.State) {
 
       for (const agentType of agentTypes) {
         const agentResults = successfulResults.filter((r) => r.action.agentType === agentType)
-        await agentMemory.generateReport(
+        await centralBrain.generateReport(
           agentType,
           state.startTime,
           Date.now(),
@@ -349,7 +401,7 @@ async function finalizeOperation(state: typeof HermesState.State) {
       `${successfulResults.length}/${state.results.length} agent actions completed in ${(totalDuration / 1000).toFixed(0)}s`
 
     try {
-      await agentMemory.addInsight(
+      await centralBrain.addInsight(
         "orchestrator",
         "Hermes operation completed",
         summaryLine,
@@ -361,6 +413,7 @@ async function finalizeOperation(state: typeof HermesState.State) {
           failedActions: failedResults.length,
           duration: totalDuration,
           objective: state.objective,
+          correlationId: state.operationId,
         }
       )
     } catch {
@@ -401,12 +454,77 @@ class HermesAgent {
   private workflow: ReturnType<typeof buildHermesWorkflow>
   private listeners: Array<(operation: HermesOperation) => void>
   private analysisPromise: Promise<void> | null
+  private readyPromise: Promise<void>
+  private pausedOperations: Set<string>
 
   constructor() {
     this.operations = new Map()
     this.workflow = buildHermesWorkflow()
     this.listeners = []
     this.analysisPromise = null
+    this.pausedOperations = new Set()
+    // Hydrate from DB in background — sync methods will work with empty map until hydration completes
+    // Register all agents with the Central Brain
+    this.registerServiceAgents()
+    this.registerPersonalizationSubscriber()
+
+    this.readyPromise = this.hydrate()
+  }
+
+  /**
+   * Register all service agents with the Central Brain.
+   * Gets metadata from agent-service-bridge to avoid circular dependencies.
+   */
+  private registerServiceAgents(): void {
+    const registrations = getAgentRegistrations()
+    for (const reg of registrations) {
+      centralBrain.registerAgent(reg.agentType, {
+        displayName: reg.displayName,
+        description: reg.description,
+        capabilities: reg.capabilities,
+        status: reg.status as "active" | "idle" | "error" | "unavailable",
+      })
+    }
+  }
+
+  private registerPersonalizationSubscriber(): void {
+    centralBrain.subscribe(
+      async (message) => {
+        if (
+          message.type === "user:personalization_updated" &&
+          (message.target === "orchestrator" || message.target === "*")
+        ) {
+          const { userId } = message.payload as { userId: string }
+          invalidatePersonalizationCache(userId)
+          this.notifyListeners({
+            id: `personalize-${userId}-${Date.now()}`,
+            objective: `Personalize experience for new user`,
+            status: "completed",
+            context: JSON.stringify(message.payload),
+            plannedActions: [],
+            results: [],
+            insights: [],
+            errors: [],
+            startedAt: Date.now(),
+            completedAt: Date.now(),
+            userId,
+          })
+        }
+      },
+      {
+        messageType: "user:personalization_updated",
+        targetFilter: "*",
+      }
+    )
+  }
+
+  private async hydrate(): Promise<void> {
+    try {
+      const hydrated = await hydrateOperationsFromDb()
+      this.operations = hydrated
+    } catch (error) {
+      console.warn("[Hermes] Hydration failed:", (error as Error).message)
+    }
   }
 
   // ==========================================================
@@ -475,6 +593,23 @@ class HermesAgent {
       this.operations.set(operation.id, operation)
       this.notifyListeners(operation)
 
+      persistDbOperation({
+        taskType: "custom",
+        status: operation.status,
+        input: JSON.stringify({ objective: operation.objective, userId: operation.userId }),
+        output: JSON.stringify({
+          results: operation.results,
+          plannedActions: operation.plannedActions,
+          insights: operation.insights,
+          context: operation.context,
+        }),
+        errorMessage: (operation.errors[0] as string) || null,
+        leadsProcessed: operation.results?.length || null,
+        messagesQueued: operation.results?.length || null,
+        userId: operation.userId || null,
+        completedAt: null,
+      }).catch((error) => console.warn("[Hermes] persist failed", error))
+
       return operation
     } catch (error) {
       operation.status = "failed"
@@ -483,6 +618,12 @@ class HermesAgent {
 
       this.operations.set(operation.id, operation)
       this.notifyListeners(operation)
+
+      updateDbOperation(operation.id, {
+        status: "failed",
+        errorMessage: (error as Error).message,
+        completedAt: new Date(),
+      }).catch(() => {})
 
       return operation
     }
@@ -519,9 +660,9 @@ class HermesAgent {
           prisma.revenueEntry.aggregate({ _sum: { amount: true } }),
         ])
 
-      // Store as system insights in agent memory
+      // Store as system insights via Central Brain
       if (leadCount > 0) {
-        await agentMemory.addInsight(
+        await centralBrain.addInsight(
           "lead",
           `Hermes startup: ${leadCount} unprocessed leads in pipeline`,
           `There are ${leadCount} leads awaiting qualification. Hermes should prioritize lead agent actions in subsequent runs.`,
@@ -531,7 +672,7 @@ class HermesAgent {
       }
 
       if (onboardingCount > 0) {
-        await agentMemory.addInsight(
+        await centralBrain.addInsight(
           "onboarding",
           `Hermes startup: ${onboardingCount} clients stuck in onboarding`,
           `${onboardingCount} clients have not completed onboarding. Hermes should send follow-ups and trigger Make.com sequences.`,
@@ -541,7 +682,7 @@ class HermesAgent {
       }
 
       if (expiringCertCount > 0) {
-        await agentMemory.addInsight(
+        await centralBrain.addInsight(
           "compliance",
           `Hermes startup: ${expiringCertCount} certifications expiring within 30 days`,
           `Found ${expiringCertCount} certs approaching expiry. Compliance agent should prioritize QMe reviews and Make.com alerts.`,
@@ -550,7 +691,7 @@ class HermesAgent {
         )
       }
 
-      await agentMemory.addInsight(
+      await centralBrain.addInsight(
         "orchestrator",
         "Hermes agent initialized",
         `System state at startup: ${leadCount} leads, ${activeClientCount} active clients, ${onboardingCount} stuck in onboarding, ${expiringCertCount} expiring certs, $${revenueData._sum.amount || 0} total revenue.`,
@@ -585,26 +726,107 @@ class HermesAgent {
   }
 
   /**
-   * Full system health check — all agents run a standard diagnostic.
+   * Full system health check — all agents run a standard diagnostic,
+   * including RevStack revenue automation status (invoices due, client health).
    */
   async runSystemHealthCheck(userId?: string): Promise<HermesOperation> {
     return this.runOperation(
       "Full system health check: scan leads, check compliance expiry, " +
       "review revenue metrics, check trade corridor matches, " +
-      "and follow up with stuck onboarding clients.",
+      "follow up with stuck onboarding clients, " +
+      "and check RevStack status: generate invoices for due retainers " +
+      "and score client health across engagement, compliance, and revenue.",
       { userId }
     )
+  }
+
+  /**
+   * RevStack health check — specific to revenue automation operations.
+   * Checks invoice generation status and runs client health scoring.
+   */
+  async runRevStackCheck(userId?: string): Promise<HermesOperation> {
+    return this.runOperation(
+      "RevStack revenue automation check: " +
+      "generate invoices for all active retainers due for billing, " +
+      "score client health on engagement, compliance, and revenue dimensions, " +
+      "and log any high-risk client alerts.",
+      { userId }
+    )
+  }
+
+  // ==========================================================
+  // Pause / Resume / Stop (God Mode control)
+  // ==========================================================
+
+  /**
+   * Pause a running Hermes operation.
+   * Marks the operation as paused so it won't continue executing.
+   */
+  async pauseOperation(operationId: string): Promise<boolean> {
+    const op = this.operations.get(operationId)
+    if (!op || op.status !== "running") return false
+    op.status = "paused"
+    this.pausedOperations.add(operationId)
+    this.operations.set(operationId, op)
+    this.notifyListeners(op)
+    return true
+  }
+
+  /**
+   * Resume a paused Hermes operation.
+   */
+  async resumeOperation(operationId: string): Promise<boolean> {
+    if (!this.pausedOperations.has(operationId)) return false
+    const op = this.operations.get(operationId)
+    if (!op) return false
+    op.status = "running"
+    this.pausedOperations.delete(operationId)
+    this.operations.set(operationId, op)
+    this.notifyListeners(op)
+    return true
+  }
+
+  /**
+   * Stop/cancel a Hermes operation.
+   */
+  async stopOperation(operationId: string): Promise<boolean> {
+    const op = this.operations.get(operationId)
+    if (!op) return false
+    op.status = "failed"
+    if (!op.errors.includes("Operation stopped by user")) {
+      op.errors = [...op.errors, "Operation stopped by user"]
+    }
+    op.completedAt = Date.now()
+    this.pausedOperations.delete(operationId)
+    this.operations.set(operationId, op)
+    this.notifyListeners(op)
+
+    updateDbOperation(operationId, {
+      status: "failed",
+      errorMessage: "Operation stopped by user",
+      completedAt: new Date(),
+    }).catch(() => {})
+
+    return true
   }
 
   // ==========================================================
   // Query Operations
   // ==========================================================
 
+  /**
+   * Get a single operation by ID.
+   * Note: If called before background hydration completes, the operation may
+   * not be found yet. This is a best-effort query that works with the current
+   * in-memory state.
+   */
   getOperation(operationId: string): HermesOperation | undefined {
+    this.readyPromise.catch(() => {}); // Fire background hydration — result may not be ready yet
     return this.operations.get(operationId)
   }
 
   getAllOperations(): HermesOperation[] {
+    this.readyPromise.catch(() => {});
     return Array.from(this.operations.values()).sort(
       (a, b) => b.startedAt - a.startedAt
     )
@@ -614,7 +836,7 @@ class HermesAgent {
     return this.getAllOperations().slice(0, limit)
   }
 
-  getOperationsByStatus(status: HermesOperation["status"]): HermesOperation[] {
+  getOperationsByStatus(status: HermesOperationStatus): HermesOperation[] {
     return this.getAllOperations().filter((op) => op.status === status)
   }
 
@@ -628,9 +850,10 @@ class HermesAgent {
     insightsCount: number
     recentErrorCount: number
   } {
-    const all = this.getAllOperations()
+    this.readyPromise.catch(() => {});
+    const all = Array.from(this.operations.values())
     const running = all.find((op) => op.status === "running")
-    const lastOp = all[0] || null
+    const lastOp = all.sort((a, b) => b.startedAt - a.startedAt)[0] || null
     const recentErrors = all
       .slice(0, 5)
       .reduce((sum, op) => sum + op.errors.length, 0)
