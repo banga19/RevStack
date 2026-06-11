@@ -47,6 +47,9 @@ type CampaignStep = {
   messageBody: string
   delayDays: number
   status?: string
+  sentAt?: string
+  openedCount?: number
+  replyCount?: number
 }
 
 type Campaign = {
@@ -82,7 +85,18 @@ const defaultStep = (): CampaignStep => ({
   delayDays: 0,
 })
 
-const emptyCampaign = {
+const emptyCampaign: {
+  clientName: string
+  channel: string
+  type: string
+  status: string
+  subject: string
+  messageBody: string
+  scheduleType: string
+  scheduledAt: string
+  targetCount: number
+  steps: CampaignStep[]
+} = {
   clientName: "",
   channel: "whatsapp",
   type: "cold",
@@ -187,7 +201,7 @@ export default function CampaignsPage() {
   const [editingCampaign, setEditingCampaign] = useState<boolean>(false)
 
   // Campaign form state
-  const [form, setForm] = useState({ ...emptyCampaign })
+  const [form, setForm] = useState<typeof emptyCampaign>({ ...emptyCampaign })
   const [formSteps, setFormSteps] = useState<CampaignStep[]>([defaultStep()])
   const [saving, setSaving] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -199,7 +213,8 @@ export default function CampaignsPage() {
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false)
 
   const loadData = () => {
-    fetch("/api/campaigns")
+    // Route through Hermes Central Brain — all page data flows via CommunicationLog
+    fetch("/api/central-brain/revstack/data?page=campaigns")
       .then((r) => r.json())
       .then((d) => { setCampaigns(d); setLoading(false) })
       .catch(() => setLoading(false))
@@ -229,6 +244,7 @@ export default function CampaignsPage() {
       scheduleType: campaign.scheduleType || "immediate",
       scheduledAt: campaign.startedAt || "",
       targetCount: campaign.targetCount || 0,
+      steps: [],
     })
     setFormSteps(
       campaign.steps.length > 0
@@ -391,7 +407,7 @@ export default function CampaignsPage() {
   // ── Apply template ───────────────────────────────────────────────────
   const applyTemplate = (tmpl: typeof QUICK_TEMPLATES[0]) => {
     if (formSteps.length === 1 && !formSteps[0].messageBody) {
-      setForm({ ...form, channel: tmpl.channel, subject: tmpl.subject })
+      setForm({ ...form, channel: tmpl.channel, subject: tmpl.subject ?? "" })
       setFormSteps([{
         stepNumber: 1,
         channel: tmpl.channel,

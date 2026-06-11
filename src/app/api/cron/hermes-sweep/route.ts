@@ -25,6 +25,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { hermesQueue } from "@/lib/hermes/queue"
+import { centralBrain } from "@/lib/hermes-central-brain"
 
 // ============================================================
 // GET — Trigger a Hermes lead sweep
@@ -63,6 +64,19 @@ export async function GET(req: NextRequest) {
       userId,
       triggeredBy: "cron:hermes-sweep",
       timestamp: new Date().toISOString(),
+    })
+
+    // Log sweep dispatch through Central Brain's message bus (after successful enqueue)
+    centralBrain.sendMessage({
+      source: "cron:hermes-sweep",
+      target: "*",
+      type: "sweep:dispatched",
+      payload: {
+        mode,
+        userId,
+        timestamp: new Date().toISOString(),
+      },
+      priority: "medium",
     })
 
     return NextResponse.json({

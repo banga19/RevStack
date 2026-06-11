@@ -69,6 +69,7 @@ model User {
   followUpLogs         FollowUpLog[]
   leads                Lead[]
   retainers            Retainer[]
+  invoices             Invoice[]
 }
 
 // Subscription — recurring subscription tied to a Flutterwave charge
@@ -220,6 +221,7 @@ model Client {
   ersSnapshots      ErsSnapshot[]
   followups         Followup[]
   retainers         Retainer[]
+  invoices          Invoice[]
   convertedLead     Lead?     // lead that converted to this client
 }
 
@@ -524,6 +526,7 @@ model Retainer {
   notes           String?
   userId          String
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoices        Invoice[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -555,6 +558,31 @@ model Message {
   createdAt DateTime @default(now())
 }
 
+// Invoice — auto-generated invoices from active retainers (RevStack operations)
+model Invoice {
+  id              String    @id @default(cuid())
+  retainerId      String?
+  retainer        Retainer? @relation(fields: [retainerId], references: [id], onDelete: SetNull)
+  clientId        String
+  client          Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  invoiceNumber   String    @unique
+  amountUsd       Float
+  currency        String    @default("USD")
+  status          String    @default("draft") // draft, sent, paid, overdue, cancelled
+  dueDate         DateTime
+  issuedAt        DateTime  @default(now())
+  paidAt          DateTime?
+  notes           String?
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([retainerId])
+  @@index([clientId])
+  @@index([status])
+}
+
 // Activity — audit trail / activity feed entries
 model Activity {
   id          String   @id @default(cuid())
@@ -564,6 +592,24 @@ model Activity {
   entityId    String?
   userId      String?
   createdAt   DateTime @default(now())
+}
+
+// CommunicationLogEntry — persisted Central Brain communication log entries
+// Survives server restarts for post-mortem analysis and audit trails
+model CommunicationLogEntry {
+  id              String    @id @default(cuid())
+  entryType       String    // message_sent, message_received, action_executed, action_failed, insight_generated, event, error
+  source          String
+  summary         String
+  details         String?   // JSON string
+  durationMs      Int?
+  correlationId   String?
+  timestamp       DateTime  @default(now())
+
+  @@index([entryType])
+  @@index([source])
+  @@index([timestamp])
+  @@index([correlationId])
 }
 
 // HermesRun — tracks AI agent execution runs

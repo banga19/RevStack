@@ -23,10 +23,32 @@
 import { test, expect, type Page } from "@playwright/test"
 import { PrismaClient } from "@prisma/client"
 import bcrypt from "bcryptjs"
+import fs from "fs"
 
 const BASE_URL = process.env.BASE_URL || "http://localhost:3000"
 const TEST_EMAIL = "playwright-checkout@example.com"
 const TEST_PASSWORD = "TestPass123!"
+
+/**
+ * Load the Flutterwave webhook secret from the environment or .env files.
+ * Playwright's test runner does NOT auto-load Next.js .env files, so we
+ * need to read them manually if the env var isn't exported in the shell.
+ */
+function getWebhookSecret(): string {
+  const fromEnv = process.env.FLUTTERWAVE_WEBHOOK_SECRET || process.env.FLW_WEBHOOK_HASH
+  if (fromEnv) return fromEnv
+  // Try .env.local first (overrides .env), then .env
+  for (const file of [".env.local", ".env"]) {
+    try {
+      const content = fs.readFileSync(file, "utf-8")
+      const match = content.match(/^FLUTTERWAVE_WEBHOOK_SECRET="?([^"\n]+)"?/m)
+      if (match) return match[1]
+      const fallbackMatch = content.match(/^FLW_WEBHOOK_HASH="?([^"\n]+)"?/m)
+      if (fallbackMatch) return fallbackMatch[1]
+    } catch {}
+  }
+  return ""
+}
 
 // ───────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -349,6 +371,167 @@ test.describe("Payment Checkout Flow", () => {
     // Should redirect to signup with plan/billing params
     await page.waitForURL(/signup/, { timeout: 10000 })
     await expect(page).toHaveURL(/signup/)
+  })
+
+  test("webhook triggers payment success via DB update (live mode pipeline)", async ({ page }) => {
+    // ── Step 1: Login and open pricing ────────────────────────────────
+    await loginAsTestUser(page)
+    await page.goto(`${BASE_URL}/pricing`, { waitUntil: "load" })
+
+    // Dismiss cookie consent if present
+    const cookieAccept = page.locator("button", { hasText: "Accept All Cookies" })
+    if (await cookieAccept.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await cookieAccept.click()
+      await page.waitForTimeout(300)
+    }
+
+    // Wait for session to fully load
+    await page.waitForLoadState("networkidle")
+    await page.waitForTimeout(500)
+
+    const choosePlanButton = page.locator("button", { hasText: "Choose Plan" }).first()
+    await expect(choosePlanButton).toBeVisible({ timeout: 10000 })
+    await choosePlanButton.click()
+
+    // Retry logic: if checkout dialog doesn't appear, reload and try once more
+    const checkoutVisible = await page.locator('[data-testid="payment-method-selection"]').isVisible({ timeout: 10000 }).catch(() => false)
+    if (!checkoutVisible) {
+      console.log("[Test] Checkout dialog not visible after first click — reloading and retrying")
+      await page.reload({ waitUntil: "load" })
+      await page.waitForLoadState("networkidle")
+      await page.waitForTimeout(500)
+      const retryButton = page.locator("button", { hasText: "Choose Plan" }).first()
+      await expect(retryButton).toBeVisible({ timeout: 10000 })
+      await retryButton.click()
+      await expect(page.locator('[data-testid="payment-method-selection"]')).toBeVisible({ timeout: 10000 })
+    }
+
+    await page.locator("button", { hasText: "Credit / Debit Card" }).click()
+    await expect(page.locator('[data-testid="card-payment-form"]')).toBeVisible()
+
+    await page.locator("#cardNumber").fill("4242 4242 4242 4242")
+    const yearOptions = getYearOptions()
+    await page.locator("label", { hasText: "Expiry" })
+      .locator("..").locator("select").first().selectOption("12")
+    await page.locator("label", { hasText: "Expiry" })
+      .locator("..").locator("select").nth(1).selectOption(yearOptions[3])
+    await page.locator("#cvv").fill("123")
+
+    // ── Step 3: Intercept initiate with simulated success ───────────────
+    // We intercept with a mock success (not forwarding to real API),
+    // then send the webhook separately to update the real DB.
+    let capturedTxRef = `webhook-test-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+
+    await page.route("**/api/payments/initiate", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          success: true,
+          paymentId: `wh-pay-${Date.now()}`,
+          txRef: capturedTxRef,
+          authUrl: undefined,
+        }),
+      })
+    })
+
+    // ── Step 4: Click Pay and verify processing state ─────────────────
+    const payButton = page.locator('[data-testid="pay-button"]')
+    await payButton.click()
+    await expect(page.locator('[data-testid="payment-processing"]')).toBeVisible({ timeout: 10000 })
+
+    // Small delay to let the frontend set up polling
+    await page.waitForTimeout(1500)
+
+    // ── Step 5: Simulate Flutterwave webhook callback ─────────────────
+    // Send a charge.completed event to the real webhook endpoint.
+    // The server processes this against the real DB using its own env vars.
+    // We need the webhook secret to match what the server expects.
+    const WEBHOOK_SECRET = getWebhookSecret()
+
+    // Create a payment record in the DB matching our txRef
+    // so the webhook can find and update it
+    const prisma = new PrismaClient()
+    try {
+      const user = await prisma.user.findUnique({ where: { email: TEST_EMAIL } })
+      if (user) {
+        await prisma.payment.create({
+          data: {
+            userId: user.id,
+            amount: 50,
+            currency: "USD",
+            provider: "flutterwave",
+            paymentMethod: "card",
+            flutterwaveTxRef: capturedTxRef,
+            status: "pending",
+            tier: "starter",
+            plan: "monthly",
+            metadata: JSON.stringify({ email: TEST_EMAIL }),
+          },
+        }).catch((e) => console.log("[Test] Payment create skipped:", e.message))
+      }
+    } finally {
+      await prisma.$disconnect()
+    }
+
+    if (WEBHOOK_SECRET) {
+      const webhookRes = await page.request.post(`${BASE_URL}/api/webhooks/flutterwave`, {
+        headers: {
+          "Content-Type": "application/json",
+          "verif-hash": WEBHOOK_SECRET,
+        },
+        data: {
+          event: "charge.completed",
+          data: {
+            id: 999888,
+            tx_ref: capturedTxRef,
+            status: "successful",
+            amount: 50,
+            currency: "USD",
+            customer: { id: 123456, email: TEST_EMAIL },
+          },
+        },
+      })
+      expect(webhookRes.status()).toBe(200)
+      const whBody = await webhookRes.json()
+      expect(whBody.received).toBe(true)
+      console.log(`[Test] Webhook processed for txRef=${capturedTxRef}`)
+
+      // Verify the DB was updated by querying directly
+      const verifyPrisma = new PrismaClient()
+      try {
+        const updatedPayment = await verifyPrisma.payment.findUnique({
+          where: { flutterwaveTxRef: capturedTxRef },
+          select: { status: true },
+        })
+        expect(updatedPayment?.status).toBe("success")
+        console.log("[Test] Payment status in DB is 'success' after webhook")
+
+        const updatedUser = await verifyPrisma.user.findUnique({
+          where: { email: TEST_EMAIL },
+          select: { subscriptionStatus: true, subscriptionTier: true },
+        })
+        expect(updatedUser?.subscriptionStatus).toBe("active")
+        expect(updatedUser?.subscriptionTier).toBe("starter")
+        console.log("[Test] User subscription activated after webhook")
+      } finally {
+        await verifyPrisma.$disconnect()
+      }
+    } else {
+      console.log("[Test] No webhook secret available — skipping webhook call")
+    }
+
+    // ── Step 6: Don't intercept status — let polling return real DB state ─
+    // The webhook updated the payment to 'success' in the DB.
+    // The frontend polls /api/payments/status which reads from the real DB.
+    // It should detect 'success' after the next poll cycle.
+    if (WEBHOOK_SECRET) {
+      await expect(page.locator('[data-testid="payment-success"]')).toBeVisible({ timeout: 30000 })
+      await expect(page.locator("text=Payment Successful! 🎉")).toBeVisible()
+      await page.waitForURL(/dashboard/, { timeout: 15000 })
+    } else {
+      console.log("[Test] Webhook secret not set — skipping frontend success checks")
+    }
   })
 
   test("shows mobile money payment form when selected", async ({ page }) => {

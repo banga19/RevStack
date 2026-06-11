@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { withAbac } from "@/lib/abac-middleware"
-import { agentOrchestrator } from "@/lib/agent-orchestrator"
-import { agentMemory } from "@/lib/agent-memory"
 import { RESOURCES } from "@/lib/abac"
 import { hermesAgent } from "@/lib/hermes-agent"
+import { centralBrain } from "@/lib/hermes-central-brain"
 
-// POST /api/god-mode — Start a new God Mode session
+// POST /api/god-mode — Start a new God Mode session (backed by Hermes)
 export const POST = withAbac(
   RESOURCES["god-mode"],
   "deploy",
-  async (req: NextRequest) => {
+  async (req: NextRequest, { session }: any) => {
     const body = await req.json()
     const { objective, duration } = body
 
@@ -22,7 +21,7 @@ export const POST = withAbac(
     }
 
     const operation = await hermesAgent.runOperation(objective, {
-      userId: undefined,
+      userId: session?.user?.id || undefined,
     })
 
     return NextResponse.json({
@@ -31,22 +30,22 @@ export const POST = withAbac(
   }
 )
 
-// GET /api/god-mode — Get all sessions
+// GET /api/god-mode — Get all sessions from Hermes
 export const GET = withAbac(RESOURCES["god-mode"], "read", async () => {
-  const sessions = agentOrchestrator.getAllSessions().map(serializeSession)
   const operations = hermesAgent.getAllOperations().map(serializeHermesOperation)
-  const allReports = agentMemory.getAllReports()
+  // Reports come through the Central Brain instead of direct agentMemory access
+  const allReports = centralBrain.getAllReports()
   const agentStatus = hermesAgent.getSystemStatus()
 
   return NextResponse.json({
-    sessions,
+    sessions: operations, // God Mode sessions = Hermes operations
     operations,
     reports: allReports.map(serializeReport),
     agentStatus,
   })
 })
 
-// PATCH /api/god-mode — Control a session (pause/resume/stop)
+// PATCH /api/god-mode — Control a session (pause/resume/stop) via Hermes
 export const PATCH = withAbac(
   RESOURCES["god-mode"],
   "deploy",
@@ -61,14 +60,29 @@ export const PATCH = withAbac(
       )
     }
 
+    // Check if the operation exists in Hermes
+    const operation = hermesAgent.getOperation(sessionId)
+    if (!operation) {
+      return NextResponse.json(
+        { error: `Session not found: ${sessionId}` },
+        { status: 404 }
+      )
+    }
+
     let success = false
     switch (action) {
+      case "pause":
+        success = await hermesAgent.pauseOperation(sessionId)
+        break
+      case "resume":
+        success = await hermesAgent.resumeOperation(sessionId)
+        break
       case "stop":
-        success = agentOrchestrator.stopGodMode(sessionId)
+        success = await hermesAgent.stopOperation(sessionId)
         break
       default:
         return NextResponse.json(
-          { error: `Unsupported action for Hermes-backed God Mode: ${action}` },
+          { error: `Unsupported action for God Mode: ${action}` },
           { status: 400 }
         )
     }
@@ -80,10 +94,10 @@ export const PATCH = withAbac(
       )
     }
 
-    const updatedSession = agentOrchestrator.getSession(sessionId)
+    const updatedSession = hermesAgent.getOperation(sessionId)
 
     return NextResponse.json({
-      session: updatedSession ? serializeSession(updatedSession) : null,
+      session: updatedSession ? serializeHermesOperation(updatedSession) : null,
     })
   }
 )
@@ -99,37 +113,11 @@ function serializeHermesOperation(operation: any) {
     results: operation.results || [],
     insights: operation.insights || [],
     errors: operation.errors || [],
-    progress: typeof operation.completedAt === "number" ? 100 : 0,
+    progress: typeof operation.completedAt === "number" ? 100 : operation.status === "running" ? 50 : 0,
     currentAgent: operation.results?.[0]?.action?.agentType,
     completedCount: (operation.results || []).filter((r: any) => r.result?.success !== false).length,
     totalActions: (operation.results || []).length + (operation.plannedActions || []).length,
     errorsCount: (operation.errors || []).length,
-  }
-}
-
-// Serialize functions to prevent circular references
-function serializeSession(session: any) {
-  return {
-    id: session.id,
-    config: session.config,
-    status: session.status,
-    startTime: session.startTime,
-    endTime: session.endTime,
-    tasks: session.tasks.map((t: any) => ({
-      id: t.id,
-      agentType: t.agentType,
-      action: t.action,
-      status: t.status,
-      result: t.result,
-      error: t.error,
-      completedAt: t.completedAt,
-    })),
-    reports: session.reports || [],
-    progress: session.progress || 0,
-    currentAgent: session.currentAgent,
-    completedCount: session.tasks?.filter((t: any) => t.status === "completed").length || 0,
-    totalActions: session.tasks?.length || 0,
-    errors: session.tasks?.filter((t: any) => t.status === "failed").length || 0,
   }
 }
 

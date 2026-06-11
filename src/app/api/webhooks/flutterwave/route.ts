@@ -82,14 +82,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Payment not found" }, { status: 404 });
     }
 
-    if (payment.status !== "PENDING") {
+    if (payment.status !== "pending") {
       return NextResponse.json({ message: "Already processed" });
     }
 
     if (amount !== undefined && payment.amount !== amount) {
       await prisma.payment.update({
         where: { id: payment.id },
-        data: { status: "FAILED", metadata: JSON.stringify({ error: "Amount mismatch" }) },
+        data: { status: "failed", metadata: JSON.stringify({ error: "Amount mismatch" }) },
       });
       return NextResponse.json({ error: "Amount mismatch" }, { status: 400 });
     }
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
       await prisma.payment.update({
         where: { id: payment.id },
         data: {
-          status: "SUCCESSFUL",
+          status: "success",
           flutterwaveTxId: transactionId,
           metadata: JSON.stringify({
             ...(typeof payment.metadata === "string" ? JSON.parse(payment.metadata) : payment.metadata || {}),
@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
           flutterwaveTxId: transactionId ?? undefined,
           amount: payment.amount,
           currency: payment.currency,
-          status: "ACTIVE",
+          status: "active",
           currentPeriodStart: now,
           currentPeriodEnd: periodEnd,
         },
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
     } else {
       await prisma.payment.update({
         where: { id: payment.id },
-        data: { status: "FAILED" },
+        data: { status: "failed" },
       });
     }
   }

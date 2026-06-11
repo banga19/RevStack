@@ -391,6 +391,62 @@ test.describe("Dev-mode simulated checkout flow", () => {
     await page.waitForURL(/dashboard/, { timeout: 15000 })
   })
 
+  test("shows unconfigured error when Flutterwave keys are absent (dev mode)", async ({ page }) => {
+    await loginAsTestUser(page)
+    await page.goto(`${BASE_URL}/pricing`, { waitUntil: "load" })
+    await dismissCookieConsent(page)
+
+    const choosePlanButton = page.locator("button", { hasText: "Choose Plan" }).first()
+    await expect(choosePlanButton).toBeVisible({ timeout: 15000 })
+    await choosePlanButton.click()
+
+    await expect(page.locator('[data-testid="payment-method-selection"]')).toBeVisible({ timeout: 5000 })
+
+    // Select card
+    await page.locator("button", { hasText: "Credit / Debit Card" }).click()
+
+    // Fill card details
+    await page.locator("#cardNumber").fill("4242 4242 4242 4242")
+    const yearOptions = getYearOptions()
+    await page.locator("label", { hasText: "Expiry" })
+      .locator("..")
+      .locator("select")
+      .first()
+      .selectOption("12")
+    await page.locator("label", { hasText: "Expiry" })
+      .locator("..")
+      .locator("select")
+      .nth(1)
+      .selectOption(yearOptions[3])
+    await page.locator("#cvv").fill("123")
+
+    // Intercept initiate endpoint to return the exact "Flutterwave not configured"
+    // error message the backend returns when no Flutterwave keys are set.
+    await page.route("**/api/payments/initiate", async (route: Route) => {
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: "Flutterwave is not configured. Set FLUTTERWAVE_SECRET_KEY and NEXT_PUBLIC_FLUTTERWAVE_PUBLIC_KEY to process payments.",
+        }),
+      })
+    })
+
+    // Click Pay
+    const payButton = page.locator('[data-testid="pay-button"]')
+    await payButton.click()
+
+    // Verify error state shows the unconfigured message
+    const errorState = page.locator('[data-testid="payment-error"]')
+    await expect(errorState).toBeVisible({ timeout: 10000 })
+    await expect(errorState.locator("text=Payment Failed")).toBeVisible()
+    await expect(errorState.locator("text=Flutterwave is not configured")).toBeVisible()
+
+    // Verify Try Again button is present
+    const tryAgainButton = errorState.locator('[data-testid="back-button"]')
+    await expect(tryAgainButton).toBeVisible()
+  })
+
   test("shows error state when payment initiation fails", async ({ page }) => {
     await loginAsTestUser(page)
     await page.goto(`${BASE_URL}/pricing`, { waitUntil: "load" })

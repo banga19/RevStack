@@ -132,12 +132,16 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <head>
-        {/* Preconnect to analytics domains */}
-        <link
-          rel="preconnect"
-          href="https://us.i.posthog.com"
-          crossOrigin="anonymous"
-        />
+        {/* Preconnect to analytics domains — only when analytics provider is active */}
+        {process.env.NEXT_PUBLIC_ANALYTICS_PROVIDER === "posthog" && (
+          <link
+            rel="preconnect"
+            href="https://us.i.posthog.com"
+            crossOrigin="anonymous"
+          />
+        )}
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#000000" />
       </head>
       <body className={inter.className} suppressHydrationWarning>
         <JsonLd />

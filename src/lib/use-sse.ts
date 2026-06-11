@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useCallback, useState } from "react"
-import type { NotificationEvent } from "@/app/api/notifications/stream/route"
+import type { NotificationEvent } from "@/lib/sse-registry"
 
 type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error"
 
@@ -64,7 +64,9 @@ export function useSSE(options: UseSSEOptions = {}): UseSSEResult {
 
       es.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data) as NotificationEvent
+          const raw = typeof event.data === "string" ? event.data.trim() : ""
+          if (!raw || raw.startsWith(":")) return
+          const data = JSON.parse(raw) as NotificationEvent
 
           // Skip heartbeat/connected events — they're informational
           if (data.id === "connected") return

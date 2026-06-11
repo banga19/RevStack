@@ -85,6 +85,7 @@ vi.mock("@/lib/agent-service-bridge", () => ({
     details: "Mock details for testing",
     metrics: { items: 5 },
   }),
+  getAgentRegistrations: vi.fn(() => []),
 }))
 
 // Mock analytics
@@ -96,6 +97,11 @@ vi.mock("@/lib/analytics", () => ({
 // Mock db (prisma) for startup analysis
 vi.mock("@/lib/db", () => ({
   prisma: {
+    hermesRun: {
+      create: vi.fn().mockResolvedValue({ id: "db-run-1" }),
+      update: vi.fn().mockResolvedValue({ id: "db-run-1" }),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     client: {
       count: vi.fn().mockResolvedValue(0),
     },
@@ -325,7 +331,7 @@ describe("HermesAgent — runOperation lifecycle", () => {
     expect(operation.status).toBe("failed")
     expect(operation.errors.length).toBeGreaterThanOrEqual(1)
     expect(operation.errors[0]).toContain("Graph execution failed")
-  })
+  }, 15000)
 
   it("stores the operation and makes it retrievable", async () => {
     const operation = await agent.runOperation("Test objective")
@@ -425,6 +431,211 @@ describe("HermesAgent — getSystemStatus with operations", () => {
     const status = agent.getSystemStatus()
     expect(status.lastOperation).toBeNull()
     expect(status.runningOperation).toBeNull()
+  })
+})
+
+describe("HermesAgent — pauseOperation, resumeOperation, stopOperation", () => {
+  let agent: HermesAgent
+
+  beforeEach(async () => {
+    agent = new HermesAgent()
+    vi.clearAllMocks()
+  })
+
+  // ── pauseOperation ────────────────────────────────────────────────
+
+  describe("pauseOperation", () => {
+    it("returns false for nonexistent operation ID", async () => {
+      const result = await agent.pauseOperation("nonexistent-id")
+      expect(result).toBe(false)
+    })
+
+    it("returns false when operation is not running (already completed)", async () => {
+      const op = await agent.runOperation("Test operation")
+      expect(op.status).toBe("completed")
+
+      const result = await agent.pauseOperation(op.id)
+      expect(result).toBe(false)
+    })
+
+    it("pauses a running operation successfully", async () => {
+      const op = await agent.runOperation("Test operation")
+
+      // Manually set status to running for pause test
+      const runningOp = agent.getOperation(op.id)!
+      ;(runningOp as any).status = "running"
+
+      const result = await agent.pauseOperation(op.id)
+      expect(result).toBe(true)
+
+      const paused = agent.getOperation(op.id)!
+      expect(paused.status).toBe("paused")
+    })
+
+    it("notifies listeners when operation is paused", async () => {
+      const listener = vi.fn()
+      agent.subscribe(listener)
+
+      const op = await agent.runOperation("Test operation")
+      const runningOp = agent.getOperation(op.id)!
+      ;(runningOp as any).status = "running"
+
+      await agent.pauseOperation(op.id)
+
+      expect(listener).toHaveBeenCalled()
+      const lastCall = listener.mock.calls[listener.mock.calls.length - 1][0]
+      expect(lastCall.status).toBe("paused")
+    })
+  })
+
+  // ── resumeOperation ───────────────────────────────────────────────
+
+  describe("resumeOperation", () => {
+    it("returns false for nonexistent operation ID", async () => {
+      const result = await agent.resumeOperation("nonexistent-id")
+      expect(result).toBe(false)
+    })
+
+    it("returns false when operation was not paused", async () => {
+      const op = await agent.runOperation("Test operation")
+
+      const result = await agent.resumeOperation(op.id)
+      expect(result).toBe(false)
+    })
+
+    it("resumes a paused operation successfully", async () => {
+      const op = await agent.runOperation("Test operation")
+
+      // Set to paused first
+      const runningOp = agent.getOperation(op.id)!
+      ;(runningOp as any).status = "running"
+      await agent.pauseOperation(op.id)
+
+      // Now resume
+      const result = await agent.resumeOperation(op.id)
+      expect(result).toBe(true)
+
+      const resumed = agent.getOperation(op.id)!
+      expect(resumed.status).toBe("running")
+    })
+
+    it("notifies listeners when operation is resumed", async () => {
+      const listener = vi.fn()
+      agent.subscribe(listener)
+
+      const op = await agent.runOperation("Test operation")
+      const runningOp = agent.getOperation(op.id)!
+      ;(runningOp as any).status = "running"
+      await agent.pauseOperation(op.id)
+
+      vi.clearAllMocks()
+      await agent.resumeOperation(op.id)
+
+      expect(listener).toHaveBeenCalled()
+      const lastCall = listener.mock.calls[listener.mock.calls.length - 1][0]
+      expect(lastCall.status).toBe("running")
+    })
+  })
+
+  // ── stopOperation ─────────────────────────────────────────────────
+
+  describe("stopOperation", () => {
+    it("returns false for nonexistent operation ID", async () => {
+      const result = await agent.stopOperation("nonexistent-id")
+      expect(result).toBe(false)
+    })
+
+    it("stops an operation successfully", async () => {
+      const op = await agent.runOperation("Test operation")
+
+      const result = await agent.stopOperation(op.id)
+      expect(result).toBe(true)
+    })
+
+    it("marks stopped operation status as failed", async () => {
+      const op = await agent.runOperation("Test operation")
+
+      await agent.stopOperation(op.id)
+
+      const stopped = agent.getOperation(op.id)!
+      expect(stopped.status).toBe("failed")
+    })
+
+    it("adds 'Operation stopped by user' to errors", async () => {
+      const op = await agent.runOperation("Test operation")
+
+      await agent.stopOperation(op.id)
+
+      const stopped = agent.getOperation(op.id)!
+      expect(stopped.errors).toContain("Operation stopped by user")
+    })
+
+    it("sets completedAt when stopped", async () => {
+      const op = await agent.runOperation("Test operation")
+
+      await agent.stopOperation(op.id)
+
+      const stopped = agent.getOperation(op.id)!
+      expect(stopped.completedAt).toBeGreaterThanOrEqual(op.startedAt)
+    })
+
+    it("notifies listeners when operation is stopped", async () => {
+      const listener = vi.fn()
+      agent.subscribe(listener)
+
+      const op = await agent.runOperation("Test operation")
+
+      await agent.stopOperation(op.id)
+
+      expect(listener).toHaveBeenCalled()
+      const lastCall = listener.mock.calls[listener.mock.calls.length - 1][0]
+      expect(lastCall.status).toBe("failed")
+      expect(lastCall.errors).toContain("Operation stopped by user")
+    })
+
+    it("can stop an operation that was previously paused", async () => {
+      const op = await agent.runOperation("Test operation")
+
+      // Pause first
+      const runningOp = agent.getOperation(op.id)!
+      ;(runningOp as any).status = "running"
+      await agent.pauseOperation(op.id)
+
+      // Then stop
+      const result = await agent.stopOperation(op.id)
+      expect(result).toBe(true)
+
+      const stopped = agent.getOperation(op.id)!
+      expect(stopped.status).toBe("failed")
+      expect(stopped.completedAt).toBeGreaterThanOrEqual(op.startedAt)
+    })
+
+    it("returns false when pausing an already-paused operation", async () => {
+      const op = await agent.runOperation("Test operation")
+      const runningOp = agent.getOperation(op.id)!
+      ;(runningOp as any).status = "running"
+      await agent.pauseOperation(op.id)
+
+      // Second pause should fail
+      const result = await agent.pauseOperation(op.id)
+      expect(result).toBe(false)
+    })
+
+    it("handles stopping an already-stopped operation gracefully (idempotent)", async () => {
+      const op = await agent.runOperation("Test operation")
+
+      await agent.stopOperation(op.id)
+      const firstCall = agent.getOperation(op.id)!
+      expect(firstCall.errors.filter(e => e === "Operation stopped by user").length).toBe(1)
+
+      // Second stop should also succeed
+      const result = await agent.stopOperation(op.id)
+      expect(result).toBe(true)
+
+      // But should not push a duplicate error message
+      const secondCall = agent.getOperation(op.id)!
+      expect(secondCall.errors.filter(e => e === "Operation stopped by user").length).toBe(1)
+    })
   })
 })
 

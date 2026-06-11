@@ -209,7 +209,8 @@ export default function LeadsPage() {
       const params = new URLSearchParams()
       if (statusFilter !== "all") params.set("status", statusFilter)
       if (search) params.set("search", search)
-      const res = await fetch(`/api/leads?${params}`)
+      // Route through Hermes Central Brain — all page data flows via CommunicationLog
+      const res = await fetch(`/api/central-brain/revstack/data?page=leads&status=${statusFilter}&search=${encodeURIComponent(search)}`)
       const data = await res.json()
       setLeads(data)
     } catch (e) {

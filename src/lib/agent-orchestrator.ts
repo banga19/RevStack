@@ -1,5 +1,23 @@
 /**
- * Mapato Autonomous Agent Orchestrator
+ * @deprecated AgentOrchestrator is deprecated since v2.0.
+ *
+ * All God Mode operations now route through HermesAgent (src/lib/hermes-agent.ts)
+ * which provides unified pause/resume/stop capabilities, LangGraph-based
+ * planning and execution, RAG pipeline context, agent memory persistence,
+ * and real-time SSE notifications.
+ *
+ * This file is kept for reference only. It is no longer used by any API routes.
+ *
+ * Migration path:
+ *   - agentOrchestrator.startGodMode()    → hermesAgent.runOperation()
+ *   - agentOrchestrator.pauseGodMode()   → hermesAgent.pauseOperation()
+ *   - agentOrchestrator.resumeGodMode()  → hermesAgent.resumeOperation()
+ *   - agentOrchestrator.stopGodMode()    → hermesAgent.stopOperation()
+ *   - agentOrchestrator.getAllSessions() → hermesAgent.getAllOperations()
+ *   - agentOrchestrator.getQuickActions() → defined inline where needed
+ *   - agentOrchestrator.getAgentStatus() → hermesAgent.getSystemStatus()
+ *
+ * Mapato Autonomous Agent Orchestrator (Legacy)
  *
  * Polsia-inspired "God Mode" — autonomous multi-agent system that plans,
  * executes, and reports on B2B trade operations without human intervention.

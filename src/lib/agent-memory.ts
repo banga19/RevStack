@@ -18,7 +18,7 @@ import { createLlm, createEmbeddings } from "./model-provider"
 // Types
 // ============================================================
 
-export type AgentType = "lead" | "trade" | "compliance" | "onboarding" | "revenue" | "orchestrator"
+export type AgentType = "lead" | "trade" | "compliance" | "onboarding" | "revenue" | "orchestrator" | "revstack-ops" | "revstack-page-data"
 
 export interface AgentInsight {
   id: string

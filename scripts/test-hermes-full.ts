@@ -352,11 +352,12 @@ async function main() {
   // ===================================================================
   console.log("\n─── 9. Autonomous Scheduler ──────────────────────────")
   try {
-    const { autonomousScheduler } = await import("@/lib/autonomous-scheduler")
+    const { runAutonomousSweep, runQuickHealthCheck } = await import("@/lib/autonomous-scheduler")
     log("Autonomous scheduler module loads", true)
-    log("Scheduler has start/stop methods",
-      typeof autonomousScheduler.start === "function" &&
-      typeof autonomousScheduler.stop === "function"
+    log("Scheduler exports sweep functions",
+      typeof runAutonomousSweep === "function" &&
+      typeof runQuickHealthCheck === "function",
+      "runAutonomousSweep and runQuickHealthCheck are available"
     )
   } catch (err) {
     log("Autonomous scheduler module", false, (err as Error).message)

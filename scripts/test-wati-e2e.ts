@@ -97,10 +97,11 @@ async function main() {
   log("Text message sent", textResult.success, textResult.messageId)
 
   console.log("\n─── 4. Send template message ───────────────────────")
+  // Template uses {{1}} for name and {{2}} for commodity/product
   const templateResult = await integration.sendTemplate(
     contactPhone,
     "lead-welcome",
-    ["QA User", "Mapato", "B2B Trade"]
+    ["QA User", "Specialty Arabica Coffee"]
   )
   log("Template message sent", templateResult.success, templateResult.messageId)
 

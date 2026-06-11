@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { withAuth } from "@/lib/abac-middleware"
 import { appendQuestionnaireRow } from "@/lib/google-sheets"
+import { centralBrain } from "@/lib/hermes-central-brain"
 
 // POST — Submit a pre-auth questionnaire (before user is authenticated)
 // Stays public since it's used pre-authentication

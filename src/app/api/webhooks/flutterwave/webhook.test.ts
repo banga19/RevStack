@@ -76,6 +76,13 @@ import { NextRequest } from "next/server"
 
 const WEBHOOK_SECRET = "test-webhook-secret-123"
 
+/**
+ * NOTE: Payment status values must be lowercase to match the Prisma schema
+ * defaults: "pending", "success", "failed", "cancelled".
+ * The old uppercase values ("PENDING", "SUCCESSFUL", "FAILED") caused
+ * webhook idempotency and processing bugs.
+ */
+
 function buildRequest(
   body: Record<string, any>,
   headers: Record<string, string> = {}
@@ -100,17 +107,16 @@ function buildPayment(overrides: Record<string, any> = {}) {
     provider: "flutterwave",
     paymentMethod: "card",
     flutterwaveTxRef: "tx-ref-001",
-    flutterwaveTxId: null,
-    status: "PENDING",
-    tier: "starter",
-    plan: "monthly",
-    metadata: JSON.stringify({
-      phone: null,
-      email: "test@example.com",
-      initiatedAt: new Date().toISOString(),
-    }),
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    flutterwaveTxId: null,      status: "pending",
+      tier: "starter",
+      plan: "monthly",
+      metadata: JSON.stringify({
+        phone: null,
+        email: "test@example.com",
+        initiatedAt: new Date().toISOString(),
+      }),
+      createdAt: new Date(),
+      updatedAt: new Date(),
     user: { id: "user-1", name: "Test User", email: "test@example.com" },
     ...overrides,
   }
@@ -252,7 +258,7 @@ describe("POST /api/webhooks/flutterwave", () => {
   describe("amount validation", () => {
     it("returns 400 and marks payment FAILED when amount does not match", async () => {
       mockPrisma.payment.findUnique.mockResolvedValue(
-        buildPayment({ status: "PENDING" })
+        buildPayment({ status: "pending" })
       )
       mockPrisma.payment.update.mockResolvedValue({} as any)
 
@@ -277,7 +283,7 @@ describe("POST /api/webhooks/flutterwave", () => {
       expect(mockPrisma.payment.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: "pay-1" },
-          data: expect.objectContaining({ status: "FAILED" }),
+          data: expect.objectContaining({ status: "failed" }),
         })
       )
 
@@ -288,7 +294,7 @@ describe("POST /api/webhooks/flutterwave", () => {
 
     it("skips amount validation when amount is not provided in webhook", async () => {
       mockPrisma.payment.findUnique.mockResolvedValue(
-        buildPayment({ status: "PENDING" })
+        buildPayment({ status: "pending" })
       )
       mockPrisma.payment.update.mockResolvedValue({} as any)
       mockPrisma.user.update.mockResolvedValue({} as any)
@@ -346,9 +352,9 @@ describe("POST /api/webhooks/flutterwave", () => {
       expect(body.error).toBe("Payment not found")
     })
 
-    it("returns 200 with Already processed when payment is not PENDING (idempotency)", async () => {
+    it("returns 200 with Already processed when payment is not pending (idempotency)", async () => {
       mockPrisma.payment.findUnique.mockResolvedValue(
-        buildPayment({ status: "SUCCESSFUL" }) // Already processed
+        buildPayment({ status: "success" }) // Already processed
       )
 
       const res = await POST(
@@ -384,14 +390,14 @@ describe("POST /api/webhooks/flutterwave", () => {
 
     beforeEach(() => {
       mockPrisma.payment.findUnique.mockResolvedValue(
-        buildPayment({ status: "PENDING" })
+        buildPayment({ status: "pending" })
       )
       mockPrisma.payment.update.mockResolvedValue({} as any)
       mockPrisma.user.update.mockResolvedValue({} as any)
       mockPrisma.subscription.create.mockResolvedValue({} as any)
     })
 
-    it("updates payment to SUCCESSFUL and sets flutterwaveTxId", async () => {
+    it("updates payment to success and sets flutterwaveTxId", async () => {
       await POST(
         buildRequest({ event: "charge.completed", data: successData })
       )
@@ -400,7 +406,7 @@ describe("POST /api/webhooks/flutterwave", () => {
         expect.objectContaining({
           where: { id: "pay-1" },
           data: expect.objectContaining({
-            status: "SUCCESSFUL",
+            status: "success",
             flutterwaveTxId: 123456,
           }),
         })
@@ -437,7 +443,7 @@ describe("POST /api/webhooks/flutterwave", () => {
             userId: "user-1",
             tier: "starter",
             plan: "monthly",
-            status: "ACTIVE",
+            status: "active",
             flutterwaveTxRef: "tx-ref-001",
             flutterwaveTxId: 123456,
             amount: 6500,
@@ -482,9 +488,9 @@ describe("POST /api/webhooks/flutterwave", () => {
       expect(updateCall.data.flutterwaveCustomerId).toBeUndefined()
     })
 
-    it("handles uppercase tier names from payment record", async () => {
+    it("handles tier names from payment record", async () => {
       mockPrisma.payment.findUnique.mockResolvedValue(
-        buildPayment({ status: "PENDING", tier: "STARTER" })
+        buildPayment({ status: "pending", tier: "starter" })
       )
 
       await POST(
@@ -493,7 +499,7 @@ describe("POST /api/webhooks/flutterwave", () => {
 
       expect(mockPrisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ subscriptionTier: "STARTER" }),
+          data: expect.objectContaining({ subscriptionTier: "starter" }),
         })
       )
     })
@@ -504,9 +510,9 @@ describe("POST /api/webhooks/flutterwave", () => {
   // ─────────────────────────────────────────────────────────────────────────
 
   describe("failed charge handling", () => {
-    it("marks payment as FAILED when charge status is failed", async () => {
+    it("marks payment as failed when charge status is failed", async () => {
       mockPrisma.payment.findUnique.mockResolvedValue(
-        buildPayment({ status: "PENDING" })
+        buildPayment({ status: "pending" })
       )
       mockPrisma.payment.update.mockResolvedValue({} as any)
 
@@ -530,7 +536,7 @@ describe("POST /api/webhooks/flutterwave", () => {
       expect(mockPrisma.payment.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: "pay-1" },
-          data: expect.objectContaining({ status: "FAILED" }),
+          data: expect.objectContaining({ status: "failed" }),
         })
       )
 
@@ -539,9 +545,9 @@ describe("POST /api/webhooks/flutterwave", () => {
       expect(mockPrisma.subscription.create).not.toHaveBeenCalled()
     })
 
-    it("marks payment FAILED when status is cancelled (not successful)", async () => {
+    it("marks payment failed when status is cancelled (not successful)", async () => {
       mockPrisma.payment.findUnique.mockResolvedValue(
-        buildPayment({ status: "PENDING" })
+        buildPayment({ status: "pending" })
       )
       mockPrisma.payment.update.mockResolvedValue({} as any)
 
@@ -560,7 +566,7 @@ describe("POST /api/webhooks/flutterwave", () => {
 
       expect(mockPrisma.payment.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ status: "FAILED" }),
+          data: expect.objectContaining({ status: "failed" }),
         })
       )
     })
@@ -610,7 +616,7 @@ describe("POST /api/webhooks/flutterwave", () => {
       // Payment already SUCCESSFUL with tx ID 100
       mockPrisma.payment.findUnique.mockResolvedValue(
         buildPayment({
-          status: "SUCCESSFUL",
+          status: "success",
           flutterwaveTxId: 100,
         })
       )
@@ -644,7 +650,7 @@ describe("POST /api/webhooks/flutterwave", () => {
     it("defaults tier to starter and plan to monthly when payment tier and plan are null", async () => {
       mockPrisma.payment.findUnique.mockResolvedValue(
         buildPayment({
-          status: "PENDING",
+          status: "pending",
           tier: null,
           plan: null,
         })
@@ -690,7 +696,7 @@ describe("POST /api/webhooks/flutterwave", () => {
     it("defaults tier to starter when only tier is null", async () => {
       mockPrisma.payment.findUnique.mockResolvedValue(
         buildPayment({
-          status: "PENDING",
+          status: "pending",
           tier: null,
           plan: "yearly", // plan is provided
         })
@@ -725,7 +731,7 @@ describe("POST /api/webhooks/flutterwave", () => {
     it("defaults plan to monthly when only plan is null", async () => {
       mockPrisma.payment.findUnique.mockResolvedValue(
         buildPayment({
-          status: "PENDING",
+          status: "pending",
           tier: "growth", // tier is provided
           plan: null,
         })
@@ -760,7 +766,7 @@ describe("POST /api/webhooks/flutterwave", () => {
     it("defaults tier to starter when tier is an empty string (falsy)", async () => {
       mockPrisma.payment.findUnique.mockResolvedValue(
         buildPayment({
-          status: "PENDING",
+          status: "pending",
           tier: "",
           plan: "monthly",
         })
@@ -820,7 +826,7 @@ describe("POST /api/webhooks/flutterwave", () => {
       // Mock returns 29 (remaining) — no throw
       mockCheckRateLimit.mockReturnValue(29)
       mockPrisma.payment.findUnique.mockResolvedValue(
-        buildPayment({ status: "PENDING" })
+        buildPayment({ status: "pending" })
       )
       mockPrisma.payment.update.mockResolvedValue({} as any)
       mockPrisma.user.update.mockResolvedValue({} as any)

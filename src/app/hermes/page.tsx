@@ -511,7 +511,7 @@ export default function HermesAnalyticsPage() {
     )
   }
 
-  const { summary, dailyTrend, typeBreakdown, statusDistribution, insights, recentRuns } = data
+  const { summary, dailyTrend, typeBreakdown, statusDistribution, insights, recentRuns, weekOverWeek, monthOverMonth, taskTypeTrends, durationTrends } = data
 
   return (
     <div className="space-y-6 animate-fade-in">

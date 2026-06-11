@@ -38,6 +38,7 @@ import {
   Zap,
   MessageSquare,
   Bot,
+  Cpu,
   BarChart3,
   Bell,
 } from "lucide-react"
@@ -50,7 +51,8 @@ const navItems = [
   { href: "/followups", label: "Follow-ups", icon: MessageSquare },
   { href: "/messages", label: "Messages", icon: Send },
   { href: "/hermes", label: "AI Agents", icon: Bot },
-  { href: "/operations", label: "Operations Center", icon: Brain },
+  { href: "/central-brain", label: "Central Brain", icon: Brain },
+  { href: "/operations", label: "Operations Center", icon: Cpu },
   { href: "/plan", label: "75-Day Plan", icon: CalendarCheck },
   { href: "/templates", label: "Templates", icon: Puzzle },
   { href: "/pipeline", label: "Pipeline CRM", icon: Users },

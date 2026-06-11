@@ -11,7 +11,7 @@
  *   7. Response shape consistency
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { NextRequest } from "next/server"
 
 // ============================================================
@@ -121,6 +121,7 @@ describe("GET /api/cron/hermes-sweep", () => {
       const { auth } = await import("@/lib/auth")
       vi.mocked(auth).mockResolvedValueOnce({
         user: { id: "admin-1", role: "admin", name: "Admin", email: "admin@test.com" },
+        expires: new Date(Date.now() + 3600_000).toISOString(),
       })
 
       const req = new NextRequest("http://localhost:3000/api/cron/hermes-sweep", {
@@ -141,6 +142,7 @@ describe("GET /api/cron/hermes-sweep", () => {
       const { auth } = await import("@/lib/auth")
       vi.mocked(auth).mockResolvedValueOnce({
         user: { id: "user-1", role: "user", name: "User", email: "user@test.com" },
+        expires: new Date(Date.now() + 3600_000).toISOString(),
       })
 
       const req = new NextRequest("http://localhost:3000/api/cron/hermes-sweep")

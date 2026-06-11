@@ -1,9 +1,5 @@
 import { defineConfig, devices } from "@playwright/test"
 
-// Path to manually-downloaded Chrome for Testing binary.
-// Necessary because Playwright doesn't support Ubuntu 26.04 natively yet.
-const CHROME_BIN = process.env.PLAYWRIGHT_CHROME_BIN || "/tmp/chrome-linux64/chrome-linux64/chrome"
-
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
@@ -18,13 +14,13 @@ export default defineConfig({
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     launchOptions: {
-      executablePath: CHROME_BIN,
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
-      env: {
-        ...process.env,
-        LD_LIBRARY_PATH: `/tmp/chrome-linux64/chrome-linux64:${process.env.LD_LIBRARY_PATH || ""}`,
-      },
-    },
+      // When PLAYWRIGHT_CHROME_BIN is set, use that custom Chrome path.
+      // Otherwise, let Playwright auto-discover Chromium.
+      ...(process.env.PLAYWRIGHT_CHROME_BIN
+        ? { executablePath: process.env.PLAYWRIGHT_CHROME_BIN }
+        : {}),
+    }
   },
 
   // ── Optional: auto-start the dev server ──────────────────────────────

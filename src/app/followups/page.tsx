@@ -39,9 +39,8 @@ export default function FollowupsPage() {
 
   const fetchFollowups = useCallback(async () => {
     try {
-      const params = new URLSearchParams()
-      if (statusFilter !== "all") params.set("status", statusFilter)
-      const res = await fetch(`/api/followups?${params}`)
+      // Route through Hermes Central Brain — all page data flows via CommunicationLog
+      const res = await fetch(`/api/central-brain/revstack/data?page=followups&status=${statusFilter}`)
       setFollowups(await res.json())
     } catch (e) {
       console.error("Failed to fetch", e)

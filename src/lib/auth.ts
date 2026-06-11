@@ -7,10 +7,11 @@
  * a convenience `auth()` function using `getServerSession`.
  */
 
-import NextAuth from "next-auth"
+import NextAuth, { type AuthOptions, type SessionStrategy } from "next-auth"
 import { getServerSession } from "next-auth"
-import Credentials from "next-auth/providers/credentials"
+import Credentials, { type CredentialsConfig } from "next-auth/providers/credentials"
 import Google from "next-auth/providers/google"
+import type { JWT } from "next-auth/jwt"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/db"
 
@@ -25,7 +26,7 @@ function logEvent(event: string, data: Record<string, any>) {
 // Auth configuration (shared between handler and getServerSession)
 // ═══════════════════════════════════════════════════════════════════════════
 
-const authOptions = {
+const authOptions: AuthOptions = {
   providers: [
     Credentials({
       name: "credentials",
@@ -71,7 +72,7 @@ const authOptions = {
       : []),
   ],
   callbacks: {
-    async signIn({ user, account }) {
+    async signIn({ user, account }: { user: any; account: any }) {
       // Track login event for retention analytics
       if (account?.provider === "credentials") {
         logEvent("login", { email: user.email, method: "credentials" })
@@ -128,7 +129,7 @@ const authOptions = {
 
       return true
     },
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account }: { token: JWT; user: any; account: any }) {
       if (user) {
         token.id = user.id
         token.role = user.role
@@ -145,7 +146,7 @@ const authOptions = {
       }
       return token
     },
-    async session({ session, token }) {
+    async session({ session, token }: { session: any; token: JWT }) {
       if (session.user) {
         session.user.id = token.id as string
         session.user.role = token.role as string
@@ -157,7 +158,7 @@ const authOptions = {
     signIn: "/login",
   },
   session: {
-    strategy: "jwt",
+    strategy: "jwt" as SessionStrategy,
   },
 }
 

@@ -69,6 +69,7 @@ model User {
   followUpLogs         FollowUpLog[]
   leads                Lead[]
   retainers            Retainer[]
+  invoices             Invoice[]
 }
 
 // Subscription — recurring subscription tied to a Flutterwave charge
@@ -220,6 +221,7 @@ model Client {
   ersSnapshots      ErsSnapshot[]
   followups         Followup[]
   retainers         Retainer[]
+  invoices          Invoice[]
   convertedLead     Lead?     // lead that converted to this client
 }
 
@@ -524,6 +526,7 @@ model Retainer {
   notes           String?
   userId          String
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoices        Invoice[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -553,6 +556,31 @@ model Message {
   leadId    String?
   clientId  String?
   createdAt DateTime @default(now())
+}
+
+// Invoice — auto-generated invoices from active retainers (RevStack operations)
+model Invoice {
+  id              String    @id @default(cuid())
+  retainerId      String?
+  retainer        Retainer? @relation(fields: [retainerId], references: [id], onDelete: SetNull)
+  clientId        String
+  client          Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  invoiceNumber   String    @unique
+  amountUsd       Float
+  currency        String    @default("USD")
+  status          String    @default("draft") // draft, sent, paid, overdue, cancelled
+  dueDate         DateTime
+  issuedAt        DateTime  @default(now())
+  paidAt          DateTime?
+  notes           String?
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([retainerId])
+  @@index([clientId])
+  @@index([status])
 }
 
 // Activity — audit trail / activity feed entries

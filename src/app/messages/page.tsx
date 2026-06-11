@@ -31,9 +31,8 @@ export default function MessagesPage() {
 
   const fetchMessages = useCallback(async () => {
     try {
-      const params = new URLSearchParams()
-      if (channelFilter !== "all") params.set("channel", channelFilter)
-      const res = await fetch(`/api/messages?${params}`)
+      // Route through Hermes Central Brain — all page data flows via CommunicationLog
+      const res = await fetch(`/api/central-brain/revstack/data?page=messages&channel=${channelFilter}`)
       setMessages(await res.json())
     } catch (e) {
       console.error("Failed to fetch", e)

@@ -248,7 +248,8 @@ export default function PipelinePage() {
   const [completingAction, setCompletingAction] = useState<string | null>(null)
 
   const loadClients = () => {
-    fetch("/api/clients")
+    // Route through Hermes Central Brain — all page data flows via CommunicationLog
+    fetch("/api/central-brain/revstack/data?page=clients")
       .then((r) => r.json())
       .then((d) => { setClients(d); setLoading(false) })
       .catch(() => setLoading(false))
@@ -259,7 +260,8 @@ export default function PipelinePage() {
   const loadActions = async (clientId: string) => {
     setActionsLoading((prev) => ({ ...prev, [clientId]: true }))
     try {
-      const res = await fetch(`/api/pipeline-actions?clientId=${clientId}`)
+      // Route through Hermes Central Brain
+      const res = await fetch(`/api/central-brain/revstack/data?page=pipeline-actions&clientId=${clientId}`)
       const data = await res.json()
       setActionsMap((prev) => ({ ...prev, [clientId]: data }))
     } catch (e) {

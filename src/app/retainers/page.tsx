@@ -38,12 +38,11 @@ export default function RetainersPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [retainersRes, clientsRes] = await Promise.all([
-        fetch("/api/retainers"),
-        fetch("/api/clients"),
-      ])
-      setRetainers(await retainersRes.json())
-      setClients(await clientsRes.json())
+      // Route through Hermes Central Brain — all page data flows via CommunicationLog
+      const res = await fetch("/api/central-brain/revstack/data?page=retainers&sub=list-with-clients")
+      const data = await res.json()
+      setRetainers(data.retainers || [])
+      setClients(data.clients || [])
     } catch (e) {
       console.error("Failed to fetch data", e)
     } finally {

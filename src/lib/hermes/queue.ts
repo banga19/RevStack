@@ -21,6 +21,7 @@ import {
   emitHermesRunCompleted,
   emitSweepCompleted,
 } from "@/lib/hermes-notifications"
+import { centralBrain } from "@/lib/hermes-central-brain"
 
 // ============================================================
 // Redis Connection
@@ -54,7 +55,7 @@ export const redis = createRedisConnection()
  *   - "retry-failed"  — retry previously failed job by ID
  */
 export const hermesQueue = new Queue("hermes-tasks", {
-  connection: redis,
+  connection: redis as any,
   defaultJobOptions: {
     attempts: 3,                       // retry up to 3 times
     backoff: { type: "exponential", delay: 5_000 }, // 5s, 10s, 20s
@@ -110,6 +111,15 @@ async function processLead(leadId: string, userId?: string): Promise<void> {
     },
   })
 
+  // Broadcast job start through Central Brain
+  centralBrain.sendMessage({
+    source: "bullmq-worker",
+    target: "orchestrator",
+    type: "job:process-lead:started",
+    payload: { leadId, runId: run.id, companyName: lead.companyName },
+    priority: "medium",
+  })
+
   try {
     // Try to use the LangGraph sales pipeline if available
     let result: { stage: string; output?: string }
@@ -160,6 +170,15 @@ async function processLead(leadId: string, userId?: string): Promise<void> {
       leadsProcessed: 1,
       errorMessage: null,
     })
+
+    // Broadcast job completion through Central Brain
+    centralBrain.sendMessage({
+      source: "bullmq-worker",
+      target: "orchestrator",
+      type: "job:process-lead:completed",
+      payload: { leadId, runId: run.id, status: "completed", stage: result.stage },
+      priority: "low",
+    })
   } catch (error) {
     // Mark the run as failed
     await prisma.hermesRun.update({
@@ -178,6 +197,15 @@ async function processLead(leadId: string, userId?: string): Promise<void> {
       status: "failed",
       leadsProcessed: 0,
       errorMessage: (error as Error).message,
+    })
+
+    // Broadcast job failure through Central Brain
+    centralBrain.sendMessage({
+      source: "bullmq-worker",
+      target: "orchestrator",
+      type: "job:process-lead:failed",
+      payload: { leadId, runId: run.id, error: (error as Error).message },
+      priority: "high",
     })
 
     throw error // re-throw so BullMQ handles retry
@@ -292,7 +320,7 @@ function startWorker(): Worker {
       await handler(job)
     },
     {
-      connection: redis,
+      connection: redis as any,
       concurrency: 5, // process up to 5 jobs concurrently
       lockDuration: 60_000, // 1-minute lock per job
       stalledInterval: 30_000, // check for stalled jobs every 30s
@@ -325,6 +353,19 @@ const shouldRunWorker =
 if (shouldRunWorker) {
   worker = startWorker()
 }
+
+// Register the BullMQ worker agent with the Central Brain
+// so its messages are properly tracked
+centralBrain.registerAgent("bullmq-worker", {
+  displayName: "BullMQ Worker",
+  description: "Background job processor for lead qualification and sweep operations",
+  capabilities: [
+    { name: "process-lead", description: "Process a single lead through the sales pipeline" },
+    { name: "sweep-leads", description: "Sweep all unprocessed leads en masse" },
+    { name: "retry-failed", description: "Retry a previously failed job" },
+  ],
+  status: "active",
+})
 
 export { worker }
 export default hermesQueue

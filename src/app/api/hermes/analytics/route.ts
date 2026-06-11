@@ -528,7 +528,7 @@ function computeMonthlyComparison(
   runs: Array<{ status: string; createdAt: Date }>,
   _since: Date // kept for API consistency
 ): {
-  months: Array<{ label: string; completed: number; failed: number; total: number; successRate: number }>
+  weeks: Array<{ label: string; completed: number; failed: number; total: number; successRate: number }>
   current: { label: string; successRate: number; total: number } | null
   previous: { label: string; successRate: number; total: number } | null
   change: number

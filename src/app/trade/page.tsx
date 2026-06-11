@@ -195,15 +195,21 @@ export default function TradePage() {
   const loadData = async () => {
     try {
       const [clientsRes, productsRes, complianceRes, financeRes] = await Promise.all([
-        fetch("/api/clients"),
-        fetch("/api/clients/products"),
-        fetch("/api/clients/compliance"),
-        fetch("/api/clients/trade-finance"),
+        fetch("/api/central-brain/revstack/data?page=clients"),
+        fetch("/api/central-brain/revstack/data?page=products"),
+        fetch("/api/central-brain/revstack/data?page=compliance-records"),
+        fetch("/api/central-brain/revstack/data?page=trade-finance"),
       ])
-      setClients(await clientsRes.json())
-      setProducts(await productsRes.json())
-      setCompliance(await complianceRes.json())
-      setFinanceApps(await financeRes.json())
+      const [clientsData, productsData, complianceData, financeData] = await Promise.all([
+        clientsRes.json(),
+        productsRes.json(),
+        complianceRes.json(),
+        financeRes.json(),
+      ])
+      setClients(clientsData.data || clientsData)
+      setProducts(productsData.data || productsData)
+      setCompliance(complianceData.data || complianceData)
+      setFinanceApps(financeData.data || financeData)
     } catch (e) {
       console.error("Load trade data failed", e)
     } finally {
@@ -216,9 +222,12 @@ export default function TradePage() {
   // Fetch ERS history when a client is selected
   useEffect(() => {
     if (selectedClient !== "all") {
-      fetch(`/api/ers/snapshots?clientId=${selectedClient}&limit=20`)
+      fetch(`/api/central-brain/revstack/data?page=ers-snapshots&clientId=${selectedClient}&limit=20`)
         .then((r) => r.json())
-        .then((data) => setErsHistory(data.reverse()))
+        .then((res) => {
+          const data = res.data || res
+          setErsHistory(Array.isArray(data) ? data.reverse() : [])
+        })
         .catch(() => setErsHistory([]))
     } else {
       setErsHistory([])

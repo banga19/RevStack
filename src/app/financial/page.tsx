@@ -92,10 +92,10 @@ export default function FinancialPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const loadData = () => {
-    fetch("/api/revenue")
+    fetch("/api/central-brain/revstack/data?page=revenue")
       .then((r) => r.json())
-      .then((d) => {
-        setData(d)
+      .then((res) => {
+        setData(res.data || res)
         setLoading(false)
       })
       .catch(() => setLoading(false))
