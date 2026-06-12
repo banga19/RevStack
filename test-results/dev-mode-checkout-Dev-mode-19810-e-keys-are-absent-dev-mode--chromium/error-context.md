@@ -1,0 +1,24 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: dev-mode-checkout.spec.ts >> Dev-mode simulated checkout flow >> shows unconfigured error when Flutterwave keys are absent (dev mode)
+- Location: e2e/dev-mode-checkout.spec.ts:394:7
+
+# Error details
+
+```
+Error: browserType.launch: Executable doesn't exist at /home/apop/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     npx playwright install                                 ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+```

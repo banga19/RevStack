@@ -2,18 +2,120 @@
  * Mapato Pricing Model
  *
  * Shared constants and utility functions for subscription tiers,
- * budget-to-tier mapping, and pricing calculations.
+ * budget-to-tier mapping, localized currency pricing, and pricing calculations.
  */
 
 // ============================================================
-// Tier Definitions
+// Supported Regions / Currencies
+// ============================================================
+
+export type Region = "ke" | "tz" | "ug" | "rw" | "ng" | "gh" | "sn" | "intl"
+
+export interface RegionConfig {
+  code: Region
+  label: string
+  labelSw: string
+  currency: string
+  symbol: string
+  flag: string
+  /** Exchange rate to USD (1 USD = X local) */
+  rate: number
+  /** Payment methods available in this region */
+  paymentMethods: string[]
+}
+
+export const REGIONS: Record<Region, RegionConfig> = {
+  ke: {
+    code: "ke",
+    label: "Kenya",
+    labelSw: "Kenya",
+    currency: "KES",
+    symbol: "KSh",
+    flag: "🇰🇪",
+    rate: 130,
+    paymentMethods: ["mpesa", "mobile_money", "card"],
+  },
+  tz: {
+    code: "tz",
+    label: "Tanzania",
+    labelSw: "Tanzania",
+    currency: "TZS",
+    symbol: "TSh",
+    flag: "🇹🇿",
+    rate: 2500,
+    paymentMethods: ["mobile_money", "card"],
+  },
+  ug: {
+    code: "ug",
+    label: "Uganda",
+    labelSw: "Uganda",
+    currency: "UGX",
+    symbol: "USh",
+    flag: "🇺🇬",
+    rate: 3800,
+    paymentMethods: ["mobile_money", "card"],
+  },
+  rw: {
+    code: "rw",
+    label: "Rwanda",
+    labelSw: "Rwanda",
+    currency: "RWF",
+    symbol: "FRw",
+    flag: "🇷🇼",
+    rate: 1300,
+    paymentMethods: ["mobile_money", "card"],
+  },
+  ng: {
+    code: "ng",
+    label: "Nigeria",
+    labelSw: "Nigeria",
+    currency: "NGN",
+    symbol: "₦",
+    flag: "🇳🇬",
+    rate: 1450,
+    paymentMethods: ["mobile_money", "card"],
+  },
+  gh: {
+    code: "gh",
+    label: "Ghana",
+    labelSw: "Ghana",
+    currency: "GHS",
+    symbol: "₵",
+    flag: "🇬🇭",
+    rate: 12,
+    paymentMethods: ["mobile_money", "card"],
+  },
+  sn: {
+    code: "sn",
+    label: "Senegal",
+    labelSw: "Senegal",
+    currency: "XOF",
+    symbol: "CFA",
+    flag: "🇸🇳",
+    rate: 610,
+    paymentMethods: ["mobile_money", "card"],
+  },
+  intl: {
+    code: "intl",
+    label: "International",
+    labelSw: "Kimataifa",
+    currency: "USD",
+    symbol: "$",
+    flag: "🌍",
+    rate: 1,
+    paymentMethods: ["card"],
+  },
+}
+
+// ============================================================
+// Tier Definitions (USD base)
 // ============================================================
 
 export interface TierDefinition {
   id: string
   name: string
-  monthlyPrice: number
-  yearlyPrice: number
+  monthlyPrice: number  // USD
+  yearlyPrice: number   // USD
   successFee: number
   godModeRate: number
 }
@@ -46,6 +148,56 @@ export const TIERS: Record<string, TierDefinition> = {
 }
 
 export type TierId = "starter" | "growth" | "enterprise"
+
+/**
+ * Get localized price for a tier in the given region.
+ */
+export function getLocalizedPrice(tierId: TierId, region: Region, plan: "monthly" | "yearly"): {
+  amount: number
+  currency: string
+  symbol: string
+  formatted: string
+} {
+  const tier = TIERS[tierId]
+  const config = REGIONS[region]
+  if (!tier || !config) {
+    return { amount: 0, currency: "USD", symbol: "$", formatted: "$0" }
+  }
+
+  const usdAmount = plan === "monthly" ? tier.monthlyPrice : tier.yearlyPrice
+  const amount = region === "intl" ? usdAmount : Math.round(usdAmount * config.rate)
+
+  return {
+    amount,
+    currency: config.currency,
+    symbol: config.symbol,
+    formatted: region === "intl"
+      ? `$${amount.toLocaleString()}`
+      : `${config.symbol} ${amount.toLocaleString()}`,
+  }
+}
+
+/**
+ * Get all tiers with localized pricing for a region.
+ */
+export function getLocalizedTiers(region: Region) {
+  return Object.values(TIERS).map((tier) => ({
+    ...tier,
+    localMonthly: getLocalizedPrice(tier.id as TierId, region, "monthly"),
+    localYearly: getLocalizedPrice(tier.id as TierId, region, "yearly"),
+  }))
+}
+
+/**
+ * Determine region from user's country code (phone prefix).
+ */
+export function regionFromPhone(phone: string): Region {
+  if (phone.startsWith("255")) return "tz"
+  if (phone.startsWith("256")) return "ug"
+  if (phone.startsWith("250")) return "rw"
+  if (phone.startsWith("254")) return "ke"
+  return "intl"
+}
 
 // ============================================================
 // Budget Range to Tier Mapping

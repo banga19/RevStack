@@ -8,7 +8,37 @@
  *   4. Clearing the buffer works
  */
 
-import { describe, it, expect, beforeEach } from "vitest"
+import { describe, it, expect, beforeEach, vi } from "vitest"
+
+// Mock model-provider to avoid OpenAI credentials error during AgentMemorySystem construction
+vi.mock("@/lib/model-provider", () => ({
+  createLlm: vi.fn(() => ({
+    pipe: vi.fn(() => ({ invoke: vi.fn().mockResolvedValue("Mock summary") })),
+    withStructuredOutput: vi.fn(() => vi.fn().mockResolvedValue({ hasInsight: false })),
+  })),
+  createEmbeddings: vi.fn(() => ({
+    embedDocuments: vi.fn().mockResolvedValue([[0.1, 0.2, 0.3]]),
+    embedQuery: vi.fn().mockResolvedValue([0.1, 0.2, 0.3]),
+  })),
+  getActiveProvider: vi.fn(() => ({ id: "openai", config: { name: "Mock", envVar: "MOCK_KEY", baseUrl: "https://mock", defaultModel: "mock-model", available: true } })),
+  getProviderSummary: vi.fn(() => "Mock provider summary"),
+  default: {
+    createLlm: vi.fn(),
+    createEmbeddings: vi.fn(),
+    getActiveProvider: vi.fn(),
+    getProviderSummary: vi.fn(),
+  },
+}))
+
+// Mock db to prevent DB connection errors during agent-memory loading
+vi.mock("@/lib/db", () => ({
+  prisma: {
+    agentInsight: { findMany: vi.fn().mockResolvedValue([]) },
+    agentReport: { findMany: vi.fn().mockResolvedValue([]) },
+    communicationLogEntry: { create: vi.fn().mockResolvedValue({}) },
+  },
+}))
+
 import { centralBrain } from "@/lib/hermes-central-brain"
 import {
   initCentralBrainBridge,

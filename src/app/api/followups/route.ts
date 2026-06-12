@@ -1,14 +1,29 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { withAuth } from "@/lib/abac-middleware"
+import { getOrgScope } from "@/lib/get-org-scope"
 
 export const GET = withAuth(async (req: NextRequest, { session }) => {
   const { searchParams } = new URL(req.url)
   const status = searchParams.get("status")
 
-  // Scope followups by the user's leads and clients
-  const userLeads = await prisma.lead.findMany({ where: { userId: session.user.id }, select: { id: true } })
-  const userClients = await prisma.client.findMany({ where: { userId: session.user.id }, select: { id: true } })
+  const scope = await getOrgScope(session.user.id)
+
+  // Scope followups by org's leads and clients
+  const orgLeadFilter = scope.isAdmin
+    ? {}
+    : scope.organizationId
+      ? { user: { organizationId: scope.organizationId } }
+      : { userId: scope.userId }
+
+  const orgClientFilter = scope.isAdmin
+    ? {}
+    : scope.organizationId
+      ? { organizationId: scope.organizationId }
+      : { userId: scope.userId }
+
+  const userLeads = await prisma.lead.findMany({ where: orgLeadFilter, select: { id: true } })
+  const userClients = await prisma.client.findMany({ where: orgClientFilter, select: { id: true } })
   const leadIds = userLeads.map((l) => l.id)
   const clientIds = userClients.map((c) => c.id)
 

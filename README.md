@@ -1,5 +1,7 @@
 # Mapato / RevStack — AI-Powered Revenue Operations for B2B Trading
 
+[![CI](https://github.com/banga19/RevStack/actions/workflows/e2e-tests.yml/badge.svg)](https://github.com/banga19/RevStack/actions/workflows/e2e-tests.yml)
+
 **Mapato** (also referred to as **RevStack**) delivers an AI-powered revenue operations platform for B2B trading companies — inspired by [Polsia.com](https://polsia.com)'s autonomous business model at a fraction of the cost.
 
 Mapato is co-built by [Sokogate.com](https://sokogate.com) and [UltimoTradingLtd.co.ke](https://ultimotradingltd.co.ke) — combining Sokogate's B2B wholesale sourcing marketplace with Ultimo Trading's operational expertise.
@@ -651,6 +653,20 @@ DEEPSEEK_API_KEY="sk-..." npx tsx scripts/test-deepseek.ts
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID for Google Sign-In |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
 
+### Cloudflare
+
+| Variable | Service | Used By |
+|----------|---------|---------|
+| `TURNSTILE_SECRET_KEY` | Turnstile bot protection | Signup form validation (`POST /api/auth/signup`) |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Turnstile widget | Client-side signup page (`/signup`) |
+| `CLOUDFLARE_ACCOUNT_ID` | R2 object storage | Document uploads (`POST /api/documents`) |
+| `CLOUDFLARE_R2_ACCESS_KEY_ID` | R2 API token access key | S3-compatible auth for R2 |
+| `CLOUDFLARE_R2_SECRET_ACCESS_KEY` | R2 API token secret | S3-compatible auth for R2 |
+| `R2_BUCKET_NAME` | R2 bucket name | Default: `revstack` |
+| `R2_PUBLIC_URL` | R2 public/custom domain | Optional — for public file URLs |
+
+Turnstile and R2 are optional. When env vars are not set, the signup form renders without the captcha widget (non-configured = invisible) and file uploads skip R2 storage while still processing documents through QMe/RAG.
+
 ### Lead Agent Integrations
 
 | Variable | Service | Used By |
@@ -820,6 +836,10 @@ RevStack/
 │   │   ├── agent-service-bridge.ts  # Service bridge (5 agents + credential banners)
 │   │   ├── autonomous-scheduler.ts  # Background scheduler
 │   │   ├── agent-memory.ts     # Cross-session agent memory
+│   │   ├── cloudflare/             # Cloudflare integration
+│   │   │   ├── turnstile.ts        # Turnstile bot protection verification
+│   │   │   ├── r2.ts               # R2 object storage (native fetch + SigV4)
+│   │   │   └── index.ts            # Re-exports
 │   │   ├── wati-integration.ts     # WATI.io WhatsApp API
 │   │   ├── zoho-crm-integration.ts # Zoho CRM integration
 │   │   ├── voiceflow-integration.ts # Voiceflow chatbot
@@ -1239,9 +1259,13 @@ server {
 | **Make.com** | Workflow automation | ⚙️ Needs webhooks | All agents |
 | **NVIDIA NIM** | Free LLM | ✅ Configured | All agents |
 | **QMe** | Document processing | ✅ Live (local) | Compliance, Onboarding |
+| **Cloudflare DNS/CDN** | Traffic proxying, DDoS | ⚙️ Point domain nameservers | Infrastructure |
 | **RAG** | Knowledge base | ✅ Live (local) | Revenue |
+| **Cloudflare Images** | Edge image optimization | ⚙️ Remote patterns configured | App |
 | **Ethereal** | Dev email | ✅ Live (dev) | Onboarding |
 | **Flutterwave** | Payments | ✅ Auto-simulates | Subscription |
+| **Cloudflare Turnstile** | Bot protection | ⚙️ Optional (set keys) | Signup |
+| **Cloudflare R2** | Object storage | ⚙️ Optional (set keys) | Documents |
 
 ---
 

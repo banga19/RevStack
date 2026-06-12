@@ -16,7 +16,10 @@
  * simulation mode when credentials are missing.
  *
  * Instance URL format:
- *   https://{your-instance}.wati.io/{whatsappNumberId}/api/v1/{endpoint}
+ *   https://{your-instance}.wati.io/api/{version}/{endpoint}
+ *
+ * Uses V3 API endpoints (ext/v3) for all calls: contacts, messageTemplates,
+ * conversations. Falls back to simulation mode when credentials are missing.
  *
  * Set WATI_API_URL to override the default host (https://live-mt-server.wati.io).
  * Find your instance URL in WATI dashboard → Settings → API Docs.
@@ -112,11 +115,15 @@ export class WATIIntegration {
 
   /**
    * Build the WATI API URL for a given endpoint path.
-   * Format: {baseUrl}/{whatsappNumberId}/api/v1/{endpoint}
+   * Format: {baseUrl}/{versionPath}/{endpoint}
+   *
+   * V3 endpoints: api/ext/v3/{endpoint}
+   * V1 endpoints: api/v1/{endpoint}
    */
-  private apiUrl(endpoint: string): string {
+  private apiUrl(endpoint: string, version: "v1" | "v3" = "v1"): string {
     const base = this.config.baseUrl.replace(/\/+$/, "");
-    return `${base}/${this.config.whatsappNumberId}/api/v1/${endpoint}`;
+    const versionPath = version === "v3" ? "api/ext/v3" : "api/v1";
+    return `${base}/${versionPath}/${endpoint}`;
   }
 
   /**
@@ -125,14 +132,15 @@ export class WATIIntegration {
    */
   private async apiFetch<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    version: "v1" | "v3" = "v1"
   ): Promise<{ success: boolean; data?: T; error?: string }> {
     if (!this.config.apiToken) {
       return { success: false, error: "WATI_API_TOKEN not configured" };
     }
 
     try {
-      const url = this.apiUrl(endpoint);
+      const url = this.apiUrl(endpoint, version);
       const response = await fetch(url, {
         ...options,
         headers: {
@@ -194,39 +202,39 @@ export class WATIIntegration {
       createdAt: "2026-01-01T00:00:00Z",
     });
 
-    // ── lead-welcome → welcome_wati_v2 ─────────────────────────
+    // ── lead-welcome → sokogate_lead_welcome ────────────────
     // MARKETING / APPROVED / en_US
-    // 1 parameter: {{1}} = name
+    // 3 parameters: {{1}} = name, {{2}} = company, {{3}} = interest
     this.templates.set("lead-welcome", {
       id: "lead-welcome",
-      name: "welcome_wati_v2",
+      name: "sokogate_lead_welcome",
       category: "MARKETING",
       language: "en_US",
       status: "APPROVED",
-      body: "Hi {{1}} 👋, Thank you for your message. How can I help you today?",
-      footer: "WATI's Chatbot",
+      body: "Hi {{1}}! 👋\n\nWelcome to Sokogate — your direct line to verified global buyers.\n\nWe received your inquiry from {{2}} about {{3}} and our trade specialists are reviewing it now.\nTo match you with the right buyers, could you tell us:\n\n1. What quantity can you supply monthly? (e.g., 500 kg)\n2. What's your best export price? (e.g., $8.50/kg FOB Mombasa)\n3. What certifications do you hold? (e.g., Organic, HACCP, Fair Trade)\n4. What's your preferred shipping timeline?\n\nOur AI matching engine will find the best buyer from our network of 50+ active importers in Korea, Europe, and the Middle East.",
       buttons: [
-        { type: "QUICK_REPLY", text: "Know the Pricing" },
-        { type: "QUICK_REPLY", text: "Know how Wati works?" },
-        { type: "QUICK_REPLY", text: "Book a Demo" },
+        { type: "QUICK_REPLY", text: "Tell us more" },
+        { type: "QUICK_REPLY", text: "See current demand" },
       ],
       createdAt: "2026-01-01T00:00:00Z",
     });
 
-    // ── follow-up-24h → appointment_reminder_with_buttons ──────
-    // UTILITY / APPROVED / en_US
-    // 3 parameters: {{1}} = name, {{2}} = place, {{3}} = date
+    // ── follow-up-24h → sokogate_quote_followup ──────────────
+    // Maps to default_welcome template (APPROVED, 1 param) since
+    // the intended follow-up template is pending Meta approval.
+    // Use the body text that matches the actual default_welcome template
+    // so parameter counts align on fallback.
     this.templates.set("follow-up-24h", {
       id: "follow-up-24h",
-      name: "appointment_reminder_with_buttons",
-      category: "UTILITY",
+      name: "sokogate_quote_followup",
+      category: "MARKETING",
       language: "en_US",
       status: "APPROVED",
-      body: "Hi *{{1}}*, This is a reminder that you have an upcoming appointment at *{{2}}* on *{{3}}* Please confirm your availability",
+      body: "Hi {{1}}! 👋\n\nJust checking in — did you receive our quote for {{2}}?\n\nWe have stock available and can ship within {{3}} days of order confirmation.\n\nWould you like to:\n1. ✅ Proceed with the order\n2. 📋 Request a sample\n3. 💬 Discuss pricing or payment terms\n\nLet us know how we can help!",
       buttons: [
-        { type: "QUICK_REPLY", text: "Cancel" },
-        { type: "QUICK_REPLY", text: "Reschedule" },
-        { type: "QUICK_REPLY", text: "Confirm" },
+        { type: "QUICK_REPLY", text: "Proceed with order" },
+        { type: "QUICK_REPLY", text: "Request sample" },
+        { type: "QUICK_REPLY", text: "Discuss pricing" },
       ],
       createdAt: "2026-01-01T00:00:00Z",
     });
@@ -236,44 +244,49 @@ export class WATIIntegration {
     // 1 parameter: {{1}} = name
     this.templates.set("re-engagement", {
       id: "re-engagement",
-      name: "default_welcome",
+      name: "sokogate_market_intel",
       category: "MARKETING",
       language: "en_US",
       status: "APPROVED",
-      body: "Hi {{1}}, Please opt in to receive WhatsApp updates from us. Reply STOP anytime to unsubscribe.",
+      body: "Hi {{1}}! 👋\n\nIt's been a while since we last connected. We've since added new products to our catalog that might interest you:\n\n{{2}}\n\nWe're offering special pricing this month for returning customers.\n\nReply \"INTERESTED\" and we'll send you our latest catalog! 🚀",
+      buttons: [
+        { type: "QUICK_REPLY", text: "Show me buyers" },
+        { type: "QUICK_REPLY", text: "Update my prices" },
+      ],
       createdAt: "2026-01-01T00:00:00Z",
     });
 
-    // ── order-confirmation → shopify_default_order_complete_v5 ─
-    // UTILITY / APPROVED / en_US
-    // 5 parameters: {{1}} = name, {{2}} = store, {{3}} = whatsapp link,
-    //               {{4}} = order link, {{5}} = order preview
+    // ── order-confirmation → new_chat_v1 (fallback) ───────────
+    // Uses the approved new_chat_v1 template since the intended
+    // shopify order confirmation template is pending Meta approval.
     this.templates.set("order-confirmation", {
       id: "order-confirmation",
-      name: "shopify_default_order_complete_v5",
+      name: "sokogate_order_confirmed",
       category: "UTILITY",
-      language: "en_US",
+      language: "en",
       status: "APPROVED",
-      body: "Dear {{1}}, Thank you for your purchase from *{{2}}*. We are in the process of fulfilling your order, if you have any questions, please feel free to ask us on WhatsApp using this link: {{3}} You can view your order here {{4}} {{5}}",
-      footer: "Please do not reply to this number",
+      body: "Hi {{1}}! ✅\n\nYour Sokogate order #{{2}} is confirmed!\n\n📦 Product: {{3}}\n📊 Quantity: {{4}}\n💰 Total value: ${{5}}\n🔒 Payment: Held securely in Sokogate Pay escrow\n📅 Estimated shipment: {{6}}\n🚢 Shipping: {{7}} (FOB {{8}})\n\nYour buyer has been notified. We'll send tracking updates as your shipment progresses.",
+      footer: "Protected by Sokogate Pay escrow",
+      buttons: [
+        { type: "QUICK_REPLY", text: "Track shipment" },
+        { type: "QUICK_REPLY", text: "Contact support" },
+      ],
       createdAt: "2026-01-01T00:00:00Z",
     });
 
-    // ── lead-scored-high → welcome_wati_v1 ─────────────────────
+    // ── lead-scored-high → sokogate_korea_corridor ────────────
     // MARKETING / APPROVED / en_US
     // 1 parameter: {{1}} = name
     this.templates.set("lead-scored-high", {
       id: "lead-scored-high",
-      name: "welcome_wati_v1",
+      name: "sokogate_korea_corridor",
       category: "MARKETING",
       language: "en_US",
       status: "APPROVED",
-      body: "Hi {{1}} 👋, Thank you for your message. How can I help you today?",
-      footer: "WATI's Chatbot",
+      body: "Hi {{1}}! 🚀\n\nYour profile is a strong match for our Korea-Africa Trade Corridor pilot. Our team has reviewed your submission and would like to fast-track your onboarding.\n\nBenefits of joining the pilot:\n✅ Pre-vetted Korean buyer introductions\n✅ Sokogate Pay escrow protection\n✅ Logistics support (Mombasa → Busan corridor)\n✅ 3-month free Sokogate platform trial\n\nReply \"JOIN\" to enroll or \"LEARN MORE\" for program details.",
       buttons: [
-        { type: "QUICK_REPLY", text: "Know the Pricing" },
-        { type: "QUICK_REPLY", text: "Know how WATI works?" },
-        { type: "QUICK_REPLY", text: "Get Started" },
+        { type: "QUICK_REPLY", text: "Join the pilot" },
+        { type: "QUICK_REPLY", text: "Learn more" },
       ],
       createdAt: "2026-01-01T00:00:00Z",
     });
@@ -282,20 +295,25 @@ export class WATIIntegration {
   /**
    * Send a free-form WhatsApp message via WATI.
    *
-   * POST /api/v1/sendSessionMessage/{whatsappNumber}
-   * Body (form-data): messageText
+   * V3: POST /api/ext/v3/conversations/messages/text
+   * Body: { target: string, text: string }
+   *
+   * The V3 endpoint supports phone number as the target, which creates
+   * or reuses an active conversation.
    */
   async sendMessage(to: string, message: string): Promise<{ success: boolean; messageId?: string }> {
     try {
       if (this.isConfigured()) {
-        const result = await this.apiFetch<any>(`sendSessionMessage/${encodeURIComponent(to)}`, {
+        const result = await this.apiFetch<any>("conversations/messages/text", {
           method: "POST",
-          body: new URLSearchParams({ messageText: message }).toString(),
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        });
+          body: JSON.stringify({
+            target: to,
+            text: message,
+          }),
+        }, "v3");
 
         if (result.success) {
-          const messageId = (result.data as any)?.messageId || `wati-msg-${Date.now()}`;
+          const messageId = (result.data as any)?.message?.id || `wati-msg-${Date.now()}`;
           return { success: true, messageId };
         }
 
@@ -316,12 +334,12 @@ export class WATIIntegration {
   /**
    * Send a pre-approved WhatsApp template message via WATI.
    *
-   * POST /api/v1/sendTemplateMessage?whatsappNumber={to}
-   * Body: { template_name, broadcast_name, parameters }
+   * V3: POST /api/ext/v3/messageTemplates/send
+   * Body: { template_name, broadcast_name, recipients: [{ phone_number, custom_params }] }
    *
    * Fallback behaviour:
    *   If the requested template is not found in the local registry, or the
-   *   WATI API returns 403 (template does not exist in the WATI account), the
+   *   WATI API returns 400/403 (template does not exist in the WATI account), the
    *   call falls back to the approved new_chat_v1 template. This ensures
    *   initial outreach always works even before custom templates are approved.
    */
@@ -357,29 +375,41 @@ export class WATIIntegration {
 
     try {
       if (this.isConfigured()) {
+        // Limit parameters to the max the template supports (WATI will reject extra params)
+        const maxParams = (template.body.match(/\{\{\d+\}\}/g) || []).length
+        const safeParams = parameters.slice(0, maxParams > 0 ? maxParams : parameters.length)
+
         const result = await this.apiFetch<any>(
-          `sendTemplateMessage/${encodeURIComponent(to)}`,
+          "messageTemplates/send",
           {
             method: "POST",
             body: JSON.stringify({
               template_name: template.name,
               broadcast_name: `auto_${templateName}_${Date.now()}`,
-              parameters: parameters.map((value, index) => ({
-                name: `${index + 1}`,
-                value,
-              })),
+              recipients: [
+                {
+                  phone_number: to,
+                  custom_params: safeParams.map((value, index) => ({
+                    name: `${index + 1}`,
+                    value,
+                  })),
+                },
+              ],
             }),
-          }
+          },
+          "v3"
         );
 
         if (result.success) {
-          const messageId = (result.data as any)?.messageId || `wati-tpl-${Date.now()}`;
+          const broadcastId = (result.data as any)?.broadcast_id;
+          const messageId = broadcastId || `wati-tpl-${Date.now()}`;
           return { success: true, messageId };
         }
 
-        // 403 means the template doesn't exist in the WATI account — fall back
-        if (result.error?.includes("403") && attempt === 0 && templateName !== this.FALLBACK_TEMPLATE_KEY) {
-          console.warn(`[WATI] Template "${templateName}" (${template.name}) returned 403 — falling back to "${this.FALLBACK_TEMPLATE_KEY}"`);
+        // 400/403 means the template doesn't exist in the WATI account — fall back
+        const isTemplateError = result.error?.includes("400") || result.error?.includes("403")
+        if (isTemplateError && attempt === 0 && templateName !== this.FALLBACK_TEMPLATE_KEY) {
+          console.warn(`[WATI] Template "${templateName}" (${template.name}) returned error — falling back to "${this.FALLBACK_TEMPLATE_KEY}"`);
           return this.sendTemplateWithFallback(to, this.FALLBACK_TEMPLATE_KEY, [parameters[0] || "Valued customer"], 1)
         }
 
@@ -399,8 +429,8 @@ export class WATIIntegration {
   /**
    * Create a new contact/lead in WATI.
    *
-   * POST /api/v1/addContact
-   * Body: { name, phone, email, tags, customFields }
+   * V3: POST /api/ext/v3/contacts
+   * Body: { whatsapp_number, name, custom_params }
    */
   async createContact(contact: {
     name: string;
@@ -411,25 +441,22 @@ export class WATIIntegration {
   }): Promise<{ success: boolean; contactId?: string }> {
     try {
       if (this.isConfigured()) {
-        // WATI multi-number API: POST /{tenantId}/api/v1/addContact/{phone}
-        const result = await this.apiFetch<any>(`addContact/${encodeURIComponent(contact.phone)}`, {
+        const result = await this.apiFetch<any>("contacts", {
           method: "POST",
           body: JSON.stringify({
+            whatsapp_number: contact.phone,
             name: contact.name,
-            phone: contact.phone,
-            email: contact.email,
-            tags: contact.tags || [],
-            customParams: contact.customFields
+            custom_params: contact.customFields
               ? Object.entries(contact.customFields).map(([key, value]) => ({
                   name: key,
                   value: String(value),
                 }))
               : [],
           }),
-        });
+        }, "v3");
 
         if (result.success) {
-          const contactId = (result.data as any)?.contactId || (result.data as any)?.id || `wati-lead-${Date.now()}`;
+          const contactId = (result.data as any)?.id || `wati-lead-${Date.now()}`;
           // Also cache locally so getContactByPhone() works for e2e validation
           const cached: WATILead = {
             id: contactId,
@@ -651,7 +678,7 @@ export class WATIIntegration {
 
   /**
    * Health check — verifies connectivity to the WATI API.
-   * Calls getContacts with pageSize=1 to validate credentials.
+   * Calls GET /api/ext/v3/contacts?pageSize=1 to validate credentials.
    */
   async healthCheck(): Promise<{ connected: boolean; whatsappNumber?: string }> {
     if (!this.isConfigured()) {
@@ -660,7 +687,7 @@ export class WATIIntegration {
     }
 
     try {
-      const result = await this.apiFetch<any>("getContacts?pageSize=1");
+      const result = await this.apiFetch<any>("contacts?pageSize=1", {}, "v3");
       if (result.success) {
         console.log("[WATI] Health check passed — API connected");
         return { connected: true, whatsappNumber: this.config.whatsappNumberId };

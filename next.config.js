@@ -74,6 +74,33 @@ const nextConfig = {
    */
   turbopack: {},
 
+  // ── Cloudflare Images remote patterns ─────────────────────────
+  // Allow loading images from Cloudflare R2 and Cloudflare Images.
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "*.r2.cloudflarestorage.com",
+      },
+      {
+        protocol: "https",
+        hostname: "*.cloudflareimages.com",
+      },
+      {
+        protocol: "https",
+        hostname: "*.cloudflare.com",
+      },
+      {
+        protocol: "https",
+        hostname: "*.cf-ipfs.com",
+      },
+      {
+        protocol: "https",
+        hostname: "imagedelivery.net",
+      },
+    ],
+  },
+
   // PWA: Service Worker must be served with correct Content-Type
   async headers() {
     return [

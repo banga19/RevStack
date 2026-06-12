@@ -85,6 +85,12 @@ services:
     # Dev mode uses SQLite by default (no external DB dependency)
     # Override with: DATABASE_URL=postgresql://mapato:mapato_secret@postgres:5432/mapato
     depends_on: {}
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      start_period: 60s
+      retries: 5
 
   hermes-worker:
     build:

@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { withAuth } from "@/lib/abac-middleware"
+import { getOrgScope, orgWhereClause } from "@/lib/get-org-scope"
 
 export const GET = withAuth(async (req: NextRequest, { session }) => {
   const { searchParams } = new URL(req.url)
   const status = searchParams.get("status")
-  const where: any = { userId: session.user.id }
+
+  const scope = await getOrgScope(session.user.id)
+  const where: any = orgWhereClause(scope, { userIdField: "userId" })
   if (status) where.status = status
 
   const retainers = await prisma.retainer.findMany({

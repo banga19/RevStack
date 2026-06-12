@@ -185,7 +185,7 @@ export function getProviderSummary(): string {
   ].join("\n")
 }
 
-export default {
+const modelProvider = {
   createLlm,
   createPlannerLlm,
   createAnalystLlm,
@@ -193,3 +193,4 @@ export default {
   getActiveProvider,
   getProviderSummary,
 }
+export default modelProvider

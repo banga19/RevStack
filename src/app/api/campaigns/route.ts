@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { withAuth } from "@/lib/abac-middleware"
+import { getOrgScope } from "@/lib/get-org-scope"
 
-export const GET = withAuth(async () => {
+export const GET = withAuth(async (req: NextRequest, { session }) => {
+  const scope = await getOrgScope(session.user.id)
+
+  // Scope campaigns: admin sees all, org users see org campaigns + personal,
+  // fallback users see their own
+  const where = scope.isAdmin ? {} :
+    scope.organizationId
+      ? { OR: [{ client: { organizationId: scope.organizationId } }, { client: { userId: scope.userId } }] }
+      : { client: { userId: scope.userId } }
+
   const campaigns = await prisma.outreachCampaign.findMany({
+    where,
     orderBy: { updatedAt: "desc" },
     include: {
       steps: { orderBy: { stepNumber: "asc" } },

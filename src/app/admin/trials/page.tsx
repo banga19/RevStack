@@ -185,7 +185,7 @@ export default function TrialDashboardPage() {
     if (abacLoading) return
     if (!isAdmin) { router.push("/dashboard"); return }
     loadData()
-  }, [abacLoading, isAdmin])
+  }, [abacLoading, isAdmin, loadData, router])
 
   // Filter users
   const filteredActive = (data?.active ?? []).filter((u) => {

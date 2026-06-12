@@ -26,6 +26,9 @@ model Organization {
   slug      String   @unique
   plan      String   @default("trial") // trial, starter, growth, enterprise
 
+  /** Custom branding for org portal/dashboard */
+  branding  String?  // JSON: { primaryColor, logoUrl, faviconUrl, accentColor }
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -64,6 +67,7 @@ model User {
   updatedAt      DateTime @updatedAt
 
   organization  Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  partner              Partner?  // partner registration (null if not a partner)
   onboardingResponses  OnboardingResponse[]
   preAuthQuestionnaires PreAuthQuestionnaire[]
   clients              Client[]
@@ -351,7 +355,6 @@ model OutreachCampaign {
   steps  CampaignStep[]
 }
 
-// CampaignStep — individual message steps in a multi-step outreach campaign
 model CampaignStep {
   id          String   @id @default(cuid())
   campaignId  String
@@ -366,7 +369,141 @@ model CampaignStep {
   openedCount Int?     @default(0)
   replyCount  Int?     @default(0)
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  updatedAt  DateTime @updatedAt
+}
+
+model Sequence {
+  id              String   @id @default(cuid())
+  organizationId  String
+  name            String
+  description     String?
+  status          String   @default("draft") // draft, active, paused, archived
+  triggerType     String   @default("manual") // manual, lead-added, event-based
+  metrics         Json?    // { sent, opened, replied, clicked, booked, converted }
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  steps           SequenceStep[]
+  prospectRuns    ProspectSequence[]
+}
+
+model SequenceStep {
+  id            String   @id @default(cuid())
+  sequenceId    String
+  sequence      Sequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  stepNumber    Int
+  channel       String   // email, whatsapp, sms, linkedin, call
+  type          String   @default("send_message") // send_message, make_call, wait, condition, voicemail
+  subject       String?  // email subject
+  messageBody   String?  // template content
+  callScript    String?  // talking points for call steps
+  delayHours    Int      @default(0) // hours after previous step
+  condition     Json?    // { field, operator, value } for branching
+  status        String   @default("pending") // pending, sent, scheduled, skipped
+  metrics       Json?    // { sent, opened, replied, ... }
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Prospect {
+  id            String   @id @default(cuid())
+  organizationId String
+  firstName     String?
+  lastName      String?
+  email         String?
+  phone         String?
+  whatsapp      String?
+  linkedin      String?
+  company       String?
+  title         String?
+  industry      String?
+  source        String?  // csv-import, manual, enriched, linkedin
+  enrichment    Json?    // { companySize, revenue, techStack, ... }
+  sequences     ProspectSequence[]
+  activities    ProspectActivity[]
+  callRecordings CallRecording[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model ProspectSequence {
+  id            String   @id @default(cuid())
+  prospectId    String
+  sequenceId    String
+  currentStep   Int      @default(0)
+  status        String   @default("enrolled") // enrolled, active, completed, paused, unsubscribed
+  enrolledAt    DateTime @default(now())
+  completedAt   DateTime?
+  lastActivityAt DateTime?
+
+  prospect   Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  sequence   Sequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+
+  @@index([prospectId])
+  @@index([sequenceId])
+}
+
+model ProspectActivity {
+  id            String   @id @default(cuid())
+  prospectId    String
+  prospect       Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  type          String   // email_sent, email_opened, email_clicked, email_replied, whatsapp_sent, call_made, call_answered, note_added
+  channel       String
+  details       Json?    // { subject, duration, sentiment, ... }
+  createdAt     DateTime @default(now())
+
+  @@index([prospectId])
+  @@index([createdAt])
+}
+
+model CallRecording {
+  id              String   @id @default(cuid())
+  organizationId  String
+  prospectId      String?
+  prospect        Prospect? @relation(fields: [prospectId], references: [id], onDelete: SetNull)
+  repId           String?  // User who made the call
+  direction       String   // outbound, inbound
+  status          String   // completed, missed, voicemail, busy, failed
+  duration        Int?     // seconds
+  recordingUrl    String?  // R2 storage key
+  transcription   String?  // AI-generated transcript
+  summary         String?  // AI-generated summary
+  sentiment       String?  // positive, neutral, negative
+  talkingPoints   Json?    // [{ topic, timestamp, snippet }]
+  actionItems     Json?    // [{ action, assignee, dueDate }]
+  objections      Json?    // [{ objection, suggestedResponse, handled }]
+  coachingScore   Float?   // AI call quality score
+  starredSnippets Json?    // [{ startTime, endTime, label }]
+  metadata        Json?
+  createdAt       DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([prospectId])
+  @@index([createdAt])
+}
+
+model CallSnippet {
+  id              String   @id @default(cuid())
+  recordingId     String
+  startTime       Int      // seconds
+  endTime         Int
+  label           String?  // e.g., "objection-handled", "great-discovery"
+  tags            Json?    // [objection, pricing, demo]
+  sharedWith      Json?    // [userId, ...]
+  createdAt       DateTime @default(now())
+}
+
+model BattleCard {
+  id              String   @id @default(cuid())
+  organizationId  String
+  name            String
+  triggerKeywords Json     // ["price", "expensive", "competitor", "budget"]
+  content         String   // suggested response + talking points
+  category        String?  // pricing, competitor, objection, feature
+  priority        Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  @@index([organizationId])
 }
 
 model ContentArticle {
@@ -394,6 +531,8 @@ model Document {
   category    String   // plan, pitch, technical, financial, marketing
   pages       Int?
   content     String?
+  /** R2 object storage key (if uploaded to Cloudflare R2) */
+  storageUrl  String?
   createdAt   DateTime @default(now())
 }
 
@@ -475,6 +614,62 @@ model SokogatePilotParticipant {
   updatedAt   DateTime @updatedAt
 
   cohort SokogatePilotCohort @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+}
+
+// ── Partner Network Models ───────────────────────────────────────────
+
+// Partner — registered users in the partner program with referral tracking
+model Partner {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  displayName   String   // public-facing name for partner directory
+  referralCode  String   @unique // unique code for tracking referrals (e.g., "MAPATO-JOHN")
+  commissionRate Float   @default(0.15) // 15% default, upgraded for reseller/agency
+  tier          String   @default("affiliate") // affiliate, reseller, agency
+  status        String   @default("active") // active, suspended
+  bio           String?  // short bio for partner directory
+  website       String?  // partner's website
+  companyName   String?
+  region        String?  // ke, tz, ug, rw, intl
+  phone         String?
+  notes         String?
+  totalEarned   Float    @default(0)
+  totalPaid     Float    @default(0)
+  payoutMethod  String?  // mpesa, bank, flutterwave
+  payoutDetails String?  // JSON: account details
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  referrals Referral[]
+
+  @@index([referralCode])
+  @@index([status])
+}
+
+// Referral — tracks each referred user and associated commission
+model Referral {
+  id               String    @id @default(cuid())
+  partnerId        String
+  referredUserId   String?   // linked after the referred user signs up
+  referredEmail    String?   // email of the referred person (captured before signup)
+  referredName     String?   // name of the referred person
+  referralCode     String    // the code used when signing up
+  status           String    @default("pending") // pending, signed-up, converted, paid
+  commissionEarned Float     @default(0)
+  convertedAt      DateTime?
+  signedUpAt       DateTime?
+  expiresAt        DateTime? // referral link expiry (90 days from creation)
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  partner Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([referralCode])
+  @@index([status])
+  @@index([partnerId])
+  @@index([referredUserId])
 }
 
 // Admin audit log — tracks who did what and when (grant access, extend trial, etc.)

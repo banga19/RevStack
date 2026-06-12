@@ -1,0 +1,170 @@
+# =============================================================================
+# RevStack / Mapato — CI: Build + E2E Tests
+#
+# Two-phase pipeline:
+#   1. build  — Build production Docker image (validates Next.js compilation)
+#   2. e2e    — Run Playwright E2E tests against the dev server
+#
+# E2E runs in dev mode (SQLite) so it doesn't need PostgreSQL and starts
+# faster. The build job already validates the production build path.
+#
+# Required repo secrets:
+#   NEXTAUTH_SECRET — used by NextAuth.js (any random 64-char string)
+#
+# Optional secrets (for integration-heavy test cases):
+#   FLUTTERWAVE_WEBHOOK_SECRET, FLW_WEBHOOK_HASH, WATI_API_TOKEN, etc.
+#
+# Trigger: push to main, pull requests targeting main
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─── Lint + Unit Tests (fast pre-check) ──────────────────────────────
+  lint:
+    name: Lint + unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run unit tests
+        run: npx vitest run
+
+  # ─── Build (production Docker image) ──────────────────────────────────
+  build:
+    name: Build app
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: lint
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-app-${{ hashFiles('**/pnpm-lock.yaml', 'Dockerfile') }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-app-
+
+      - name: Build production Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          target: runner
+          push: false
+          load: true
+          tags: mapato:ci-${{ github.sha }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+
+      # Move cache so post-run cache step picks it up
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+      - name: Verify image exists
+        run: docker image inspect mapato:ci-${{ github.sha }} > /dev/null
+
+  # ─── E2E Tests (Playwright via Docker) ────────────────────────────────
+  e2e:
+    name: E2E tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: build
+
+    env:
+      COMPOSE_FILES: "-f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.e2e.yml"
+      NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET || 'ci-e2e-test-secret-change-me' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Build the E2E test runner image (Playwright + Chromium)
+      - name: Build E2E test runner image
+        run: docker compose ${{ env.COMPOSE_FILES }} build e2e
+        env:
+          DOCKER_BUILDKIT: 1
+          COMPOSE_DOCKER_CLI_BUILD: 1
+
+      # Start dev server and run tests
+      - name: Start app and run E2E tests
+        run: |
+          echo "🚀 Starting app in dev mode..."
+          docker compose ${{ env.COMPOSE_FILES }} up -d app
+
+          echo "⏳ E2E runner will wait for healthcheck before running tests..."
+          echo ""
+
+          docker compose ${{ env.COMPOSE_FILES }} run --rm e2e sh -c \
+            "NODE_ENV=development DATABASE_URL=file:/app/data/dev.db npx playwright test --reporter=list"
+
+      # Upload screenshots / traces for debugging
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results-${{ github.run_id }}
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: warn
+          retention-days: 7
+
+      # Show container logs on failure
+      - name: Show container logs
+        if: failure() || cancelled()
+        run: |
+          echo "=== App container logs ==="
+          docker compose ${{ env.COMPOSE_FILES }} logs app --tail=50 || true
+          echo ""
+          echo "=== E2E container logs ==="
+          docker compose ${{ env.COMPOSE_FILES }} logs e2e --tail=50 || true
+
+      # Cleanup
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose ${{ env.COMPOSE_FILES }} down --volumes --remove-orphans 2>/dev/null || true
+          echo "🧹 Cleanup complete"

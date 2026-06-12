@@ -16,7 +16,9 @@
     "db:use:sqlite": "cp prisma/schema.sqlite.prisma prisma/schema.prisma && prisma generate",
     "docker:setup": "prisma db push && tsx prisma/seed.ts && tsx prisma/seed-revstack.ts",
     "test:e2e": "playwright test",
-    "test:e2e:dev-checkout": "playwright test e2e/dev-mode-checkout.spec.ts"
+    "test:e2e:dev-checkout": "playwright test e2e/dev-mode-checkout.spec.ts",
+    "test:e2e:docker": "bash scripts/run-e2e.sh",
+    "test:e2e:docker:dev": "bash scripts/run-e2e.sh --dev"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",

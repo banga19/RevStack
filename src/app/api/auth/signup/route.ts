@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db"
 import { sendWelcomeEmail } from "@/lib/email"
 import { validateCsrf } from "@/lib/csrf"
 import { appendSignupRow } from "@/lib/google-sheets"
+import { requireTurnstileToken, TurnstileError } from "@/lib/cloudflare/turnstile"
+import { ipFromRequest } from "@/lib/rate-limiter"
 
 export async function POST(req: NextRequest) {
   const csrfCheck = await validateCsrf(req)
@@ -11,8 +13,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid or missing security token. Please refresh the page and try again." }, { status: 403 })
   }
 
+  let turnstileToken: string | null = null
+  let body: any = {}
   try {
-    const { name, email, password, phone, termsAccepted } = await req.json()
+    body = await req.json()
+    turnstileToken = body.turnstileToken || null
+  } catch {
+    body = {}
+  }
+
+  if (process.env.TURNSTILE_SECRET_KEY) {
+    try {
+      const ip = ipFromRequest(req)
+      await requireTurnstileToken(turnstileToken || "", ip)
+    } catch (err) {
+      if (err instanceof TurnstileError) {
+        return NextResponse.json({ error: err.message }, { status: 403 })
+      }
+      console.warn("[Turnstile] Pre-check failed, continuing:", err)
+    }
+  }
+
+  try {
+    const { name, email, password, phone, termsAccepted, organizationName, industry, referralCode } = body
     if (!name || !email || !password) {
       return NextResponse.json({ error: "Name, email, and password are required" }, { status: 400 })
     }
@@ -31,12 +54,18 @@ export async function POST(req: NextRequest) {
     const hashedPassword = await bcrypt.hash(password, 10)
     const now = new Date()
     const trialEnd = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
-    const orgSlug = `${email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "-")}-${Date.now().toString(36)}`
+    const orgName = organizationName?.trim() || `${name}'s Company`
+    const baseSlug = orgName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .substring(0, 40) || `org-${Date.now().toString(36)}`
+    const orgSlug = `${baseSlug}-${Date.now().toString(36).substring(0, 8)}`
 
     const [organization, user] = await Promise.all([
       prisma.organization.create({
         data: {
-          name: `${name}'s Company`,
+          name: orgName,
           slug: orgSlug,
           plan: "trial",
         },
@@ -65,7 +94,40 @@ export async function POST(req: NextRequest) {
       data: { organizationId: organization.id },
     })
 
-    // Defer email + sheets; do not block signup
+    let referralValidation: { valid: boolean; partnerFound: boolean; referralTracked: boolean }
+    if (referralCode && typeof referralCode === "string" && referralCode.trim()) {
+      try {
+        const code = referralCode.trim()
+        const partner = await prisma.partner.findUnique({ where: { referralCode: code } })
+        if (partner) {
+          const existingReferral = await prisma.referral.findFirst({
+            where: { partnerId: partner.id, referredUserId: user.id },
+          })
+          if (!existingReferral) {
+            await prisma.referral.create({
+              data: {
+                partnerId: partner.id,
+                referredUserId: user.id,
+                referredEmail: user.email,
+                referredName: user.name,
+                referralCode: code,
+                status: "signed-up",
+                signedUpAt: now,
+              },
+            })
+          }
+          referralValidation = { valid: true, partnerFound: true, referralTracked: !existingReferral }
+        } else {
+          referralValidation = { valid: false, partnerFound: false, referralTracked: false }
+        }
+      } catch (referralErr) {
+        console.warn("[signup] referral tracking failed:", referralErr)
+        referralValidation = { valid: false, partnerFound: false, referralTracked: false }
+      }
+    } else {
+      referralValidation = { valid: false, partnerFound: false, referralTracked: false }
+    }
+
     Promise.all([
       sendWelcomeEmail(user.email, user.name).catch((err) => console.warn("[signup] welcome email failed", err)),
       appendSignupRow({
@@ -94,6 +156,7 @@ export async function POST(req: NextRequest) {
           endsAt: trialEnd.toISOString(),
           daysRemaining: 3,
         },
+        referralValidation,
       },
       { status: 201 }
     )

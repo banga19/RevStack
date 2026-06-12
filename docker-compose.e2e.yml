@@ -1,0 +1,90 @@
+# =============================================================================
+# Mapato / RevStack — E2E Test Override
+#
+# Adds a Playwright + Chromium E2E test runner service to the stack.
+# Run alongside the main app service (dev or prod) to execute Playwright tests.
+#
+# Usage:
+#   # 1. Start the app and PostgreSQL (production mode):
+#   docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d app postgres
+#
+#   # 2. Run all E2E tests:
+#   docker compose -f docker-compose.yml -f docker-compose.e2e.yml run --rm e2e
+#
+#   # 3. Run a specific test file:
+#   docker compose -f docker-compose.yml -f docker-compose.e2e.yml \
+#     run --rm e2e npx playwright test e2e/checkout-flow.spec.ts
+#
+#   # 4. Run with dev mode (SQLite, hot reload):
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml \
+#     -f docker-compose.e2e.yml up -d app
+#   docker compose -f docker-compose.yml -f docker-compose.e2e.yml \
+#     run --rm e2e npx playwright test e2e/dev-mode-checkout.spec.ts
+#
+# Requirements:
+#   - Docker daemon must be running and accessible
+#   - Port 3000 must be free on the host
+#   - .env file with required vars (NEXTAUTH_SECRET, etc.)
+# =============================================================================
+
+services:
+  # ── E2E Test Runner (Playwright + Chromium) ─────────────────────────
+  e2e:
+    build:
+      context: .
+      dockerfile: Dockerfile.e2e
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - BASE_URL=http://app:3000
+      - PLAYWRIGHT_CHROME_BIN=/usr/bin/chromium
+      - DATABASE_URL=${DATABASE_URL:-postgresql://mapato:mapato_secret@postgres:5432/mapato}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required}
+
+      # Forward LLM provider keys (needed for unit tests, not E2E)
+      - NVIDIA_NIM_API_KEY=${NVIDIA_NIM_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+
+      # Forward integration keys (needed for integration tests)
+      - WATI_API_TOKEN=${WATI_API_TOKEN:-}
+      - WATI_WHATSAPP_NUMBER_ID=${WATI_WHATSAPP_NUMBER_ID:-}
+      - ZOHO_CLIENT_ID=${ZOHO_CLIENT_ID:-}
+      - ZOHO_CLIENT_SECRET=${ZOHO_CLIENT_SECRET:-}
+      - ZOHO_REFRESH_TOKEN=${ZOHO_REFRESH_TOKEN:-}
+      - INSTANTLY_API_KEY=${INSTANTLY_API_KEY:-}
+      - VOICEFLOW_API_KEY=${VOICEFLOW_API_KEY:-}
+      - VOICEFLOW_PROJECT_ID=${VOICEFLOW_PROJECT_ID:-}
+      - SOKOGATE_API_KEY=${SOKOGATE_API_KEY:-}
+      - SOKOGATE_API_SECRET=${SOKOGATE_API_SECRET:-}
+      - FLW_WEBHOOK_HASH=${FLW_WEBHOOK_HASH:-}
+      - FLUTTERWAVE_WEBHOOK_SECRET=${FLUTTERWAVE_WEBHOOK_SECRET:-}
+
+      # Email
+      - SMTP_HOST=${SMTP_HOST:-smtp.ethereal.email}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+
+      # Google OAuth
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+
+    volumes:
+      # Mount the e2e test files for live updates
+      - ./e2e:/app/e2e
+      # Mount Playwright config
+      - ./playwright.config.ts:/app/playwright.config.ts
+      # Mount prisma schema for DB queries in tests
+      - ./prisma:/app/prisma
+      # Mount .env so E2E tests can read FLW_WEBHOOK_HASH
+      - ./.env:/app/.env:ro
+      # Mount SQLite database volume for dev mode (shared with app container)
+      - sqlite-data:/app/data
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - mapato-network
+    profiles:
+      - e2e

@@ -25,11 +25,7 @@ import {
   Activity,
   Send,
   FileText,
-  Sparkles,
-  Clock,
-  CreditCard,
-  Puzzle,
-  BookOpen,
+  Globe, Sparkles, Ship, Loader2, TrendingUp, ShieldCheck,
 } from "lucide-react"
 import {
   BarChart,
@@ -60,6 +56,7 @@ type DashboardData = {
   pipelineByTier: { tier: string; value: number; count: number }[]
   recentActivity: { id: string; type: string; message: string; time: string }[]
 }
+type TradeHubReport = { corridor?: string; clients?: number; exportReady?: number; avgErs?: number; country?: string; partners?: number; generatedAt?: string }
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -79,6 +76,10 @@ export default function DashboardPage() {
     tier: string
     plan: string
   } | null>(null)
+
+  const [reportsLoading, setReportsLoading] = useState(false)
+  const [afcfta, setAfcfta] = useState<TradeHubReport | null>(null)
+  const [westAfrica, setWestAfrica] = useState<TradeHubReport | null>(null)
 
   // Check if onboarding is completed (admin users skip — they have demo data)
   useEffect(() => {
@@ -126,6 +127,23 @@ export default function DashboardPage() {
         }
       })
       .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    setReportsLoading(true)
+    Promise.all([
+      fetch("/api/reports/afcfta").catch(() => null),
+      fetch("/api/reports/west-africa").catch(() => null),
+    ]).then(([afRes, waRes]) => {
+      if (cancelled) return
+      if (afRes?.ok) setAfcfta(afRes.json().catch(() => null))
+      if (waRes?.ok) setWestAfrica(waRes.json().catch(() => null))
+      setReportsLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   // Determine whether user needs a payment
@@ -464,6 +482,43 @@ export default function DashboardPage() {
 
       {/* Bottom Row */}
       <div className="grid gap-6 lg:grid-cols-2">
+        {/* Trade Hub Summaries */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5 text-primary" />
+              Trade Hub Overview
+            </CardTitle>
+            <CardDescription>AfCFTA + West Africa pipeline health</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="p-4 rounded-lg border bg-muted/20">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-muted-foreground">AfCFTA clients</span>
+                  <Badge variant="outline" className="text-[10px]">AfCFTA</Badge>
+                </div>
+                <div className="text-2xl font-bold">{afcfta?.clients ?? "—"}</div>
+                <div className="text-xs text-muted-foreground">Corridor: {afcfta?.corridor ?? "—"}</div>
+              </div>
+              <div className="p-4 rounded-lg border bg-muted/20">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-muted-foreground">West Africa partners</span>
+                  <Badge variant="outline" className="text-[10px]">West Africa</Badge>
+                </div>
+                <div className="text-2xl font-bold">{westAfrica?.partners ?? "—"}</div>
+                <div className="text-xs text-muted-foreground">Country: {westAfrica?.country ?? "all"}</div>
+              </div>
+              <div className="p-4 rounded-lg border bg-primary/5">
+                <div className="text-xs text-muted-foreground mb-2">Latest snapshot</div>
+                <div className="text-sm font-medium">{new Date().toLocaleDateString()}</div>
+                <div className="text-xs text-muted-foreground">AfCFTA avg ERS {afcfta?.avgErs ?? "—"} · West Africa partners {westAfrica?.partners ?? "—"}</div>
+                {reportsLoading && <Loader2 className="h-3 w-3 animate-spin mt-2 text-primary" />}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Recent Activity */}
         <Card>
           <CardHeader>

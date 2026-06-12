@@ -33,10 +33,9 @@
 
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-
-// ============================================================
-// Public API route prefixes — no subscription check
-// ============================================================
+import { checkRateLimit, RateLimitError, getDefaultLimits, ipFromRequest } from "@/lib/rate-limiter"
+import { applySecurityHeaders } from "@/lib/security-headers"
+import { checkAccessFromSession } from "@/lib/abac"
 
 const PUBLIC_API_PREFIXES = [
   "/api/auth/",
@@ -49,43 +48,103 @@ const PUBLIC_API_PREFIXES = [
   "/api/push/",
 ]
 
-// API routes that are ALWAYS allowed (GET read-only for subscription info)
 const ALWAYS_ALLOWED_API = [
   "/api/subscription",
   "/api/ers/snapshots",
 ]
 
 function isPublicApiRoute(pathname: string, method: string): boolean {
-  // Check public prefixes
-  if (PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
-    return true
-  }
-
-  // GET requests to specific allowed endpoints
-  if (method === "GET" && ALWAYS_ALLOWED_API.some((p) => pathname.startsWith(p))) {
-    return true
-  }
-
+  if (PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true
+  if (method === "GET" && ALWAYS_ALLOWED_API.some((p) => pathname.startsWith(p))) return true
   return false
 }
 
-function isProtectedApiRoute(pathname: string): boolean {
-  // Only check /api/* routes
-  if (!pathname.startsWith("/api/")) return false
+export default function proxy() {
+  return async (req: NextRequest) => {
+    const { pathname, method } = req
+    const ip = ipFromRequest(req)
 
-  // If not a public route, it's protected
-  return true
+    if (!isPublicApiRoute(pathname, method || "GET")) {
+      try {
+        const limit = getDefaultLimits().find((c) => pathname.startsWith(c.pathPrefix))
+        const config = limit || { pathPrefix: "/api", max: 100, windowMs: 60_000 }
+        checkRateLimit(ip, config)
+      } catch (err) {
+        if (err instanceof RateLimitError) {
+          const res = NextResponse.json(
+            { error: "Too many requests", retryAfter: err.retryAfter },
+            { status: 429 }
+          )
+          res.headers.set("Retry-After", String(err.retryAfter))
+          return applySecurityHeaders(res)
+        }
+        console.error("[RateLimiter] unexpected error", err)
+      }
+    }
+
+    try {
+      const { decision } = await checkAccessFromSession("dashboard", "read")
+      if (!decision.allowed) {
+        const blocked = NextResponse.json(
+          { error: decision.reason, code: "access_denied" },
+          { status: isPublicApiRoute(pathname, method || "GET") ? 403 : 401 }
+        )
+        return applySecurityHeaders(blocked)
+      }
+    } catch {
+      // Allow degraded mode when DB/ABAC is unavailable
+    }
+
+    const res = NextResponse.next()
+    return applySecurityHeaders(res)
+  }
+}</text>
+</invoke>
+  if (method === "GET" && ALWAYS_ALLOWED_API.some((p) => pathname.startsWith(p))) {
+    return true
+  }
+  return false
 }
 
-// ============================================================
-// Middleware
-// ============================================================
-
 export default function proxy() {
-  // Subscription gating is handled by:
-  //   1. Client-side SubscriptionGate component (src/components/subscription-gate.tsx)
-  //   2. Server-side subscription-gate.ts utility for route handlers
-  //
-  // This proxy is intentionally empty — all gating logic lives in the components
-  // and utilities where full user context (DB fetch) is available.
+  return async (req: NextRequest) => {
+    const { pathname, method } = req
+    const ip = ipFromRequest(req)
+
+    if (!isPublicApiRoute(pathname, method || "GET")) {
+      try {
+        const limit = getDefaultLimits().find((c) => pathname.startsWith(c.pathPrefix))
+        const config = limit || { pathPrefix: "/api", max: 100, windowMs: 60_000 }
+        checkRateLimit(ip, config)
+      } catch (err) {
+        if (err instanceof RateLimitError) {
+          const res = NextResponse.json(
+            { error: "Too many requests", retryAfter: err.retryAfter },
+            { status: 429 }
+          )
+          res.headers.set("Retry-After", String(err.retryAfter))
+          return applySecurityHeaders(res)
+        }
+        console.error("[RateLimiter] unexpected error", err)
+      }
+    }
+
+    let res: NextResponse | Response | undefined
+    try {
+      const { decision } = await checkAccessFromSession("dashboard", "read")
+      if (!decision.allowed) {
+        const unauthorized = isPublicApiRoute(pathname, method || "GET")
+        const blocked = NextResponse.json(
+          { error: decision.reason, code: "access_denied" },
+          { status: unauthorized ? 403 : 401 }
+        )
+        return applySecurityHeaders(blocked)
+      }
+    } catch {
+      // DB / Auth unavailable — allow through with degraded mode
+    }
+
+    res = NextResponse.next()
+    return applySecurityHeaders(res)
+  }
 }

@@ -9,11 +9,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
-import { Brain, Loader2, Eye, EyeOff, AlertCircle, Sparkles, CheckCircle2, FileText, MessageSquare } from "lucide-react"
+import { Brain, Loader2, Eye, EyeOff, AlertCircle, Sparkles, CheckCircle2, FileText, MessageSquare, ShieldCheck } from "lucide-react"
 import { useTranslation } from "@/lib/i18n/use-translation"
 import { LanguageToggle } from "@/components/language-toggle"
 import { ContactBar } from "@/components/contact-bar"
 import { CONTACT_INFO } from "@/lib/contact-info"
+import { TurnstileWidget } from "@/components/turnstile-widget"
 
 function SignupForm() {
   const { t, lang } = useTranslation()
@@ -21,9 +22,11 @@ function SignupForm() {
   const searchParams = useSearchParams()
 
   const [name, setName] = useState("")
+  const [organizationName, setOrganizationName] = useState("")
   const [email, setEmail] = useState(searchParams.get("email") || "")
   const [phone, setPhone] = useState("")
   const fromNeedsAssessment = searchParams.get("needsAssessment") === "true"
+  const referralCode = searchParams.get("ref") || ""
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -32,6 +35,7 @@ function SignupForm() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const { csrfToken, loading: csrfLoading } = useCsrf()
 
   useEffect(() => { setMounted(true) }, [])
@@ -65,13 +69,29 @@ function SignupForm() {
     setLoading(true)
 
     try {
+      // Validate Turnstile before submitting
+      if (!turnstileToken && process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) {
+        setError("Please complete the security check before continuing.")
+        setLoading(false)
+        return
+      }
+
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(csrfToken ? { "x-csrf-token": csrfToken } : {}),
         },
-        body: JSON.stringify({ name, email, password, phone: phone || undefined, termsAccepted }),
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          phone: phone || undefined,
+          termsAccepted,
+          organizationName: organizationName || undefined,
+          referralCode: referralCode || undefined,
+          turnstileToken, // passed to server for verification
+        }),
       })
 
       const data = await res.json()
@@ -168,11 +188,34 @@ function SignupForm() {
                 type="text"
                 placeholder="John Doe"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value)
+                  // Auto-suggest org name when user types their name
+                  if (!organizationName && e.target.value.trim()) {
+                    setOrganizationName(`${e.target.value.split(' ')[0]}'s Company`)
+                  }
+                }}
                 required
                 autoFocus
                 className="h-11"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="org-name" className="text-sm font-medium">
+                Business / Organization Name <span className="text-muted-foreground font-normal">(for your workspace)</span>
+              </Label>
+              <Input
+                id="org-name"
+                type="text"
+                placeholder="Acme Trading Ltd"
+                value={organizationName}
+                onChange={(e) => setOrganizationName(e.target.value)}
+                className="h-11"
+              />
+              <p className="text-xs text-muted-foreground">
+                This becomes your workspace name. You can change it later.
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -283,6 +326,21 @@ function SignupForm() {
                 . {t("form.understand")}
               </label>
             </div>
+
+            {/* Cloudflare Turnstile — privacy-friendly bot protection */}
+            <TurnstileWidget
+              onToken={setTurnstileToken}
+              onExpire={() => setTurnstileToken(null)}
+              onError={() => setTurnstileToken(null)}
+              action="signup-form"
+            />
+
+            {turnstileToken && (
+              <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400 justify-center">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                <span>Security check passed</span>
+              </div>
+            )}
 
             <Button
               type="submit"

@@ -49,6 +49,7 @@ import { cn } from "@/lib/utils"
 import { useAbac } from "@/lib/use-abac"
 import { useSession } from "next-auth/react"
 import { RetentionDashboard } from "@/components/retention-dashboard"
+import { ChurnDashboard } from "@/components/churn-dashboard"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -166,12 +167,12 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null)
   const initialTab = search?.get("tab")
   const [activeTab, setActiveTab] = useState<string>(
-    ["users", "payments", "trials", "godmode", "hermes", "audit", "followups", "retention"].includes(initialTab || "") ? (initialTab as string) : "users"
+    ["users", "payments", "trials", "godmode", "hermes", "audit", "followups", "retention", "churn"].includes(initialTab || "") ? (initialTab as string) : "users"
   )
 
   useEffect(() => {
     const tab = search?.get("tab")
-    if (tab && ["users", "payments", "trials", "godmode", "hermes", "audit", "followups", "retention"].includes(tab)) {
+    if (tab && ["users", "payments", "trials", "godmode", "hermes", "audit", "followups", "retention", "churn"].includes(tab)) {
       setActiveTab(tab)
     }
   }, [search])
@@ -527,7 +528,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-8">
+        <TabsList className="grid w-full grid-cols-9">
           <TabsTrigger value="users"><Users className="h-4 w-4 mr-2" /> Users</TabsTrigger>
           <TabsTrigger value="audit"><Shield className="h-4 w-4 mr-2" /> Audit Log</TabsTrigger>
           <TabsTrigger value="payments"><DollarSign className="h-4 w-4 mr-2" /> Payments</TabsTrigger>
@@ -535,6 +536,7 @@ export default function AdminPage() {
           <TabsTrigger value="retention"><BarChart3 className="h-4 w-4 mr-2" /> Retention</TabsTrigger>
           <TabsTrigger value="followups"><BellRing className="h-4 w-4 mr-2" /> Follow-ups</TabsTrigger>
           <TabsTrigger value="godmode"><Zap className="h-4 w-4 mr-2" /> God Mode</TabsTrigger>
+          <TabsTrigger value="churn"><AlertTriangle className="h-4 w-4 mr-2" /> Churn</TabsTrigger>
           <TabsTrigger value="hermes"><Sparkles className="h-4 w-4 mr-2" /> Hermes</TabsTrigger>
         </TabsList>
 
@@ -877,6 +879,21 @@ export default function AdminPage() {
 </TabsContent>
 
 {/* ================================================================= */}
+{/* TAB: Churn Prediction */}
+{/* ================================================================= */}
+<TabsContent value="churn" className="space-y-4">
+  <Card>
+    <CardHeader>
+      <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-orange-500" /> Churn Prediction &amp; Risk Scoring</CardTitle>
+      <CardDescription>AI-driven risk assessment, at-risk users, and automated retention recommendations</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <ChurnDashboard />
+    </CardContent>
+  </Card>
+</TabsContent>
+
+{/* ================================================================= */}
 {/* TAB: Retention */}
 {/* ================================================================= */}
 <TabsContent value="retention" className="space-y-4">
@@ -1060,7 +1077,7 @@ export default function AdminPage() {
       {godModeSessions.filter((s: any) => s.status === "running" || s.status === "paused").length === 0 && godModeReports.length === 0 && (
         <div className="text-center py-8">
           <Brain className="h-12 w-12 text-muted-foreground/50 mx-auto mb-3" />
-          <p className="text-muted-foreground text-sm">No active God Mode sessions. Click "Start Full God Mode" to launch all 5 autonomous agents.</p>
+          <p className="text-muted-foreground text-sm">No active God Mode sessions. Click &ldquo;Start Full God Mode&rdquo; to launch all 5 autonomous agents.</p>
           <Button variant="outline" className="mt-4" onClick={loadGodMode}>
             <RefreshCw className={cn("h-4 w-4 mr-2", godModeLoading && "animate-spin")} />
             Refresh Status

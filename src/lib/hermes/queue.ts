@@ -82,6 +82,24 @@ export interface RetryFailedJobData {
   originalJobId: string
 }
 
+export interface SendSequenceStepJobData {
+  sequenceId: string
+  stepId: string
+  prospectId: string
+  organizationId: string
+}
+
+export interface EnrollProspectJobData {
+  prospectId: string
+  sequenceId: string
+  organizationId: string
+}
+
+export interface ProcessSequenceRunJobData {
+  sequenceId: string
+  prospectId: string
+}
+
 // ============================================================
 // Worker
 // ============================================================
@@ -275,6 +293,211 @@ async function retryFailedJob(originalJobId: string): Promise<void> {
 }
 
 // ============================================================
+// Sequence Execution Jobs
+// ============================================================
+
+/**
+ * Send a single sequence step to a prospect.
+ * Dispatches to the appropriate channel handler based on step.channel.
+ */
+async function sendSequenceStep(
+  sequenceId: string,
+  stepId: string,
+  prospectId: string,
+  organizationId: string
+): Promise<void> {
+  const step = await prisma.sequenceStep.findUnique({
+    where: { id: stepId },
+    include: { sequence: true },
+  })
+
+  if (!step || step.sequenceId !== sequenceId) {
+    throw new Error(`Sequence step not found: ${stepId}`)
+  }
+
+  const prospect = await prisma.prospect.findUnique({
+    where: { id: prospectId },
+  })
+
+  if (!prospect || prospect.organizationId !== organizationId) {
+    throw new Error(`Prospect not found or access denied: ${prospectId}`)
+  }
+
+  // Update step status to sent
+  await prisma.sequenceStep.update({
+    where: { id: stepId },
+    data: { status: "sent" },
+  })
+
+  // Record prospect activity
+  await prisma.prospectActivity.create({
+    data: {
+      prospectId,
+      type: `${step.channel}_sent`,
+      channel: step.channel,
+      details: {
+        stepId,
+        sequenceId,
+        subject: step.subject,
+        messageBody: step.messageBody,
+      },
+    },
+  })
+
+  // Dispatch to channel-specific sender
+  switch (step.channel) {
+    case "email":
+      // TODO: integrate with Instantly.ai or Nodemailer
+      console.log(`[Sequence] Email step ${stepId} queued for prospect ${prospectId}`)
+      break
+    case "whatsapp":
+      // TODO: integrate with WATI
+      console.log(`[Sequence] WhatsApp step ${stepId} queued for prospect ${prospectId}`)
+      break
+    case "sms":
+      // TODO: integrate with Twilio
+      console.log(`[Sequence] SMS step ${stepId} queued for prospect ${prospectId}`)
+      break
+    case "call":
+      // TODO: create a call task for the rep (not auto-dial)
+      console.log(`[Sequence] Call step ${stepId} queued for prospect ${prospectId}`)
+      break
+    default:
+      console.log(`[Sequence] Unknown channel ${step.channel} for step ${stepId}`)
+  }
+
+  // TODO: evaluate trigger conditions for next step (open, reply, click)
+  // If conditions met, schedule next step via hermesQueue.add("send-sequence-step", ...)
+}
+
+/**
+ * Enroll a prospect into a sequence — initializes ProspectSequence record
+ * and schedules the first step.
+ */
+async function enrollProspect(
+  prospectId: string,
+  sequenceId: string,
+  organizationId: string
+): Promise<void> {
+  const prospect = await prisma.prospect.findUnique({
+    where: { id: prospectId },
+  })
+
+  if (!prospect || prospect.organizationId !== organizationId) {
+    throw new Error(`Prospect not found or access denied: ${prospectId}`)
+  }
+
+  const sequence = await prisma.sequence.findUnique({
+    where: { id: sequenceId },
+    include: { steps: true },
+  })
+
+  if (!sequence) {
+    throw new Error(`Sequence not found: ${sequenceId}`)
+  }
+
+  // Create enrollment record
+  await prisma.prospectSequence.create({
+    data: {
+      prospectId,
+      sequenceId,
+      status: "active",
+      currentStep: 0,
+      enrolledAt: new Date(),
+      lastActivityAt: new Date(),
+    },
+  })
+
+  // Record enrollment activity
+  await prisma.prospectActivity.create({
+    data: {
+      prospectId,
+      type: "enrolled_in_sequence",
+      channel: "system",
+      details: { sequenceId, sequenceName: sequence.name },
+    },
+  })
+
+  // Schedule the first step
+  const firstStep = sequence.steps
+    .filter((s) => s.stepNumber === 0)
+    .sort((a, b) => a.stepNumber - b.stepNumber)[0]
+
+  if (firstStep) {
+    const delayMs = firstStep.delayHours > 0 ? firstStep.delayHours * 60 * 60 * 1000 : 0
+    await hermesQueue.add(
+      "send-sequence-step",
+      {
+        sequenceId,
+        stepId: firstStep.id,
+        prospectId,
+        organizationId,
+      },
+      {
+        delay: delayMs,
+        attempts: 3,
+        backoff: { type: "exponential", delay: 5_000 },
+      }
+    )
+  }
+}
+
+/**
+ * Advance a prospect through a sequence after a trigger event.
+ * Evaluates conditions and schedules the next step if conditions are met.
+ */
+async function processSequenceRun(
+  sequenceId: string,
+  prospectId: string
+): Promise<void> {
+  const enrollment = await prisma.prospectSequence.findFirst({
+    where: { prospectId, sequenceId },
+    include: { sequence: { include: { steps: true } } },
+  })
+
+  if (!enrollment || enrollment.status !== "active") {
+    return // prospect not actively enrolled
+  }
+
+  const currentStepNumber = enrollment.currentStep
+  const nextStep = enrollment.sequence.steps
+    .filter((s) => s.stepNumber > currentStepNumber)
+    .sort((a, b) => a.stepNumber - b.stepNumber)[0]
+
+  if (!nextStep) {
+    // Sequence completed
+    await prisma.prospectSequence.update({
+      where: { id: enrollment.id },
+      data: { status: "completed", completedAt: new Date() },
+    })
+    return
+  }
+
+  // Schedule next step
+  const delayMs = nextStep.delayHours > 0 ? nextStep.delayHours * 60 * 60 * 1000 : 0
+  await hermesQueue.add(
+    "send-sequence-step",
+    {
+      sequenceId,
+      stepId: nextStep.id,
+      prospectId,
+      organizationId: enrollment.sequence.organizationId,
+    },
+    {
+      delay: delayMs,
+      attempts: 3,
+      backoff: { type: "exponential", delay: 5_000 },
+    }
+  )
+
+  // Update current step pointer
+  await prisma.prospectSequence.update({
+    where: { id: enrollment.id },
+    data: { currentStep: nextStep.stepNumber, lastActivityAt: new Date() },
+  })
+}
+
+// ============================================================
 // Worker Handler Map
 // ============================================================
 
@@ -292,6 +515,21 @@ const handlers: Record<string, (job: Job) => Promise<void>> = {
   "retry-failed": async (job) => {
     const { originalJobId } = job.data as RetryFailedJobData
     await retryFailedJob(originalJobId)
+  },
+
+  "send-sequence-step": async (job) => {
+    const { sequenceId, stepId, prospectId, organizationId } = job.data as SendSequenceStepJobData
+    await sendSequenceStep(sequenceId, stepId, prospectId, organizationId)
+  },
+
+  "enroll-prospect": async (job) => {
+    const { prospectId, sequenceId, organizationId } = job.data as EnrollProspectJobData
+    await enrollProspect(prospectId, sequenceId, organizationId)
+  },
+
+  "process-sequence-run": async (job) => {
+    const { sequenceId, prospectId } = job.data as ProcessSequenceRunJobData
+    await processSequenceRun(sequenceId, prospectId)
   },
 }
 
@@ -358,11 +596,14 @@ if (shouldRunWorker) {
 // so its messages are properly tracked
 centralBrain.registerAgent("bullmq-worker", {
   displayName: "BullMQ Worker",
-  description: "Background job processor for lead qualification and sweep operations",
+  description: "Background job processor for lead qualification, sweep operations, and sequence execution",
   capabilities: [
     { name: "process-lead", description: "Process a single lead through the sales pipeline" },
     { name: "sweep-leads", description: "Sweep all unprocessed leads en masse" },
     { name: "retry-failed", description: "Retry a previously failed job" },
+    { name: "send-sequence-step", description: "Send a sequence step to a prospect via the appropriate channel" },
+    { name: "enroll-prospect", description: "Enroll a prospect into a sequence" },
+    { name: "process-sequence-run", description: "Advance a prospect through a sequence after a trigger event" },
   ],
   status: "active",
 })

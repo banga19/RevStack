@@ -217,7 +217,10 @@ export const useButtonSync = () => {
     return unsubscribe;
   }, []);
 
-  const handleButtonClick = useCallback(buttonSyncManager.handleButtonClick, []);
+  const handleButtonClick = useCallback(
+    (...args: Parameters<typeof buttonSyncManager.handleButtonClick>) => buttonSyncManager.handleButtonClick(...args),
+    []
+  );
 
   const updateContext = useCallback((context: Record<string, any>) => {
     buttonSyncManager.updateContext(context);

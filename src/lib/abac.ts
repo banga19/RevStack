@@ -64,6 +64,9 @@ export type AbacResource =
   | "retainers"
   | "followups"
   | "messages"
+  | "sequences"
+  | "prospects"
+  | "call-recordings"
   | "hermes-runs"
 
 // ============================================================
@@ -82,6 +85,9 @@ export const RESOURCES: Record<AbacResource, AbacResource> = {
   korea: "korea",
   content: "content",
   outreach: "outreach",
+  sequences: "sequences",
+  prospects: "prospects",
+  "call-recordings": "call-recordings",
   financial: "financial",
   pricing: "pricing",
   onboarding: "onboarding",
@@ -283,6 +289,33 @@ const policies: Record<string, ResourcePolicies> = {
     ],
   },
 
+  sequences: {
+    read: [
+      { description: "Admin or active/trial user", evaluate: (u) => u.role === "admin" || u.subscriptionStatus === "active" || u.subscriptionStatus === "trial", grant: "sequences:read" },
+    ],
+    write: [
+      { description: "Admin or active user", evaluate: (u) => u.role === "admin" || u.subscriptionStatus === "active", grant: "sequences:write" },
+    ],
+  },
+
+  prospects: {
+    read: [
+      { description: "Admin or active/trial user", evaluate: (u) => u.role === "admin" || u.subscriptionStatus === "active" || u.subscriptionStatus === "trial", grant: "prospects:read" },
+    ],
+    write: [
+      { description: "Admin or active user", evaluate: (u) => u.role === "admin" || u.subscriptionStatus === "active", grant: "prospects:write" },
+    ],
+  },
+
+  "call-recordings": {
+    read: [
+      { description: "Admin or active growth+ user", evaluate: (u) => u.role === "admin" || (u.subscriptionStatus === "active" && (u.subscriptionTier === "growth" || u.subscriptionTier === "enterprise")), grant: "call-recordings:read" },
+    ],
+    write: [
+      { description: "Admin only", evaluate: (u) => u.role === "admin", grant: "call-recordings:write" },
+    ],
+  },
+
   // ── Financial & Revenue ─────────────────────────────────
   financial: {
     read: [
@@ -472,4 +505,6 @@ export async function checkAccessFromSession(
 }
 
 export type { AbacResource as Resource }
-export default { checkAccess, checkAccessFromSession, RESOURCES }
+
+const abac = { checkAccess, checkAccessFromSession, RESOURCES }
+export default abac

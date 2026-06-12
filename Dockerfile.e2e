@@ -1,0 +1,41 @@
+# =============================================================================
+# Mapato / RevStack — E2E Test Runner
+#
+# Build & run:
+#   docker compose -f docker-compose.yml -f docker-compose.e2e.yml run --rm e2e
+#
+# Or with a specific test file:
+#   docker compose -f docker-compose.yml -f docker-compose.e2e.yml \
+#     run --rm e2e npx playwright test e2e/dev-mode-checkout.spec.ts
+#
+# Uses Microsoft's official Playwright image with Chromium pre-installed.
+# =============================================================================
+
+FROM mcr.microsoft.com/playwright:v1.60.0-noble
+
+WORKDIR /app
+
+# Copy dependency manifests first for caching
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+# Install pnpm
+RUN npm install -g pnpm@9.15.0
+
+# Install project dependencies (no dev server needed — just test libs & Playwright)
+# Note: uses plain install (not --frozen-lockfile) because this is a test image
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm install
+
+# Copy all source code
+COPY . .
+
+# Generate Prisma client (needed for test DB queries from E2E tests)
+RUN npx prisma generate
+
+# Set environment defaults
+ENV NODE_ENV=development
+ENV BASE_URL=http://app:3000
+ENV PLAYWRIGHT_CHROME_BIN=/usr/bin/chromium
+
+# Default command: run all E2E tests
+CMD ["npx", "playwright", "test", "--reporter=list"]

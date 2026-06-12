@@ -123,7 +123,7 @@ const HermesState = Annotation.Root({
   completed: Annotation<boolean>,
   operationId: Annotation<string>,
   startTime: Annotation<number>,
-  userId: Annotation<string | undefined>(),
+  userId: Annotation<string | undefined>,
 })
 
 // ============================================================

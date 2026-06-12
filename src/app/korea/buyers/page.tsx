@@ -89,6 +89,17 @@ export default function KoreaBuyersPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [submitError, setSubmitError] = useState("")
+  const [matchingData, setMatchingData] = useState<any | null>(null)
+  const [matchingLoading, setMatchingLoading] = useState(false)
+
+  const runBuyerMatching = async () => {
+    setMatchingLoading(true)
+    try {
+      const res = await fetch("/api/korea/matching", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) })
+      const data = await res.json()
+      if (res.ok) setMatchingData(data)
+    } catch (e) { console.error(e) } finally { setMatchingLoading(false) }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -117,8 +128,12 @@ export default function KoreaBuyersPage() {
 
   const loadData = async () => {
     try {
-      const res = await fetch("/api/korea/participants")
-      setParticipants(await res.json())
+      const [participantsRes, matchRes] = await Promise.all([
+        fetch("/api/korea/participants").catch(() => null),
+        fetch("/api/korea/matching").catch(() => null),
+      ])
+      if (participantsRes?.ok) setParticipants(await participantsRes.json())
+      if (matchRes?.ok) setMatchingData(await matchRes.json())
     } catch (e) {
       console.error("Load failed", e)
     } finally {
@@ -553,6 +568,41 @@ export default function KoreaBuyersPage() {
             )}
           </CardContent>
         </form>
+      </Card>
+
+      {/* Matching preview */}
+      <Card className="bg-gradient-to-br from-primary/5 to-blue-500/5 border-primary/10">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" /> 라이브 매칭 (Live Matching)
+          </CardTitle>
+          <CardDescription>실시간 수출업체 매칭 결과</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {matchingLoading && <p className="text-xs text-muted-foreground">매칭 실행 중...</p>}
+          {!matchingLoading && matchingData?.items?.length === 0 && <p className="text-xs text-muted-foreground">아직 매칭 결과가 없습니다. 설정에서 corridor/ERS 데이터를 입력하세요.</p>}
+          {!matchingLoading && matchingData?.items?.length > 0 ? (
+            <div className="space-y-2">
+              {matchingData.items.slice(0, 6).map((item: any) => (
+                <div key={item.id} className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/30">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">{item.name}</p>
+                      <Badge variant="outline" className="text-[9px]">{item.tier}</Badge>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">{item.company} · corridor: {item.corridor}</p>
+                    <p className="text-[10px] text-muted-foreground">ERS {item.ersScore}/100 · {item.readinessLevel}</p>
+                  </div>
+                  <Badge className={cn("text-[9px]", item.ersScore >= 80 ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600")}>{item.ersScore}</Badge>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={runBuyerMatching} disabled={matchingLoading}>
+            {matchingLoading ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
+            매칭 새로고침 (Refresh Matching)
+          </Button>
+        </CardContent>
       </Card>
 
       {/* CTA */}

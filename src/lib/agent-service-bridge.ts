@@ -207,14 +207,10 @@ export async function leadAgentAction(
 
           // Send the appropriate template based on qualification score
           if (qualification.leadScore && qualification.leadScore >= 70) {
+            // Template only supports 1 parameter (name). Extra params are
+            // stripped by sendTemplate which limits to the template's {{n}} count.
             await watiIntegration.sendTemplate(lead.phone, "lead-scored-high", [
               lead.name,
-              lead.company || lead.name,
-              String(qualification.leadScore),
-              "Trading products",
-              "Inquired",
-              "ASAP",
-              lead.email || lead.phone,
             ])
             // Mark as qualified in CRM
             await prisma.client.update({
@@ -2243,7 +2239,7 @@ export async function executeAgentServiceAction(
   }
 }
 
-export default {
+const agentServiceBridge = {
   executeAgentServiceAction,
   getUserPersonalizationContext,
   getCachedUserPersonalization,
@@ -2254,3 +2250,4 @@ export default {
   onboardingAgentAction,
   revenueAgentAction,
 }
+export default agentServiceBridge

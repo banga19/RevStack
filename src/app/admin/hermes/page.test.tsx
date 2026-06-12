@@ -12,6 +12,7 @@
  *   8. Expanded run detail — toggles detail view
  *   9. Action feedback toast — success and error variants
  */
+/* eslint-disable react/display-name */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen } from "@testing-library/react"

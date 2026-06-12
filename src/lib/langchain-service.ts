@@ -146,7 +146,7 @@ export const getEnhancedButtonAction = async (
   return await getButtonAction(enhancedContext);
 };
 
-export default {
+const langchainService = {
   initializeButtonWorkflow,
   getButtonAction,
   getEnhancedButtonAction,
@@ -156,3 +156,4 @@ export default {
   embeddings,
   vectorStore,
 };
+export default langchainService;

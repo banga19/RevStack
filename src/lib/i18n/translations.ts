@@ -221,6 +221,24 @@ export const translations: Record<Language, Record<string, string>> = {
     // Logo cloud
     "logoCloud.title": "Integrated with leading platforms",
 
+    // Region / Localized Pricing
+    "region.label": "Region",
+    "region.ke": "Kenya",
+    "region.tz": "Tanzania",
+    "region.ug": "Uganda",
+    "region.rw": "Rwanda",
+    "region.ng": "Nigeria",
+    "region.gh": "Ghana",
+    "region.sn": "Senegal",
+    "region.intl": "International",
+    "region.pricing": "Pricing in",
+    "region.currency": "Currency",
+    "region.saving": "Save",
+    "region.perYear": "/yr",
+    "region.perMonth": "/mo",
+    "region.payWith": "Pay with",
+    "region.localPrices": "Local prices in {currency}",
+
     // Polsia Comparison Table
     "compare.title": "Mapato vs Polsia: Built for B2B Trade",
     "compare.subtitle": "While Polsia is the AI co-founder for e-commerce businesses, Mapato is purpose-built for B2B trading companies — with half the success fee and trade-specific features.",
@@ -468,6 +486,24 @@ export const translations: Record<Language, Record<string, string>> = {
 
     // Logo cloud
     "logoCloud.title": "Imeunganishwa na majukwaa yanayoongoza",
+
+    // Region / Localized Pricing
+    "region.label": "Eneo",
+    "region.ke": "Kenya",
+    "region.tz": "Tanzania",
+    "region.ug": "Uganda",
+    "region.rw": "Rwanda",
+    "region.ng": "Nigeria",
+    "region.gh": "Ghana",
+    "region.sn": "Senegal",
+    "region.intl": "Kimataifa",
+    "region.pricing": "Bei katika",
+    "region.currency": "Sarafu",
+    "region.saving": "Okoa",
+    "region.perYear": "/mwaka",
+    "region.perMonth": "/mwezi",
+    "region.payWith": "Lipa kwa",
+    "region.localPrices": "Bei za ndani kwa {currency}",
 
     // Polsia Comparison Table
     "compare.title": "Mapato dhidi ya Polsia: Imejengwa kwa Biashara ya B2B",

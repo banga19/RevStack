@@ -6,6 +6,7 @@ import { getSuggestionFromBudget } from "@/lib/pricing"
 import { centralBrain } from "@/lib/hermes-central-brain"
 import { invalidatePersonalizationCache } from "@/lib/agent-service-bridge"
 import { hermesAgent } from "@/lib/hermes-agent"
+import { getTemplateById } from "@/lib/templates"
 
 // Server-side analytics logging
 function logEvent(event: string, data: Record<string, any>) {
@@ -61,7 +62,7 @@ export const POST = withAuth(async (req: NextRequest, { session }) => {
     },
   })
 
-  // Reset trial dates so the 14-day free trial starts NOW (after onboarding completion)
+  // Reset trial dates so the 3-day free trial starts NOW (after onboarding completion)
   const trialStart = new Date()
   const trialEnd = new Date(trialStart.getTime() + 3 * 24 * 60 * 60 * 1000)
   await prisma.user.update({
@@ -151,11 +152,148 @@ export const POST = withAuth(async (req: NextRequest, { session }) => {
     console.error("Onboarding sheets append error:", err)
   }
 
+  // ── Auto-provisioning: deploy starter templates ──────────────────
+  // Creates org, default client, and deploys lead-qualification + onboarding-automation
+  const autoProvisionResults: { templateId: string; success: boolean; error?: string }[] = []
+  let orgId = dbUser.organizationId
+
+  try {
+    // Ensure org exists
+    if (!orgId) {
+      const orgSlug = `org-${dbUser.id.slice(0, 8)}`
+      const org = await prisma.organization.create({
+        data: {
+          name: body.businessName,
+          slug: orgSlug,
+          plan: suggestedTier || "trial",
+        },
+      })
+      orgId = org.id
+      await prisma.user.update({
+        where: { id: dbUser.id },
+        data: { organizationId: orgId },
+      })
+    }
+
+    // Create a default client from onboarding data
+    const defaultClient = await prisma.client.create({
+      data: {
+        userId: dbUser.id,
+        organizationId: orgId,
+        name: body.businessName,
+        company: body.businessName,
+        email: dbUser.email,
+        status: "lead",
+        industry: body.industry,
+        source: "onboarding",
+      },
+    })
+
+    // Deploy the lead qualification template
+    const leadQualTemplate = getTemplateById("lead-qualification")
+    if (leadQualTemplate) {
+      for (const action of leadQualTemplate.actions) {
+        try {
+          switch (action.type) {
+            case "create_outreach_campaign": {
+              await prisma.outreachCampaign.create({
+                data: {
+                  clientId: defaultClient.id,
+                  clientName: body.businessName,
+                  channel: "whatsapp",
+                  type: "warm",
+                  status: "draft",
+                  templateId: leadQualTemplate.id,
+                  sentCount: 0,
+                  replyCount: 0,
+                  bookedCount: 0,
+                },
+              })
+              break
+            }
+            case "create_pipeline_action": {
+              await prisma.pipelineAction.create({
+                data: {
+                  clientId: defaultClient.id,
+                  type: "follow-up",
+                  note: `[Auto-provisioned] ${action.description}`,
+                  status: "pending",
+                  dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000),
+                },
+              })
+              break
+            }
+          }
+        } catch (actionErr) {
+          console.warn(`[Auto-provision] lead-qualification action ${action.type} failed:`, actionErr)
+        }
+      }
+      autoProvisionResults.push({ templateId: leadQualTemplate.id, success: true })
+    }
+
+    // Deploy the onboarding automation template
+    const onboardingTemplate = getTemplateById("onboarding-automation")
+    if (onboardingTemplate) {
+      const checkInDays = typeof onboardingTemplate.defaultConfig.checkInDays === "number"
+        ? onboardingTemplate.defaultConfig.checkInDays
+        : 3
+      for (const action of onboardingTemplate.actions) {
+        try {
+          switch (action.type) {
+            case "create_outreach_campaign": {
+              await prisma.outreachCampaign.create({
+                data: {
+                  clientId: defaultClient.id,
+                  clientName: body.businessName,
+                  channel: "email",
+                  type: "warm",
+                  status: "draft",
+                  templateId: onboardingTemplate.id,
+                  sentCount: 0,
+                  replyCount: 0,
+                  bookedCount: 0,
+                },
+              })
+              break
+            }
+            case "create_pipeline_action": {
+              await prisma.pipelineAction.create({
+                data: {
+                  clientId: defaultClient.id,
+                  type: "onboarding",
+                  note: `[Auto-provisioned] ${action.description}`,
+                  status: "pending",
+                  dueDate: new Date(Date.now() + checkInDays * 24 * 60 * 60 * 1000),
+                },
+              })
+              break
+            }
+          }
+        } catch (actionErr) {
+          console.warn(`[Auto-provision] onboarding-automation action ${action.type} failed:`, actionErr)
+        }
+      }
+      autoProvisionResults.push({ templateId: onboardingTemplate.id, success: true })
+    }
+  } catch (provisionErr) {
+    console.warn("[Auto-provision] Failed:", provisionErr)
+    autoProvisionResults.push({
+      templateId: "auto-provision",
+      success: false,
+      error: (provisionErr as Error).message,
+    })
+  }
+
   return NextResponse.json({
     id: response.id,
     message: "Onboarding complete",
     sheetsOk,
     sheetsError,
+    autoProvisioning: {
+      deployed: autoProvisionResults.filter((r) => r.success).length,
+      failed: autoProvisionResults.filter((r) => !r.success).length,
+      results: autoProvisionResults,
+    },
   }, { status: 201 })
 })
 

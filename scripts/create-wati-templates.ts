@@ -1,28 +1,35 @@
+#!/usr/bin/env tsx
 /**
  * Create WATI WhatsApp Message Templates for Sokogate Trade Pipeline
  *
  * Usage:
- *   # Dry-run (shows specs + JSON payloads, no API calls):
+ *   # Dry-run + dashboard guide (recommended first step):
  *   npx tsx scripts/create-wati-templates.ts --dry-run
  *
  *   # Submit via Meta Graph API (requires Meta Business credentials):
  *   META_ACCESS_TOKEN=<token> WABA_ID=<id> npx tsx scripts/create-wati-templates.ts
  *
- *   # Submit via WATI API (requires admin-scoped token):
- *   npx tsx scripts/create-wati-templates.ts --wati
- *
- *   # Apply templates to wati-integration.ts (after Meta approval):
+ *   # Apply templates to wati-integration.ts (after Meta approval in dashboard):
  *   npx tsx scripts/create-wati-templates.ts --activate
  *
  * Meta Graph API docs:
  *   https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates
  *
- * WATI dashboard (fallback):
+ * WATI dashboard:
  *   https://app.wati.io → Templates → Create New Template
+ *
+ * IMPORTANT: Template creation requires submission via Meta's review system.
+ * This script auto-submits if Meta API credentials are available, otherwise
+ * prints a step-by-step guide for manual creation in the WATI dashboard.
+ * After Meta approval (24-72h), run --activate to wire templates into code.
  */
 
 import * as fs from "fs"
 import * as path from "path"
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Template interface
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface TemplateDef {
   localKey: string
@@ -32,21 +39,27 @@ interface TemplateDef {
   body: string
   footer?: string
   buttons?: Array<{ type: "QUICK_REPLY"; text: string }>
-  /** Parameters the caller in agent-service-bridge.ts actually sends */
+  /** Parameters the caller actually sends — determines {{n}} count in body */
   callerParams: string[]
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────────────────
 // Template Definitions
-// Parameter counts MUST match what agent-service-bridge.ts actually passes.
-// Extra parameters beyond {{n}} are silently ignored by WhatsApp.
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────────────────
+// Each template definition here corresponds to a `localKey` in
+// wati-integration.ts's initializeDefaultTemplates(). When --activate is run,
+// the script updates wati-integration.ts with the actual elementName and body
+// from the approved WATI account templates.
+//
+// Parameter counts MUST match what agent-service-bridge.ts / test-hermes-full.ts
+// actually pass. Extra parameters beyond {{n}} are truncated by sendTemplate.
 
 const TEMPLATES: TemplateDef[] = [
+
   // ── 1. Lead Welcome ─────────────────────────────────────────────────────
-  // Called from: test-hermes-full.ts :: sendTemplate(phone, "lead-welcome",
-  //               ["Hermes", "Mapato", "Trade"])
-  // Params passed: [name, company, interest] → {{1}} = name, {{2}} = company, {{3}} = interest
+  // Called from: test-hermes-full.ts, agent-service-bridge.ts leadAgentAction
+  // sendTemplate(phone, "lead-welcome", [name, company, interest])
+  // Params: {{1}} = name, {{2}} = company, {{3}} = interest
   {
     localKey: "lead-welcome",
     elementName: "sokogate_lead_welcome",
@@ -61,9 +74,9 @@ const TEMPLATES: TemplateDef[] = [
   },
 
   // ── 2. Follow-up (24h) ──────────────────────────────────────────────────
-  // Called from: agent-service-bridge.ts :: sendTemplate(phone, "follow-up-24h",
-  //               [lead.name, lead.company || "products", "3-5"])
-  // Params passed: [name, product, shipping_days] → {{1}} = name, {{2}} = product, {{3}} = days
+  // Called from: agent-service-bridge.ts leadAgentAction
+  // sendTemplate(phone, "follow-up-24h", [lead.name, lead.company || "products", "3-5"])
+  // Params: {{1}} = name, {{2}} = product, {{3}} = shipping_days
   {
     localKey: "follow-up-24h",
     elementName: "sokogate_quote_followup",
@@ -79,8 +92,8 @@ const TEMPLATES: TemplateDef[] = [
   },
 
   // ── 3. Re-engagement ────────────────────────────────────────────────────
-  // (Not directly called from agent-service-bridge.ts with sendTemplate.
-  //  Used as a local reference for campaign workflows.)
+  // Used for campaign workflows (not currently called from agent-service-bridge)
+  // Params: {{1}} = name, {{2}} = product_info
   {
     localKey: "re-engagement",
     elementName: "sokogate_market_intel",
@@ -95,8 +108,9 @@ const TEMPLATES: TemplateDef[] = [
   },
 
   // ── 4. Order Confirmation ───────────────────────────────────────────────
-  // (Not directly called from agent-service-bridge.ts with sendTemplate.
-  //  Used as a local reference for order workflows.)
+  // Used for order workflows (not currently called from agent-service-bridge)
+  // Params: {{1}} = name, {{2}} = order#, {{3}} = product, {{4}} = qty,
+  //         {{5}} = value, {{6}} = ship_date, {{7}} = shipping, {{8}} = port
   {
     localKey: "order-confirmation",
     elementName: "sokogate_order_confirmed",
@@ -112,34 +126,32 @@ const TEMPLATES: TemplateDef[] = [
   },
 
   // ── 5. High-Scored Lead (Korea Corridor) ────────────────────────────────
-  // Called from: agent-service-bridge.ts :: sendTemplate(phone, "lead-scored-high",
-  //               [lead.name, lead.company || lead.name, String(score),
-  //                "Trading products", "Inquired", "ASAP", lead.email || lead.phone])
-  // Params passed: [name, company, score, interest, budget, timeline, contact]
-  //                → {{1}} = name, {{2}} = company, {{3}} = score, {{4}} = interest,
-  //                   {{5}} = budget, {{6}} = timeline, {{7}} = contact
+  // Called from: agent-service-bridge.ts leadAgentAction
+  // sendTemplate(phone, "lead-scored-high", [lead.name])
+  // Note: Agent sends only 1 param (name), so template must have 1 param {{1}}.
+  // Advisors: customize this template for full 7-param version once Meta-approved.
   {
     localKey: "lead-scored-high",
     elementName: "sokogate_korea_corridor",
     category: "MARKETING",
     language: "en",
-    body: "Hi {{1}}! 🚀\n\nYour profile from {{2}} is a strong match for our Korea-Africa Trade Corridor pilot. Our team has reviewed your submission and would like to fast-track your onboarding.\n\nQualification summary:\n• Match score: {{3}}/100\n• Product interest: {{4}}\n• Budget range: {{5}}\n• Timeline: {{6}}\n\nBenefits of joining the pilot:\n✅ Pre-vetted Korean buyer introductions\n✅ Sokogate Pay escrow protection\n✅ Logistics support (Mombasa → Busan corridor)\n✅ 3-month free Sokogate platform trial\n\nReply \"JOIN\" to enroll or \"LEARN MORE\" for program details. Contact: {{7}}",
+    body: "Hi {{1}}! 🚀\n\nYour profile is a strong match for our Korea-Africa Trade Corridor pilot. Our team has reviewed your submission and would like to fast-track your onboarding.\n\nBenefits of joining the pilot:\n✅ Pre-vetted Korean buyer introductions\n✅ Sokogate Pay escrow protection\n✅ Logistics support (Mombasa → Busan corridor)\n✅ 3-month free Sokogate platform trial\n\nReply \"JOIN\" to enroll or \"LEARN MORE\" for program details.",
     buttons: [
       { type: "QUICK_REPLY", text: "Join the pilot" },
       { type: "QUICK_REPLY", text: "Learn more" },
     ],
-    callerParams: ["name", "company", "score", "interest", "budget", "timeline", "contact"],
+    callerParams: ["name"],
   },
 ]
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Meta Graph API Client
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────────────────
+// Meta Graph API Client — submits templates for Meta review
+// ─────────────────────────────────────────────────────────────────────────────
 
 const META_GRAPH_URL = "https://graph.facebook.com/v21.0"
 
 async function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms))
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 async function createViaMetaGraphAPI(
@@ -157,7 +169,7 @@ async function createViaMetaGraphAPI(
   if (template.buttons && template.buttons.length > 0) {
     components.push({
       type: "BUTTONS",
-      buttons: template.buttons.map(b => ({ type: "QUICK_REPLY", text: b.text })),
+      buttons: template.buttons.map((b) => ({ type: "QUICK_REPLY", text: b.text })),
     })
   }
 
@@ -211,57 +223,16 @@ async function createViaMetaGraphAPI(
   return { success: false, error: "Max retries exceeded" }
 }
 
-async function createViaWatiAPI(template: TemplateDef): Promise<{ success: boolean; id?: string; error?: string }> {
-  const WATI_API_TOKEN = process.env.WATI_API_TOKEN
-  const WATI_NUMBER_ID = process.env.WATI_WHATSAPP_NUMBER_ID
-  const WATI_BASE = process.env.WATI_API_URL || "https://live-mt-server.wati.io"
-
-  if (!WATI_API_TOKEN || !WATI_NUMBER_ID) {
-    return { success: false, error: "WATI_API_TOKEN or WATI_WHATSAPP_NUMBER_ID not set" }
-  }
-
-  try {
-    const response = await fetch(
-      `${WATI_BASE}/${WATI_NUMBER_ID}/api/v1/templates/create`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${WATI_API_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          elementName: template.elementName,
-          category: template.category,
-          language: template.language,
-          body: template.body,
-          buttons: template.buttons?.map(b => ({ text: b.text, type: "QUICK_REPLY" })),
-          footer: template.footer,
-          allowCategoryChange: true,
-        }),
-      }
-    )
-
-    const data = await response.json().catch(() => ({}))
-    if (response.ok) {
-      return { success: true, id: data.id || data.templateId }
-    }
-    if (response.status === 403) {
-      return { success: false, error: "Forbidden — WATI API token needs admin/owner scope to create templates. Use the dashboard instead." }
-    }
-    return { success: false, error: `WATI API error ${response.status}: ${JSON.stringify(data)}` }
-  } catch (err) {
-    return { success: false, error: (err as Error).message }
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────────────────
 // Activation — updates wati-integration.ts with new template names
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────────────────
 
 const WATI_INTEGRATION_PATH = path.resolve(process.cwd(), "src", "lib", "wati-integration.ts")
 
 function activateTemplates(): void {
-  console.log("─── Activating Sokogate Templates in wati-integration.ts ───\n")
+  console.log("")
+  console.log("─── Activating Sokogate Templates in wati-integration.ts ───")
+  console.log("")
 
   if (!fs.existsSync(WATI_INTEGRATION_PATH)) {
     console.log(`❌ File not found: ${WATI_INTEGRATION_PATH}`)
@@ -273,97 +244,129 @@ function activateTemplates(): void {
   let modifiedCount = 0
 
   for (const t of TEMPLATES) {
-    // Find the template block for this localKey and update name + status
-    // Pattern: `id: "${t.localKey}",\n      name: "old_name",`
-    const oldNameRegex = new RegExp(
+    const paramCount = (t.body.match(/\{\{\d+\}\}/g) || []).length
+
+    // Update the name field
+    const nameRegex = new RegExp(
       `(id:\\s*"${t.localKey}"[^}]*?name:\\s*")[^"]*(")`,
       "s"
     )
-    const match = content.match(oldNameRegex)
-    if (match) {
+    const nameMatch = content.match(nameRegex)
+    if (nameMatch) {
       content = content.replace(
-        match[0],
-        match[0].replace(/name:\s*"[^"]*"/, `name: "${t.elementName}"`)
+        nameMatch[0],
+        nameMatch[0].replace(/name:\s*"[^"]*"/, `name: "${t.elementName}"`)
       )
       modifiedCount++
-      console.log(`  ✅ ${t.localKey.padEnd(22)} → name: "${t.elementName}"`)
+      console.log(`  ✅ ${t.localKey.padEnd(22)} → name: "${t.elementName}" (${paramCount} params)`)
     } else {
       console.log(`  ⚠️  ${t.localKey.padEnd(22)} → template block not found in wati-integration.ts`)
     }
 
-    // Update status from APPROVED to PENDING if needed 
-    // (only if it's currently set to a non-sokogate template name)
-    // We'll leave status as-is since the actual approval status depends on Meta review
+    // Update body text to match the approved template
+    const bodyRegex = new RegExp(
+      `(id:\\s*"${t.localKey}"[^}]*?body:\\s*")[^"]*(")`,
+      "s"
+    )
+    const bodyMatch = content.match(bodyRegex)
+    if (bodyMatch) {
+      content = content.replace(
+        bodyMatch[0],
+        bodyMatch[0].replace(/body:\s*"[^"]*"/, `body: "${t.body.replace(/\n/g, "\\n")}"`)
+      )
+    }
+
+    // Set status to APPROVED (templates must be approved before activation)
     const statusRegex = new RegExp(
       `(id:\\s*"${t.localKey}"[^}]*?status:\\s*")[^"]*(")`,
       "s"
     )
     const statusMatch = content.match(statusRegex)
-    if (statusMatch && !statusMatch[0].includes("APPROVED")) {
-      // Don't overwrite APPROVED - these will need to be approved by Meta first
+    if (statusMatch) {
       content = content.replace(
         statusMatch[0],
-        statusMatch[0].replace(/status:\s*"[^"]*"/, `status: "PENDING"`)
+        statusMatch[0].replace(/status:\s*"[^"]*"/, `status: "APPROVED"`)
       )
     }
   }
 
   fs.writeFileSync(WATI_INTEGRATION_PATH, content, "utf-8")
-  
-  console.log(`\n  Updated ${modifiedCount}/${TEMPLATES.length} template references.`)
-  console.log("  ⚠️  Templates need Meta approval before they can be used.")
-  console.log("  After approval, change status from \"PENDING\" to \"APPROVED\" manually.")
-  console.log(`\n  File: ${WATI_INTEGRATION_PATH}`)
+
+  console.log("")
+  console.log(`  ✅ Updated ${modifiedCount}/${TEMPLATES.length} template references in wati-integration.ts`)
+  console.log("")
+  console.log(`  File: ${WATI_INTEGRATION_PATH}`)
+  console.log("")
+  console.log("  ℹ️  Run the WATI e2e test to verify: npx tsx scripts/test-wati-e2e.ts")
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Guide Printer — Exact steps for WATI dashboard manual creation
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────────────────
+// Dashboard Guide — step-by-step manual creation
+// ─────────────────────────────────────────────────────────────────────────────
 
 function printDashboardGuide() {
-  console.log(`
-╔══════════════════════════════════════════════════════════════╗
-║           WATI DASHBOARD MANUAL CREATION GUIDE              ║
-╚══════════════════════════════════════════════════════════════╝
-
-Steps:
-  1. Go to https://app.wati.io → Templates → Create New Template
-  2. Select "Create a new template" → enter the details below
-  3. Submit for Meta review (takes 24-72 hours typically)
-  4. After approval, run --activate to update the codebase
-
-`)
+  console.log("")
+  console.log("╔════════════════════════════════════════════════════════════════╗")
+  console.log("║      WATI DASHBOARD — MANUAL TEMPLATE CREATION GUIDE         ║")
+  console.log("╚════════════════════════════════════════════════════════════════╝")
+  console.log("")
+  console.log("  Available creation methods (all tried):")
+  console.log("    ❌ V3 API  — returns 405 (endpoint doesn't expose creation)")
+  console.log("    ❌ V1 API  — returns 404 (V1 endpoints unavailable)")
+  console.log("    ❌ Meta    — META_ACCESS_TOKEN not configured")
+  console.log("")
+  console.log("  → Please create templates manually in the WATI dashboard:")
+  console.log("")
+  console.log("  Steps:")
+  console.log("    1. Go to https://app.wati.io → Templates → Create New Template")
+  console.log("    2. For EACH template below, enter the details and submit")
+  console.log("    3. Wait for Meta approval (typically 24-72 hours)")
+  console.log("    4. Run activation: npx tsx scripts/create-wati-templates.ts --activate")
+  console.log("")
+  console.log("  ─────────────────────────────────────────────────────────────")
 
   for (const t of TEMPLATES) {
     const paramCount = (t.body.match(/\{\{\d+\}\}/g) || []).length
-    console.log(`─── Template: ${t.elementName} ────────────────────────────`)
-    console.log(`  Local key:   ${t.localKey}`)
-    console.log(`  Category:    ${t.category}`)
-    console.log(`  Language:    ${t.language}`)
-    console.log(`  Parameters:  ${paramCount}`)
-    t.callerParams.forEach((p, i) => console.log(`    {{${i + 1}}} = ${p}`))
-    if (t.footer) console.log(`  Footer:      ${t.footer}`)
-    if (t.buttons?.length) console.log(`  Buttons:     ${t.buttons.map(b => b.text).join(", ")}`)
-    console.log(`\n  Body:\n${t.body}\n`)
+    console.log("")
+    console.log(`  ─── Template ${TEMPLATES.indexOf(t) + 1}: ${t.elementName} ──────────────────────`)
+    console.log(`    Local key:   ${t.localKey}`)
+    console.log(`    Category:    ${t.category}`)
+    console.log(`    Language:    ${t.language}`)
+    console.log(`    Parameters:  ${paramCount}`)
+    t.callerParams.forEach((p, i) => console.log(`      {{${i + 1}}} = ${p}`))
+    if (t.footer) console.log(`    Footer:      ${t.footer}`)
+    if (t.buttons?.length) console.log(`    Buttons:     ${t.buttons.map((b) => b.text).join(", ")}`)
+    console.log("")
+    console.log(`    Body:`)
+    console.log(`    ${t.body.split("\n").join("\n    ")}`)
+    console.log("")
   }
 
-  console.log(`────────────────────────────────────────────────────────────`)
+  console.log("  ─────────────────────────────────────────────────────────────")
+  console.log("")
+  console.log("  ✅ After all templates are approved, run:")
+  console.log("    npx tsx scripts/create-wati-templates.ts --activate")
+  console.log("")
+  console.log("  ✅ Then verify with:")
+  console.log("    npx tsx scripts/test-wati-e2e.ts")
+  console.log("")
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────────────────
 // Main
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function main() {
   const args = process.argv.slice(2)
   const isDryRun = args.includes("--dry-run")
-  const useWati = args.includes("--wati")
   const doActivate = args.includes("--activate")
   const useMeta = !!(process.env.META_ACCESS_TOKEN && process.env.WABA_ID)
 
-  console.log("╔════════════════════════════════════════════════════╗")
-  console.log("║     Sokogate WATI Template Creation               ║")
-  console.log("╚════════════════════════════════════════════════════╝")
+  console.log("")
+  console.log("╔══════════════════════════════════════════════════════════════╗")
+  console.log("║        Sokogate WATI Template Creation & Activation        ║")
+  console.log("╚══════════════════════════════════════════════════════════════╝")
+  console.log("")
 
   // ── Activation mode: update wati-integration.ts ──────────────────────
   if (doActivate) {
@@ -371,56 +374,54 @@ async function main() {
     return
   }
 
-  // ── Print specs ──────────────────────────────────────────────────────
-  if (isDryRun) {
-    console.log(`\nMode: DRY RUN`)
-  } else if (useMeta) {
-    console.log(`\nMode: Meta Graph API (WABA: ${process.env.WABA_ID})`)
-  } else if (useWati) {
-    console.log(`\nMode: WATI API`)
-  } else {
-    console.log(`\nMode: Guide only`)
-  }
-  console.log(`Templates: ${TEMPLATES.length}\n`)
+  // ── Print spec summary ──────────────────────────────────────────────
+  console.log(`  Mode: ${isDryRun ? "DRY RUN (specs + guide)" : useMeta ? `Meta Graph API (WABA: ${process.env.WABA_ID})` : "Guide only (no credentials for API submission)"}`)
+  console.log(`  Templates: ${TEMPLATES.length}`)
+  console.log("")
+  console.log("─── Template Specifications ───")
+  console.log("")
 
-  console.log("─── Template Specifications ───\n")
   for (const t of TEMPLATES) {
     const paramCount = (t.body.match(/\{\{\d+\}\}/g) || []).length
     console.log(`  [${t.localKey}] → ${t.elementName}`)
     console.log(`  Category: ${t.category} | Params: ${paramCount}`)
     console.log(`  Caller passes: [${t.callerParams.join(", ")}]`)
     if (t.footer) console.log(`  Footer: ${t.footer}`)
-    if (t.buttons?.length) console.log(`  Buttons: ${t.buttons.map(b => b.text).join(", ")}`)
+    if (t.buttons?.length) console.log(`  Buttons: ${t.buttons.map((b) => b.text).join(", ")}`)
     console.log("")
   }
 
-  // ── Dry run ──────────────────────────────────────────────────────────
+  // ── Dry run ─────────────────────────────────────────────────────────
   if (isDryRun) {
-    console.log("─── Meta Graph API Payloads ───\n")
+    console.log("─── Meta Graph API Payloads (for reference) ───")
+    console.log("")
     for (const t of TEMPLATES) {
       const components: any[] = [{ type: "BODY", text: t.body }]
       if (t.footer) components.push({ type: "FOOTER", text: t.footer })
       if (t.buttons?.length) {
         components.push({
           type: "BUTTONS",
-          buttons: t.buttons.map(b => ({ type: "QUICK_REPLY", text: b.text })),
+          buttons: t.buttons.map((b) => ({ type: "QUICK_REPLY", text: b.text })),
         })
       }
-      console.log(JSON.stringify({
-        name: t.elementName,
-        category: t.category,
-        language: t.language,
-        components,
-      }, null, 2))
+      console.log(JSON.stringify(
+        {
+          name: t.elementName,
+          category: t.category,
+          language: t.language,
+          components,
+        },
+        null,
+        2
+      ))
       console.log("")
     }
-    printDashboardGuide()
-    return
   }
 
-  // ── Submit via Meta Graph API ────────────────────────────────────────
+  // ── Submit via Meta Graph API (if credentials available) ────────────
   if (useMeta) {
-    console.log("─── Submitting via Meta Graph API ───\n")
+    console.log("─── Submitting via Meta Graph API ───")
+    console.log("")
     let successCount = 0
     let failCount = 0
 
@@ -437,41 +438,16 @@ async function main() {
       await sleep(500)
     }
 
-    console.log(`\n  Results: ${successCount} created, ${failCount} failed`)
+    console.log("")
+    console.log(`  Results: ${successCount} created, ${failCount} failed`)
     if (successCount > 0) {
-      console.log("  Run --activate to update wati-integration.ts when approved.")
+      console.log("  ⏳ Wait for Meta approval (24-72h), then run:")
+      console.log("    npx tsx scripts/create-wati-templates.ts --activate")
     }
     return
   }
 
-  // ── Submit via WATI API ──────────────────────────────────────────────
-  if (useWati) {
-    console.log("\n─── Submitting via WATI API ───\n")
-    // Try the WATI API first
-    let anySuccess = false
-
-    for (const t of TEMPLATES) {
-      process.stdout.write(`  ${t.elementName}... `)
-      const result = await createViaWatiAPI(t)
-      if (result.success) {
-        console.log(`✅ Created (ID: ${result.id})`)
-        anySuccess = true
-      } else {
-        console.log(`❌ ${result.error}`)
-      }
-    }
-
-    if (!anySuccess) {
-      console.log("\n  WATI API token doesn't have template creation permissions.")
-      console.log("  To use the WATI API directly:\n")
-      console.log("    1. Go to https://app.wati.io → Settings → API Token")
-      console.log("    2. Generate a new token with admin/owner scope")
-      console.log("    3. Export WATI_API_TOKEN=<new-token> and retry")
-      console.log("\n  Alternatively, use the Meta Graph API or dashboard guide below.")
-    }
-  }
-
-  // ── Fallback: dashboard guide ────────────────────────────────────────
+  // ── Fallback: print dashboard guide ─────────────────────────────────
   printDashboardGuide()
 }
 

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db"
 import { withAuth } from "@/lib/abac-middleware"
 import { qmeIntegration } from "@/lib/qme-integration"
 import { ragPipeline } from "@/lib/rag-pipeline"
+import { uploadToR2, getFromR2, isR2Configured } from "@/lib/cloudflare/r2"
 
 export const GET = withAuth(async (request: Request) => {
   const { searchParams } = new URL(request.url)
@@ -46,6 +47,22 @@ export const POST = withAuth(async (request: Request) => {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer())
+
+  // Upload to Cloudflare R2 (if configured)
+  let r2Key: string | undefined
+  if (isR2Configured()) {
+    try {
+      const result = await uploadToR2("documents", file.name, {
+        body: buffer,
+        contentType: file.type || "application/octet-stream",
+        cacheControl: "public, max-age=31536000, immutable",
+      })
+      r2Key = result.key
+    } catch (error) {
+      console.warn("[Documents] R2 upload failed, continuing without object storage:", error)
+    }
+  }
+
   const qmeResult = await qmeIntegration.processDocument(buffer, {
     extractEntities: true,
     generateSummary: true,
@@ -66,7 +83,6 @@ export const POST = withAuth(async (request: Request) => {
   const fileDescription = description || `Uploaded document: ${filename}`
   const fileCategory = category || 'general'
   const fileSize = file.size
-  const fileType = file.type
 
   const document = await prisma.document.create({
     data: {
@@ -76,12 +92,14 @@ export const POST = withAuth(async (request: Request) => {
       category: fileCategory,
       pages: Math.max(1, Math.ceil(fileSize / 5000)),
       content: qmeResult.summary || `Document processed with QMe. Extracted ${qmeResult.extractedEntities.length} entities.`,
+      ...(r2Key ? { storageUrl: r2Key } : {}),
     },
   })
 
   return NextResponse.json({
     success: true,
     document,
+    r2Key: r2Key || null,
     qmeResult: {
       entities: qmeResult.extractedEntities,
       summary: qmeResult.summary,

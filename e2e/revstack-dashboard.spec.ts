@@ -1,13 +1,14 @@
 /**
- * Playwright E2E test: RevStack dashboard — invoice list and client health widgets.
+ * Playwright E2E test: RevStack dashboard — analytics, forecast, and client health widgets.
  *
  * Flow:
  *   1. Seed a dedicated test user
- *   2. Log in via DOM form POST (same proven pattern as checkout-flow.spec.ts)
- *      with callbackUrl=/revstack so NextAuth redirects straight there
- *   3. Intercept /api/central-brain/revstack with mock invoice and health data
- *   4. Verify the invoice list widget renders (titles, rows, statuses, amounts)
- *   5. Verify the client health score widget renders (titles, scores, tiers, badges)
+ *   2. Log in via DOM form POST with callbackUrl=/revstack
+ *   3. Intercept /api/central-brain/revstack AND /api/revstack/analytics/forecast
+ *      with mock data matching the current page's expected data structure
+ *   4. Verify KPI cards, revenue forecast chart, pipeline funnel, revenue summary,
+ *      client health distribution, scored client rows, and at-risk section
+ *   5. Verify empty state when no data is available
  *
  * Prerequisites:
  *   - Dev server running on localhost:3000
@@ -108,10 +109,7 @@ async function blockBackgroundRequests(page: Page) {
 /**
  * Authenticate by DOM form POST to the NextAuth credentials callback.
  * Uses callbackUrl=/revstack so the post-login hard redirect lands straight
- * on the RevStack dashboard (no intermediate /dashboard hop).
- *
- * This is the exact same proven pattern used by checkout-flow.spec.ts and
- * dev-mode-checkout.spec.ts — it bypasses React strict mode / router issues.
+ * on the RevStack dashboard.
  */
 async function loginAsTestUser(page: Page) {
   await blockBackgroundRequests(page)
@@ -153,15 +151,9 @@ async function loginAsTestUser(page: Page) {
     { email: TEST_EMAIL, password: TEST_PASSWORD, csrfToken }
   )
 
-  // Accept either /revstack (success) or /login (failure) so we get a clear
-  // error instead of a 90s blind timeout when something goes wrong.
   await page.waitForURL(/revstack|login/, { timeout: 90000 })
 
   if (page.url().includes("/login")) {
-    const errorMsg = page.locator("text=Invalid email or password")
-    if (await errorMsg.isVisible({ timeout: 2000 }).catch(() => false)) {
-      throw new Error("Login failed: invalid credentials for " + TEST_EMAIL)
-    }
     throw new Error("Login failed: redirected back to /login after POST to credentials callback")
   }
 
@@ -169,13 +161,18 @@ async function loginAsTestUser(page: Page) {
   await page.waitForTimeout(500)
 }
 
-function getMockRevStackData() {
-  const now = new Date()
-  const dueSoon = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString()
-  const dueLater = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString()
-  const issued = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString()
-  const paidAt = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString()
+// ═══════════════════════════════════════════════════════════════════════════
+// Mock Data — matches the shape of GET /api/revstack/analytics/forecast
+// ═══════════════════════════════════════════════════════════════════════════
 
+const NOW = new Date()
+
+function getMonthLabel(offset: number): string {
+  const d = new Date(NOW.getFullYear(), NOW.getMonth() + offset, 1)
+  return d.toLocaleString("default", { month: "short", year: "2-digit" })
+}
+
+function getForecastMockData() {
   return {
     stats: {
       totalLeads: 42,
@@ -187,125 +184,116 @@ function getMockRevStackData() {
       totalMessages: 124,
       hermesRunsToday: 7,
     },
-    revenue: [
-      { month: "Jan", revenue: 5000, newClients: 1 },
-      { month: "Feb", revenue: 6200, newClients: 2 },
-      { month: "Mar", revenue: 7100, newClients: 1 },
-      { month: "Apr", revenue: 7800, newClients: 2 },
-      { month: "May", revenue: 8200, newClients: 1 },
-      { month: "Jun", revenue: 8500, newClients: 0 },
-    ],
-    pipeline: { new: 10, qualified: 18, disqualified: 8, converted: 6 },
-    activity: [
-      {
-        id: "act-1",
-        type: "followup_sent",
-        description: "Follow-up sent to Acme Corp",
-        entityType: "followup",
-        createdAt: now.toISOString(),
-      },
-      {
-        id: "act-2",
-        type: "client_onboarded",
-        description: "New client onboarded: Globex Inc",
-        entityType: "client",
-        createdAt: new Date(now.getTime() - 3600000).toISOString(),
-      },
-    ],
-    runs: [
-      {
-        id: "run-1",
-        taskType: "qualify_leads",
-        status: "completed",
-        output: "Processed 15 leads",
-        leadsProcessed: 15,
-        messagesQueued: null,
-        createdAt: new Date(now.getTime() - 7200000).toISOString(),
-        completedAt: new Date(now.getTime() - 7000000).toISOString(),
-      },
-    ],
-    invoices: [
-      {
-        id: "inv-1",
-        invoiceNumber: "INV-001",
-        amountUsd: 2500,
-        currency: "USD",
-        status: "paid",
-        dueDate: dueLater,
-        issuedAt: issued,
-        paidAt: paidAt,
-        notes: null,
-        client: { name: "Acme Corp", company: "Acme Industries" },
-      },
-      {
-        id: "inv-2",
-        invoiceNumber: "INV-002",
-        amountUsd: 1800,
-        currency: "USD",
-        status: "sent",
-        dueDate: dueSoon,
-        issuedAt: issued,
-        paidAt: null,
-        notes: "Q2 retainer",
-        client: { name: "Globex Inc", company: "Globex Ltd" },
-      },
-      {
-        id: "inv-3",
-        invoiceNumber: "INV-003",
-        amountUsd: 1200,
-        currency: "USD",
-        status: "overdue",
-        dueDate: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        issuedAt: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-        paidAt: null,
-        notes: null,
-        client: { name: "Initech", company: "Initech Corp" },
-      },
-    ],
-    invoiceMetrics: {
-      totalOutstanding: 3000,
-      overdueCount: 1,
-      paidThisMonth: 1,
-      totalInvoices: 3,
+    forecast: {
+      monthly: (() => {
+        const months = []
+        for (let i = -6; i <= 2; i++) {
+          months.push({
+            month: `${NOW.getFullYear()}-${String(NOW.getMonth() + i + 1).padStart(2, "0")}`,
+            label: getMonthLabel(i),
+            actual: i < 0 ? 5000 + (i + 6) * 600 : 0,
+            projected: i >= 0 ? 8600 + i * 200 : 0,
+            newClients: i < 0 ? Math.abs(i % 2) : 1,
+            invoices: i < 0 ? 3000 + (i + 6) * 400 : 0,
+          })
+        }
+        return months
+      })(),
+      currentMrr: 8500,
+      projectedMrr: 9000,
+      totalInvoiced: 18500,
+      paidInvoiced: 14000,
+      outstanding: 4500,
+    },
+    pipeline: {
+      totalLeads: 42,
+      byStage: { new: 10, qualified: 18, disqualified: 8, converted: 6 },
+      conversionRate: 32,
+      avgConversionDays: 18,
+      totalFollowups: 24,
+      responseRate: 45,
+      totalMessages: 124,
+      activeClients: 12,
     },
     clientHealth: {
-      scoredClients: [
+      scored: [
         {
           id: "client-1",
           name: "Acme Corp",
           company: "Acme Industries",
-          status: "active",
-          tier: "healthy",
           score: 88,
+          tier: "healthy",
+          scoreFactors: { revenue: 30, engagement: 20, compliance: 18, status: 12, tenure: 8 },
           retainerValue: 2500,
-          factors: { revenue: 90, engagement: 85, compliance: 95, status: 90, tenure: 80 },
+          lastInvoiceDate: new Date(NOW.getTime() - 2 * 86400000).toISOString(),
         },
         {
           id: "client-2",
           name: "Globex Inc",
           company: "Globex Ltd",
-          status: "active",
-          tier: "medium",
           score: 62,
+          tier: "medium",
+          scoreFactors: { revenue: 15, engagement: 12, compliance: 15, status: 10, tenure: 10 },
           retainerValue: 1800,
-          factors: { revenue: 70, engagement: 55, compliance: 60, status: 65, tenure: 60 },
+          lastInvoiceDate: new Date(NOW.getTime() - 15 * 86400000).toISOString(),
         },
         {
           id: "client-3",
           name: "Initech",
           company: "Initech Corp",
-          status: "active",
-          tier: "high-risk",
           score: 34,
+          tier: "at-risk",
+          scoreFactors: { revenue: 8, engagement: 5, compliance: 8, status: 5, tenure: 8 },
           retainerValue: 1200,
-          factors: { revenue: 30, engagement: 25, compliance: 40, status: 35, tenure: 40 },
+          lastInvoiceDate: null,
         },
       ],
       healthyCount: 1,
-      mediumRiskCount: 1,
-      highRiskCount: 1,
+      mediumCount: 1,
+      riskCount: 1,
       totalScored: 3,
       averageScore: 61,
+    },
+  }
+}
+
+function getEmptyForecastData() {
+  return {
+    stats: {
+      totalLeads: 0,
+      qualifiedLeads: 0,
+      activeClients: 0,
+      monthlyRecurringRevenue: 0,
+      pendingFollowups: 0,
+      conversionRate: 0,
+      totalMessages: 0,
+      hermesRunsToday: 0,
+    },
+    forecast: {
+      monthly: [],
+      currentMrr: 0,
+      projectedMrr: 0,
+      totalInvoiced: 0,
+      paidInvoiced: 0,
+      outstanding: 0,
+    },
+    pipeline: {
+      totalLeads: 0,
+      byStage: { new: 0, qualified: 0, disqualified: 0, converted: 0 },
+      conversionRate: 0,
+      avgConversionDays: null,
+      totalFollowups: 0,
+      responseRate: 0,
+      totalMessages: 0,
+      activeClients: 0,
+    },
+    clientHealth: {
+      scored: [],
+      healthyCount: 0,
+      mediumCount: 0,
+      riskCount: 0,
+      totalScored: 0,
+      averageScore: 0,
     },
   }
 }
@@ -331,17 +319,15 @@ test.afterAll(async () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe("RevStack Dashboard", () => {
-  test("invoice list and client health widgets render correctly", async ({ page }) => {
+  test("widgets render correctly with data", async ({ page }) => {
     // ── Step 1: Log in (callbackUrl=/revstack → lands on /revstack) ───
     await loginAsTestUser(page)
-
-    // Sanity check: we must already be on /revstack after login
     expect(page.url()).toContain("/revstack")
 
-    // ── Step 2: Intercept the central-brain API with mock data ─────────
-    const mockData = getMockRevStackData()
+    // ── Step 2: Intercept both API endpoints the page fetches ──────────
+    const mockData = getForecastMockData()
 
-    await page.route("**/api/central-brain/revstack", async (route: Route) => {
+    await page.route("**/api/central-brain/revstack**", async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -349,7 +335,7 @@ test.describe("RevStack Dashboard", () => {
       })
     })
 
-    await page.route("**/api/central-brain/revstack?*", async (route: Route) => {
+    await page.route("**/api/revstack/analytics/forecast**", async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -357,88 +343,120 @@ test.describe("RevStack Dashboard", () => {
       })
     })
 
-    // ── Step 3: Reload so the intercepts catch the page's data fetch ───
+    // ── Step 3: Reload so intercepts catch the page's data fetch ──────
     await page.reload({ waitUntil: "load" })
     await dismissCookieConsent(page)
 
-    // Wait for the dashboard content to appear
-    await expect(page.locator("text=RevStack Dashboard")).toBeVisible({ timeout: 20000 })
+    // Wait for dashboard content to appear
+    await expect(page.locator("h1", { hasText: "RevStack Dashboard" })).toBeVisible({ timeout: 20000 })
     await page.waitForLoadState("networkidle").catch(() => {})
     await page.waitForTimeout(500)
 
-    // ── Step 4: Verify invoice list widget renders ──────────────────────
-    await expect(page.locator("text=Recent Invoices")).toBeVisible()
-    await expect(page.locator("text=Latest invoices from active retainers")).toBeVisible()
+    // ── Step 4: Verify KPI cards ──────────────────────────────────────
+    await expect(page.locator("text=MRR")).toBeVisible()
+    await expect(page.locator("text=$8,500")).toBeVisible()
+    await expect(page.locator("text=Leads")).toBeVisible()
+    await expect(page.locator("text=42")).toBeVisible()
+    await expect(page.locator("text=Clients")).toBeVisible()
+    await expect(page.locator("text=Pipeline Velocity")).toBeVisible()
 
-    // Verify metrics badges are present
-    await expect(page.locator("text=$3,000 outstanding")).toBeVisible()
-    await expect(page.locator("text=1 overdue")).toBeVisible()
+    // KPI subtitles
+    await expect(page.locator("text=1 healthy · 1 at risk").first()).toBeVisible()
+    await expect(page.locator("text=Growing")).toBeVisible()
 
-    // Verify individual invoice rows
-    await expect(page.locator("text=INV-001")).toBeVisible()
-    await expect(page.locator("text=INV-002")).toBeVisible()
-    await expect(page.locator("text=INV-003")).toBeVisible()
+    // ── Step 5: Verify Revenue Forecast section ────────────────────────
+    await expect(page.locator("text=Revenue Forecast")).toBeVisible()
+    await expect(page.locator("text=6-month actuals + 3-month projection")).toBeVisible()
+    // Projected badge
+    await expect(page.locator("text=$9,000 projected")).toBeVisible()
 
-    // Verify invoice statuses
-    await expect(page.locator("text=paid").first()).toBeVisible()
-    await expect(page.locator("text=sent").first()).toBeVisible()
-    await expect(page.locator("text=overdue").first()).toBeVisible()
+    // ── Step 6: Verify Pipeline Funnel section ─────────────────────────
+    await expect(page.locator("text=Pipeline Funnel")).toBeVisible()
+    await expect(page.locator("text=Lead stages from new to converted")).toBeVisible()
+    await expect(page.locator("text=32% conversion")).toBeVisible()
 
-    // Verify client names appear in invoice rows
+    // Stage values
+    await expect(page.locator("text=18").first()).toBeVisible()
+    await expect(page.locator("text=6").first()).toBeVisible()
+
+    // Velocity metrics
+    await expect(page.locator("text=18d").first()).toBeVisible()
+    await expect(page.locator("text=45% response rate")).toBeVisible()
+    await expect(page.locator("text=24 follow-ups")).toBeVisible()
+
+    // ── Step 7: Verify Revenue Summary section ─────────────────────────
+    await expect(page.locator("text=Revenue Summary")).toBeVisible()
+    await expect(page.locator("text=Invoiced, collected, and outstanding")).toBeVisible()
+    await expect(page.locator("text=Monthly Recurring Revenue")).toBeVisible()
+    await expect(page.locator("text=Total Invoiced")).toBeVisible()
+    await expect(page.locator("text=$18,500")).toBeVisible()
+    await expect(page.locator("text=Collected")).toBeVisible()
+    await expect(page.locator("text=$14,000")).toBeVisible()
+    await expect(page.locator("text=Outstanding")).toBeVisible()
+    await expect(page.locator("text=$4,500")).toBeVisible()
+
+    // ── Step 8: Verify Client Health Distribution section ──────────────
+    await expect(page.locator("text=Client Health Distribution")).toBeVisible()
+    await expect(page.locator("text=3 clients · Avg 61/100")).toBeVisible()
+
+    // Health badges
+    await expect(page.locator("text=1 at risk").first()).toBeVisible()
+    await expect(page.locator("text=1 healthy").first()).toBeVisible()
+
+    // Legend labels in the donut
+    await expect(page.locator("text=Healthy").first()).toBeVisible()
+    await expect(page.locator("text=Medium").first()).toBeVisible()
+    await expect(page.locator("text=At Risk").first()).toBeVisible()
+
+    // ── Step 9: Verify At-Risk Clients section ─────────────────────────
+    await expect(page.locator("text=At-Risk Clients")).toBeVisible()
+    await expect(
+      page.locator("text=These clients need attention")
+    ).toBeVisible()
+    await expect(page.locator("text=Initech").first()).toBeVisible()
+    await expect(page.locator("text=Initech Corp").first()).toBeVisible()
+    // Factor labels displayed for at-risk client
+    await expect(page.locator("text=Revenue:").first()).toBeVisible()
+
+    // ── Step 10: Verify All Client Health Scores section ───────────────
+    await expect(page.locator("text=All Client Health Scores")).toBeVisible()
+
+    // Client names in the scored list
     await expect(page.locator("text=Acme Corp").first()).toBeVisible()
     await expect(page.locator("text=Globex Inc").first()).toBeVisible()
     await expect(page.locator("text=Initech").first()).toBeVisible()
 
-    // Verify amounts
-    await expect(page.locator("text=$2,500.00")).toBeVisible()
-    await expect(page.locator("text=$1,800.00")).toBeVisible()
-    await expect(page.locator("text=$1,200.00")).toBeVisible()
-
-    // ── Step 5: Verify client health score widget renders ───────────────
-    await expect(page.locator("text=Client Health Scores")).toBeVisible()
-    await expect(page.locator("text=3 active clients · Avg 61/100")).toBeVisible()
-
-    // Verify health badges
-    await expect(page.locator("text=1 healthy")).toBeVisible()
-    await expect(page.locator("text=1 at risk")).toBeVisible()
-
-    // Verify scored client entries
+    // Score values (displayed as badge numbers)
     await expect(page.locator("text=88").first()).toBeVisible()
     await expect(page.locator("text=62").first()).toBeVisible()
-    await expect(page.locator("text=34").first()).toBeVisible()
 
-    // Verify tier badges
-    await expect(page.locator("text=healthy").first()).toBeVisible()
-    await expect(page.locator("text=medium").first()).toBeVisible()
-    await expect(page.locator("text=high-risk").first()).toBeVisible()
+    // Tier badges
+    await expect(page.locator("text=healthy")).toBeVisible()
+    await expect(page.locator("text=medium")).toBeVisible()
+    await expect(page.locator("text=at-risk")).toBeVisible()
 
-    // Verify retainer values are shown
-    await expect(page.locator("text=$2,500.00/mo")).toBeVisible()
-    await expect(page.locator("text=$1,800.00/mo")).toBeVisible()
-    await expect(page.locator("text=$1,200.00/mo")).toBeVisible()
+    // Retainer values shown
+    await expect(page.locator("text=$2,500/mo")).toBeVisible()
+    await expect(page.locator("text=$1,800/mo")).toBeVisible()
+    await expect(page.locator("text=$1,200/mo")).toBeVisible()
 
-    // Verify factor legend is present
-    await expect(page.locator("text=Revenue")).toBeVisible()
-    await expect(page.locator("text=Engagement")).toBeVisible()
-    await expect(page.locator("text=Compliance")).toBeVisible()
-    await expect(page.locator("text=Status")).toBeVisible()
-    await expect(page.locator("text=Tenure")).toBeVisible()
+    // Factor legend at the bottom
+    await expect(page.locator("text=Revenue").last()).toBeVisible()
+    await expect(page.locator("text=Engagement").last()).toBeVisible()
+    await expect(page.locator("text=Compliance").last()).toBeVisible()
+    await expect(page.locator("text=Status").last()).toBeVisible()
+    await expect(page.locator("text=Tenure").last()).toBeVisible()
   })
 
-  test("invoice and health widgets show empty state when no data", async ({ page }) => {
+  test("shows empty state when no data", async ({ page }) => {
     // ── Step 1: Log in ──────────────────────────────────────────────────
     await loginAsTestUser(page)
     expect(page.url()).toContain("/revstack")
 
-    // ── Step 2: Intercept with empty invoices and clientHealth ──────────
-    const emptyData = {
-      ...getMockRevStackData(),
-      invoices: [],
-      invoiceMetrics: { totalOutstanding: 0, overdueCount: 0, paidThisMonth: 0, totalInvoices: 0 },
-      clientHealth: { scoredClients: [], healthyCount: 0, mediumRiskCount: 0, highRiskCount: 0, totalScored: 0, averageScore: 0 },
-    }
+    // ── Step 2: Intercept with empty data ───────────────────────────────
+    const emptyData = getEmptyForecastData()
 
-    await page.route("**/api/central-brain/revstack", async (route: Route) => {
+    await page.route("**/api/central-brain/revstack**", async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -446,7 +464,7 @@ test.describe("RevStack Dashboard", () => {
       })
     })
 
-    await page.route("**/api/central-brain/revstack?*", async (route: Route) => {
+    await page.route("**/api/revstack/analytics/forecast**", async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -458,21 +476,19 @@ test.describe("RevStack Dashboard", () => {
     await page.reload({ waitUntil: "load" })
     await dismissCookieConsent(page)
 
-    await expect(page.locator("text=RevStack Dashboard")).toBeVisible({ timeout: 20000 })
-    await page.waitForLoadState("networkidle").catch(() => {})
-    await page.waitForTimeout(500)
+    await page.waitForTimeout(2000)
 
-    // ── Step 4: Verify empty state messages ─────────────────────────────
+    // ── Step 4: Verify empty state ──────────────────────────────────────
+    await expect(page.locator("h1", { hasText: "RevStack Dashboard" })).toBeVisible({ timeout: 20000 })
+
+    // Empty state messaging
+    await expect(page.locator("text=No Data Yet")).toBeVisible()
     await expect(
-      page.locator("text=No invoices yet — run RevStack Operations to generate invoices from active retainers")
+      page.locator("text=Add leads, clients, and retainers to populate your dashboard")
     ).toBeVisible()
 
-    await expect(
-      page.locator("text=No clients scored yet — clients need active status and data to generate health scores")
-    ).toBeVisible()
-
-    // Metrics badges should not be present when metrics are empty
-    await expect(page.locator("text=$0 outstanding")).not.toBeVisible()
-    await expect(page.locator("text=0 at risk")).not.toBeVisible()
+    // Action buttons in empty state
+    await expect(page.locator("button", { hasText: "Add Leads" })).toBeVisible()
+    await expect(page.locator("button", { hasText: "Refresh" })).toBeVisible()
   })
 })

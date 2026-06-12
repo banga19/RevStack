@@ -42,16 +42,18 @@ function buildCsp(frameAncestors: string): string {
   const directives = [
     // Default: only same-origin
     "default-src 'self'",
-    // Scripts: allow 'unsafe-inline' for Next.js hydration
-    `script-src 'self' 'unsafe-inline' 'unsafe-eval'`,
+    // Scripts: allow 'unsafe-inline' for Next.js hydration + Cloudflare Turnstile
+    `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com`,
     // Styles: allow inline styles (Next.js, recharts, framer-motion)
     `style-src 'self' 'unsafe-inline'`,
-    // Images: allow data: URIs and blob: for charts
-    "img-src 'self' data: blob:",
+    // Images: allow data: URIs and blob: for charts + Cloudflare Images/ R2
+    "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://*.cloudflareimages.com",
+    // Frames: allow Cloudflare Turnstile challenge
+    "frame-src 'self' https://challenges.cloudflare.com",
     // Fonts: self-hosted
     "font-src 'self' data:",
-    // Connect: API calls + websockets
-    "connect-src 'self' ws: wss:",
+    // Connect: API calls + websockets + Cloudflare Turnstile + R2
+    "connect-src 'self' ws: wss: https://challenges.cloudflare.com https://*.r2.cloudflarestorage.com",
     // Frames: block unless overridden
     `frame-ancestors ${frameAncestors}`,
     // Form actions: only same-origin

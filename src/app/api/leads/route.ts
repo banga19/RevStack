@@ -2,21 +2,34 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { withAuth } from "@/lib/abac-middleware"
 import { appendLeadRow } from "@/lib/google-sheets"
+import { getOrgScope, orgWhereClause } from "@/lib/get-org-scope"
 
 export const GET = withAuth(async (req: NextRequest, { session }) => {
   const { searchParams } = new URL(req.url)
   const status = searchParams.get("status")
   const search = searchParams.get("search")
 
-  const where: any = { userId: session.user.id }
-  if (status) where.status = status
-  if (search) {
-    where.OR = [
-      { companyName: { contains: search } },
-      { contactName: { contains: search } },
-      { email: { contains: search } },
-    ]
+  const scope = await getOrgScope(session.user.id)
+
+  // Build query: org scope + status filter + search filter
+  const scopeClause = orgWhereClause(scope, { userIdField: "userId" })
+  const filters: any[] = [scopeClause]
+
+  if (status) {
+    filters.push({ status })
   }
+
+  if (search) {
+    filters.push({
+      OR: [
+        { companyName: { contains: search } },
+        { contactName: { contains: search } },
+        { email: { contains: search } },
+      ],
+    })
+  }
+
+  const where = filters.length === 1 ? filters[0] : { AND: filters }
 
   const leads = await prisma.lead.findMany({
     where,
