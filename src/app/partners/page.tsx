@@ -76,6 +76,8 @@ export default function PartnersPage() {
   const [showRegisterForm, setShowRegisterForm] = useState(false)
   const [regForm, setRegForm] = useState({ displayName: "", bio: "", website: "", payoutMethod: "mpesa", companyName: "", region: "ke", phone: "", payoutDetails: "" })
 
+  const [organizationBranding, setOrganizationBranding] = useState<Record<string, any> | null>(null)
+
   const regionOptions = [
     { value: "ke", label: "Kenya (KE)", hint: "KES pricing, KEPSA-aligned onboarding if available" },
     { value: "tz", label: "Tanzania (TZ)", hint: "TZS pricing, DAR partner network" },
@@ -131,6 +133,23 @@ export default function PartnersPage() {
 
   useEffect(() => { loadData(); loadReg() }, [loadData, loadReg])
 
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch("/api/organizations/branding?organizationId=default").catch(() => null)
+        const data = res?.ok ? await res.json().catch(() => null) : null
+        if (cancelled || !data?.branding) return
+        setOrganizationBranding(data.branding)
+        const root = document.documentElement
+        if (data.branding.primaryColor) root.style.setProperty("--primary", data.branding.primaryColor)
+        if (data.branding.secondaryColor) root.style.setProperty("--secondary", data.branding.secondaryColor)
+        if (data.branding.fontFamily) root.style.setProperty("--font-sans", data.branding.fontFamily)
+      } catch {}
+    })()
+    return () => { cancelled = true }
+  }, [])
+
   // Load referrals automatically when partner is detected as registered
   useEffect(() => {
     if (partnerReg?.registered) {
@@ -152,7 +171,11 @@ export default function PartnersPage() {
       if (!res.ok) { setRegError(d.error); return }
       setPartnerReg(d)
       setRegSuccess(true)
-      setTimeout(() => { setShowRegisterForm(false); setRegSuccess(false) }, 2000)
+      if (d.registered) {
+        setActiveTab("referrals")
+        setShowRegisterForm(false)
+      }
+      setTimeout(() => setRegSuccess(false), 2000)
     } catch (e) { setRegError("Failed to register. Please try again.") } finally { setRegSubmitting(false) }
   }
 
@@ -177,7 +200,7 @@ export default function PartnersPage() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in" style={organizationBranding?.fontFamily ? { fontFamily: organizationBranding.fontFamily } : undefined}>
       {/* ── Header ──────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -202,7 +225,32 @@ export default function PartnersPage() {
         )}
       </div>
 
-      {/* ── Registration Modal ──────────────────────────────────── */}
+      {/* White-label preview */}
+      {organizationBranding && (
+        <Card className="border-primary/10 bg-primary/5">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <p className="text-sm font-medium">White-label preview</p>
+            </div>
+            <div className="flex flex-wrap gap-3 text-xs">
+              {organizationBranding.primaryColor && (
+                <span className="inline-flex items-center gap-2 px-2 py-1 rounded border">
+                  <span className="w-3 h-3 rounded-full border" style={{ backgroundColor: organizationBranding.primaryColor }} /> Primary
+                </span>
+              )}
+              {organizationBranding.secondaryColor && (
+                <span className="inline-flex items-center gap-2 px-2 py-1 rounded border">
+                  <span className="w-3 h-3 rounded-full border" style={{ backgroundColor: organizationBranding.secondaryColor }} /> Secondary
+                </span>
+              )}
+              {organizationBranding.fontFamily && <span className="px-2 py-1 rounded border">Font: {organizationBranding.fontFamily.split(",")[0]}</span>}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Main Tabs ──────────────────────────────────────────── */}
       {showRegisterForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !regSubmitting && setShowRegisterForm(false)}>
           <Card className="w-full max-w-lg animate-fade-in" onClick={(e) => e.stopPropagation()}>

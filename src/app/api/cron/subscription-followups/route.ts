@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import crypto from "crypto"
 import { auth } from "@/lib/auth"
 import { processFollowUps } from "@/lib/subscription-followups"
 
@@ -9,33 +10,25 @@ import { processFollowUps } from "@/lib/subscription-followups"
  * GitHub Actions, Vercel Cron, etc.) at:
  *   GET /api/cron/subscription-followups
  *
- * It checks all users on trial/expired status and sends appropriate
- * follow-up messages based on where they are in the trial timeline.
- *
- * Add this to your cron provider:
- *   Schedule: 0 8 * * *  (every day at 8 AM)
- *   URL: https://your-domain.com/api/cron/subscription-followups
- *
  * Security: Validates via:
- *   1. x-cron-secret header matching CRON_SECRET env var
+ *   1. x-cron-secret header — constant-time comparison against CRON_SECRET env var
  *   2. Admin session (for manual testing)
  */
 export async function GET(req: NextRequest) {
   try {
     const cronSecret = process.env.CRON_SECRET
+    if (!cronSecret) {
+      return NextResponse.json({ error: "Server misconfigured — CRON_SECRET missing" }, { status: 500 })
+    }
+
     const session = await auth()
-
-    // Check x-cron-secret header (matching server env var)
-    const headerSecret = req.headers.get("x-cron-secret")
-    const headerMatch = cronSecret && headerSecret && cronSecret === headerSecret
-
-    // Check admin session (for manual testing)
     const isAdmin = session?.user?.role === "admin"
 
-    // Dev mode: also allow "cron-trigger-dev" as fallback secret
-    const isDevMode = cronSecret === "cron-trigger-dev"
+    const headerSecret = req.headers.get("x-cron-secret")
+    const headerMatch = !!headerSecret && headerSecret.length === cronSecret.length &&
+      crypto.timingSafeEqual(Buffer.from(headerSecret), Buffer.from(cronSecret))
 
-    if (!headerMatch && !isAdmin && !isDevMode) {
+    if (!headerMatch && !isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

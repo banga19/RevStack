@@ -23,7 +23,7 @@ networks:
     driver: bridge
 
 services:
-  # ── PostgreSQL (Primary database for production) ───────────────────────
+  # PostgreSQL (Primary database for production)
   postgres:
     image: postgres:16-alpine
     volumes:
@@ -42,7 +42,7 @@ services:
     networks:
       - mapato-network
 
-  # ── Main Next.js Application ──────────────────────────────────────────
+  # Main Next.js Application
   app:
     build:
       context: .
@@ -57,13 +57,13 @@ services:
       - DATABASE_URL=${DATABASE_URL:-postgresql://mapato:mapato_secret@postgres:5432/mapato}
       - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL:-http://localhost:3000}
 
-      # ── LLM Providers (set at least one) ──────────────────────────
+      # LLM Providers (set at least one)
       - NVIDIA_NIM_API_KEY=${NVIDIA_NIM_API_KEY:-}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
 
-      # ── Integrations ──────────────────────────────────────────────
+      # Integrations
       - WATI_API_TOKEN=${WATI_API_TOKEN:-}
       - WATI_WHATSAPP_NUMBER_ID=${WATI_WHATSAPP_NUMBER_ID:-}
       - ZOHO_CLIENT_ID=${ZOHO_CLIENT_ID:-}
@@ -75,22 +75,22 @@ services:
       - SOKOGATE_API_KEY=${SOKOGATE_API_KEY:-}
       - SOKOGATE_API_SECRET=${SOKOGATE_API_SECRET:-}
 
-      # ── Payments ──────────────────────────────────────────────────
-      - FLW_PUBLIC_KEY=${FLW_PUBLIC_KEY:-}
-      - FLW_SECRET_KEY=${FLW_SECRET_KEY:-}
-      - FLW_ENCRYPTION_KEY=${FLW_ENCRYPTION_KEY:-}
-      - FLW_WEBHOOK_HASH=${FLW_WEBHOOK_HASH:-}
+      # Payments
+      - FLUTTERWAVE_PUBLIC_KEY=${FLUTTERWAVE_PUBLIC_KEY:-}
+      - FLUTTERWAVE_SECRET_KEY=${FLUTTERWAVE_SECRET_KEY:-}
+      - FLUTTERWAVE_ENCRYPTION_KEY=${FLUTTERWAVE_ENCRYPTION_KEY:-}
+      - FLUTTERWAVE_WEBHOOK_SECRET=${FLUTTERWAVE_WEBHOOK_SECRET:-}
 
-      # ── Email ─────────────────────────────────────────────────────
+      # Email
       - SMTP_HOST=${SMTP_HOST:-smtp.ethereal.email}
       - SMTP_PORT=${SMTP_PORT:-587}
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
 
-      # ── Optional: Redis (for BullMQ / Hermes workers) ─────────────
+      # Optional: Redis (for BullMQ / Hermes workers)
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
 
-      # ── Optional: Google OAuth ────────────────────────────────────
+      # Optional: Google OAuth
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
 

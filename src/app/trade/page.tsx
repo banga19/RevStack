@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -873,46 +873,46 @@ export default function TradePage() {
                 </Card>
               )}
 
-              <Card className="bg-amber-500/5 border-amber-500/10">
-                <CardContent className="p-5">
-                  <div className="flex items-start gap-4">
-                    <div className="p-2 rounded-lg bg-amber-500/10 shrink-0">
-                      <ShieldCheck className="h-5 w-5 text-amber-500" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold mb-1">Compliance Gap Analysis</h3>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Top certifications needed for Korea market entry. 12 of 20 pilot companies need at least
-                        1 additional Korea-required certification. Priority: Korean Import Permit (5 needed).
-                      </p>
-                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={runGapAnalysis} disabled={gapLoading}>
-                        {gapLoading ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <ShieldCheck className="h-3 w-3 mr-1" />} {gapLoading ? "Analyzing..." : "Run Gap Analysis"}
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+               <Card className="bg-amber-500/5 border-amber-500/10">
+                 <CardContent className="p-5">
+                   <div className="flex items-start gap-4">
+                     <div className="p-2 rounded-lg bg-amber-500/10 shrink-0">
+                       <ShieldCheck className="h-5 w-5 text-amber-500" />
+                     </div>
+                     <div>
+                       <h3 className="font-semibold mb-1">Compliance Gap Analysis</h3>
+                       <p className="text-sm text-muted-foreground mb-3">
+                         Top certifications needed for Korea market entry. 12 of 20 pilot companies need at least
+                         1 additional Korea-required certification. Priority: Korean Import Permit (5 needed).
+                       </p>
+                       <Button size="sm" variant="outline" className="h-7 text-xs" onClick={runGapAnalysis} disabled={gapLoading}>
+                         {gapLoading ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <ShieldCheck className="h-3 w-3 mr-1" />} {gapLoading ? "Analyzing..." : "Run Gap Analysis"}
+                       </Button>
+                     </div>
+                   </div>
+                 </CardContent>
+               </Card>
 
-            {gapResults?.items?.length > 0 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Gap Analysis Results</CardTitle>
-                  <CardDescription>{gapResults.filters?.origin || "Korea"} candidates for matching</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {gapResults.items.map((item: any) => (
-                    <div key={item.id} className="flex items-center gap-3 p-3 rounded-lg border">
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">{item.name}</p>
-                        <p className="text-[10px] text-muted-foreground">ERS {item.ersScore}/100 · {item.readinessLevel}</p>
-                      </div>
-                      <Badge variant="outline" className="text-[9px]">{item.tier}</Badge>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
+               {gapResults?.items?.length > 0 && (
+                 <Card className="mt-4">
+                   <CardHeader className="pb-3">
+                     <CardTitle className="text-sm">Gap Analysis Results</CardTitle>
+                     <CardDescription>{gapResults.filters?.origin || "Korea"} candidates for matching</CardDescription>
+                   </CardHeader>
+                   <CardContent className="space-y-2">
+                     {gapResults.items.map((item: any) => (
+                       <div key={item.id} className="flex items-center gap-3 p-3 rounded-lg border">
+                         <div className="flex-1">
+                           <p className="text-sm font-medium">{item.name}</p>
+                           <p className="text-[10px] text-muted-foreground">ERS {item.ersScore}/100 · {item.readinessLevel}</p>
+                         </div>
+                         <Badge variant="outline" className="text-[9px]">{item.tier}</Badge>
+                       </div>
+                     ))}
+                   </CardContent>
+                 </Card>
+               )}
+             </TabsContent>
 
             {/* Compliance & ERS sub-tab */}
             <TabsContent value="compliance" className="space-y-4 mt-4">

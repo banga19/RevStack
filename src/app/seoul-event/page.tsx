@@ -116,7 +116,7 @@ export default function SeoulEventPage() {
                 <Select value={formData.dealRange} onValueChange={(v) => setFormData({ ...formData, dealRange: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="<10k"><$10K</SelectItem>
+                    <SelectItem value="<10k">&lt; $10K</SelectItem>
                     <SelectItem value="10k-50k">$10K-$50K</SelectItem>
                     <SelectItem value="50k-200k">$50K-$200K</SelectItem>
                     <SelectItem value="200k+">$200K+</SelectItem>

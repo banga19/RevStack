@@ -40,7 +40,7 @@ export const POST = withAbac(RESOURCES["call-recordings"], "write", async (req, 
     if (prospect) matchedProspectId = prospect.id
   }
 
-  const callResult = twilioIntegration.initiateCall({
+  const callResult = await twilioIntegration.initiateCall({
     to,
     record,
     recordingChannels: "mono",
@@ -53,7 +53,7 @@ export const POST = withAbac(RESOURCES["call-recordings"], "write", async (req, 
     },
   })
 
-  if (!callResult.success) {
+  if (callResult.error) {
     return NextResponse.json({ error: callResult.error || "Failed to initiate call" }, { status: 500 })
   }
 

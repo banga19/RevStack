@@ -280,18 +280,18 @@ export default function LandingPage() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
-              { icon: Bot, title: t("features.aiQual"), desc: t("features.aiQualDesc"), color: "primary" },
-              { icon: MessageSquare, title: t("features.whatsapp"), desc: t("features.whatsappDesc"), color: "emerald" },
-              { icon: Send, title: t("features.email"), desc: t("features.emailDesc"), color: "blue" },
-              { icon: Globe, title: t("features.trade"), desc: t("features.tradeDesc"), color: "purple" },
-              { icon: FileText, title: t("features.compliance"), desc: t("features.complianceDesc"), color: "amber" },
-              { icon: DollarSign, title: t("features.finance"), desc: t("features.financeDesc"), color: "emerald" },
-              { icon: BarChart3, title: t("features.crm"), desc: t("features.crmDesc"), color: "primary" },
-              { icon: TrendingUp, title: t("features.revenue"), desc: t("features.revenueDesc"), color: "green" },
-              { icon: Users, title: t("features.onboarding"), desc: t("features.onboardingDesc"), color: "cyan" },
-              { icon: Shield, title: t("features.ers"), desc: t("features.ersDesc"), color: "primary" },
-              { icon: Layers, title: t("features.content"), desc: t("features.contentDesc"), color: "orange" },
-              { icon: Zap, title: t("features.automations"), desc: t("features.automationsDesc"), color: "yellow" },
+               { icon: Bot, title: t("features.aiQual"), desc: t("features.aiQualDesc"), color: "primary", colorClass: "bg-primary/10 text-primary" },
+               { icon: MessageSquare, title: t("features.whatsapp"), desc: t("features.whatsappDesc"), color: "emerald", colorClass: "bg-emerald-500/10 text-emerald-600" },
+               { icon: Send, title: t("features.email"), desc: t("features.emailDesc"), color: "blue", colorClass: "bg-blue-500/10 text-blue-600" },
+               { icon: Globe, title: t("features.trade"), desc: t("features.tradeDesc"), color: "purple", colorClass: "bg-purple-500/10 text-purple-600" },
+               { icon: FileText, title: t("features.compliance"), desc: t("features.complianceDesc"), color: "amber", colorClass: "bg-amber-500/10 text-amber-600" },
+               { icon: DollarSign, title: t("features.finance"), desc: t("features.financeDesc"), color: "emerald", colorClass: "bg-emerald-500/10 text-emerald-600" },
+               { icon: BarChart3, title: t("features.crm"), desc: t("features.crmDesc"), color: "primary", colorClass: "bg-primary/10 text-primary" },
+               { icon: TrendingUp, title: t("features.revenue"), desc: t("features.revenueDesc"), color: "green", colorClass: "bg-green-500/10 text-green-600" },
+               { icon: Users, title: t("features.onboarding"), desc: t("features.onboardingDesc"), color: "cyan", colorClass: "bg-cyan-500/10 text-cyan-600" },
+               { icon: Shield, title: t("features.ers"), desc: t("features.ersDesc"), color: "primary", colorClass: "bg-primary/10 text-primary" },
+               { icon: Layers, title: t("features.content"), desc: t("features.contentDesc"), color: "orange", colorClass: "bg-orange-500/10 text-orange-600" },
+               { icon: Zap, title: t("features.automations"), desc: t("features.automationsDesc"), color: "yellow", colorClass: "bg-yellow-500/10 text-yellow-600" },
             ].map((feature, i) => (
               <div
                 key={i}
@@ -299,9 +299,9 @@ export default function LandingPage() {
               >
                 <div className={cn(
                   "p-3 rounded-lg w-fit mb-4 group-hover:scale-110 transition-transform",
-                  `bg-${feature.color}/10`
+                  feature.colorClass
                 )}>
-                  <feature.icon className={cn("h-6 w-6", `text-${feature.color}`)} />
+                  <feature.icon className={cn("h-6 w-6", feature.colorClass.split(" ")[1])} />
                 </div>
                 <h3 className="font-semibold mb-2">{feature.title}</h3>
                 <p className="text-sm text-muted-foreground">{feature.desc}</p>

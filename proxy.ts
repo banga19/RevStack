@@ -130,6 +130,18 @@ export default async function middleware(req: NextRequest) {
     }
   }
 
+  // Subscription gating for app routes (not API — API handles its own gating)
+  if (
+    isLoggedIn &&
+    !nextUrl.pathname.startsWith("/api") &&
+    !isPublicRoute &&
+    token?.subscriptionStatus === "expired"
+  ) {
+    const upgradeUrl = new URL("/pricing", nextUrl)
+    upgradeUrl.searchParams.set("reason", "subscription_expired")
+    return wrap(NextResponse.redirect(upgradeUrl))
+  }
+
   return wrap(NextResponse.next())
 }
 

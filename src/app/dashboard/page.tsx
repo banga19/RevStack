@@ -25,7 +25,7 @@ import {
   Activity,
   Send,
   FileText,
-  Globe, Sparkles, Ship, Loader2, TrendingUp, ShieldCheck,
+  Globe, Sparkles, Ship, Loader2, ShieldCheck,
 } from "lucide-react"
 import {
   BarChart,
@@ -137,8 +137,8 @@ export default function DashboardPage() {
       fetch("/api/reports/west-africa").catch(() => null),
     ]).then(([afRes, waRes]) => {
       if (cancelled) return
-      if (afRes?.ok) setAfcfta(afRes.json().catch(() => null))
-      if (waRes?.ok) setWestAfrica(waRes.json().catch(() => null))
+      if (afRes?.ok) afRes.json().then(d => { if (!cancelled) setAfcfta(d) }).catch(() => {})
+      if (waRes?.ok) waRes.json().then(d => { if (!cancelled) setWestAfrica(d) }).catch(() => {})
       setReportsLoading(false)
     })
     return () => {

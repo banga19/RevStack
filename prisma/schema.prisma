@@ -216,6 +216,7 @@ model Client {
   ersBreakdown  String?  // JSON: { documentation, compliance, exportHistory, capacityVerified }
   // Trade corridor — which international trade route this client targets
   corridor      String?  // china-africa, korea-africa, africa-africa
+  licenseProfile String? // JSON: { services: string[], complianceStatus: string, restrictions: Record<string, any>, licensedAt?: string }
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -282,6 +283,7 @@ model TradeFinanceApplication {
   approvedAt  DateTime?
   disbursedAt DateTime?
   notes       String?
+  licenseProfile String? // JSON: { services: string[], complianceStatus: string, restrictions: Record<string, any>, licensedAt?: string }
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

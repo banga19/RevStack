@@ -31,9 +31,6 @@ pnpm install
 cp .env.example .env.local
 # Edit .env.local with your keys (at minimum NEXTAUTH_SECRET)
 
-# Set up database:
-pnpm run setup
-
 # Start dev server:
 pnpm dev
 ```

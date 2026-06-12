@@ -148,6 +148,34 @@ export default function ForecastPage() {
         </div>
       </div>
 
+      {summary && metadata && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-muted-foreground">Plan benchmarks</span>
+          {Object.entries(metadata.planTargets || {}).map(([day, target]) => {
+            const dayIndex = Number(day)
+            const projectedAtMilestone = dayIndex === 365
+              ? summary.predictedMrr12
+              : forecast[Math.min(Math.max(dayIndex - 1, 0), forecast.length - 1)]?.projected
+            const diff = projectedAtMilestone && projectedAtMilestone > 0 ? projectedAtMilestone - (target as number) : 0
+            const isAhead = diff >= 0
+            const chipClass = isAhead
+              ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-600"
+              : "border-amber-500/30 bg-amber-500/5 text-amber-600"
+            return (
+              <div key={day} className="flex items-center gap-2 rounded-full border px-3 py-1">
+                <span className="text-muted-foreground">Day {day}</span>
+                <span className="font-mono">{formatCurrency(target as number)}</span>
+                <span className="text-muted-foreground">vs</span>
+                <span className="font-mono">{formatCurrency(projectedAtMilestone || 0)}</span>
+                <Badge variant="outline" className={cn("border-none text-[10px] px-1 py-0", chipClass)}>
+                  {isAhead ? `+${formatCurrency(diff)} ahead` : `${formatCurrency(Math.abs(diff))} short`}
+                </Badge>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {summary && (
         <>
           {/* KPI Cards */}

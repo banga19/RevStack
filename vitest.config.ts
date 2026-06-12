@@ -13,6 +13,19 @@ export default defineConfig({
       },
     },
     exclude: ["**/lib/db/src/schema/__tests__/**", "**/node_modules/**"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json", "html"],
+      reportsDirectory: "./coverage",
+      include: ["src/lib/**/*.ts"],
+      exclude: ["src/lib/__tests__/**", "src/test/**"],
+      thresholds: {
+        lines: 40,
+        functions: 40,
+        branches: 30,
+        statements: 40,
+      },
+    },
   },
   resolve: {
     alias: {

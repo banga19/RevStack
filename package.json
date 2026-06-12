@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "next lint",
     "db:generate": "prisma generate",
@@ -18,7 +18,8 @@
     "test:e2e": "playwright test",
     "test:e2e:dev-checkout": "playwright test e2e/dev-mode-checkout.spec.ts",
     "test:e2e:docker": "bash scripts/run-e2e.sh",
-    "test:e2e:docker:dev": "bash scripts/run-e2e.sh --dev"
+    "test:e2e:docker:dev": "bash scripts/run-e2e.sh --dev",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",

@@ -134,12 +134,18 @@ const mockInvokeResult = vi.hoisted(() => ({
   startTime: 1000,
 }))
 
-const mockWorkflowInstance = vi.hoisted(() => ({
-  addNode: vi.fn().mockReturnThis(),
-  addEdge: vi.fn().mockReturnThis(),
-  addConditionalEdges: vi.fn().mockReturnThis(),
-  compile: vi.fn().mockReturnValue({ invoke: vi.fn().mockResolvedValue(mockInvokeResult) }),
-}))
+const mockWorkflowInstance = vi.hoisted(() => {
+  function StateGraph(this: any) {
+    return mockWorkflowInstance
+  }
+  return {
+    addNode: vi.fn().mockReturnThis(),
+    addEdge: vi.fn().mockReturnThis(),
+    addConditionalEdges: vi.fn().mockReturnThis(),
+    compile: vi.fn().mockReturnValue({ invoke: vi.fn().mockResolvedValue(mockInvokeResult) }),
+    StateGraph,
+  }
+})
 
 vi.mock("@langchain/core/output_parsers", () => ({
   StringOutputParser: vi.fn().mockImplementation(() => ({

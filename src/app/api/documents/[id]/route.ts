@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { withAuth } from "@/lib/abac-middleware"
-import fs from "fs"
-import path from "path"
+
+async function tryReadLocalFile(filename: string | null) {
+  if (!filename || filename.includes("..")) return null
+  try {
+    const fs = await import("node:fs")
+    const path = await import("node:path")
+    const projectRoot = process.cwd()
+    const filePath = path.join(projectRoot, filename)
+    if (fs.existsSync(filePath)) {
+      return fs.readFileSync(filePath, "utf-8")
+    }
+  } catch (error) {
+    console.warn("[documents] local read failed", error)
+  }
+  return null
+}
 
 export const GET = withAuth(async (request: NextRequest, { params }) => {
   const { id } = await params
@@ -10,29 +24,15 @@ export const GET = withAuth(async (request: NextRequest, { params }) => {
     where: { id },
   })
   if (!document) {
-    return NextResponse.json({ error: 'Document not found' }, { status: 404 })
+    return NextResponse.json({ error: "Document not found" }, { status: 404 })
   }
 
-  // If the document has stored content, return it directly
   if (document.content) {
     return NextResponse.json(document)
   }
 
-  // Otherwise, try to read from the filesystem
-  const projectRoot = process.cwd()
-  const filePath = path.join(projectRoot, document.filename)
-
-  // Reject path traversal
-  if (document.filename.includes("..")) {
-    return NextResponse.json({ ...document, content: "" })
-  }
-
-  if (fs.existsSync(filePath)) {
-    const fileContent = fs.readFileSync(filePath, "utf-8")
-    return NextResponse.json({ ...document, content: fileContent })
-  }
-
-  return NextResponse.json({ ...document, content: "" })
+  const local = await tryReadLocalFile(document.filename)
+  return NextResponse.json({ ...document, content: local ?? "" })
 })
 
 export const PUT = withAuth(async (request: NextRequest, { params }) => {

@@ -74,6 +74,12 @@ COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/lib ./lib
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY --from=builder /app/middleware.ts ./middleware.ts
+COPY --from=builder /app/proxy.ts ./proxy.ts
+COPY --from=builder /app/tailwind.config.ts ./tailwind.config.ts
+COPY --from=builder /app/postcss.config.js ./postcss.config.js
+COPY --from=builder /app/sentry.client.config.ts ./sentry.client.config.ts
+COPY --from=builder /app/sentry.server.config.ts ./sentry.server.config.ts
 
 # Grant permissions to the nextjs user
 RUN chown -R nextjs:nodejs /app

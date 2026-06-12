@@ -154,11 +154,18 @@ const authOptions: AuthOptions = {
       return session
     },
   },
+  jwt: {
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+    updateAge: 24 * 60 * 60, // refresh every 24 hours
+  },
   pages: {
     signIn: "/login",
+    newUser: "/onboarding",
   },
   session: {
     strategy: "jwt" as SessionStrategy,
+    maxAge: 30 * 24 * 60 * 60,
+    updateAge: 24 * 60 * 60,
   },
 }
 

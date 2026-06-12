@@ -12,6 +12,8 @@ desktop.ini
 # Environment
 .env
 .env.local
+.env.production
+.env.*.local
 
 # Node (if any)
 node_modules/

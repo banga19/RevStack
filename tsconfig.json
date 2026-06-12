@@ -44,6 +44,7 @@
     "__tests__",
     "prisma/seed*.ts",
     "prisma/verify-seed.ts",
-    "scripts"
+    "scripts",
+    ".next"
   ]
 }

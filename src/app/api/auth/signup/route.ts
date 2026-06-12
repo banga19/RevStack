@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/db"
 import { sendWelcomeEmail } from "@/lib/email"
@@ -6,6 +7,17 @@ import { validateCsrf } from "@/lib/csrf"
 import { appendSignupRow } from "@/lib/google-sheets"
 import { requireTurnstileToken, TurnstileError } from "@/lib/cloudflare/turnstile"
 import { ipFromRequest } from "@/lib/rate-limiter"
+
+const SignupSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Valid email is required"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  phone: z.string().optional(),
+  termsAccepted: z.boolean().refine((v) => v === true, "Terms must be accepted"),
+  organizationName: z.string().optional(),
+  industry: z.string().optional(),
+  referralCode: z.string().optional(),
+})
 
 export async function POST(req: NextRequest) {
   const csrfCheck = await validateCsrf(req)
@@ -35,16 +47,13 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { name, email, password, phone, termsAccepted, organizationName, industry, referralCode } = body
-    if (!name || !email || !password) {
-      return NextResponse.json({ error: "Name, email, and password are required" }, { status: 400 })
+    const parsed = SignupSchema.safeParse(body)
+    if (!parsed.success) {
+      const firstError = parsed.error.errors[0]
+      return NextResponse.json({ error: firstError.message }, { status: 400 })
     }
-    if (!termsAccepted) {
-      return NextResponse.json({ error: "You must accept the Terms & Conditions to create an account" }, { status: 400 })
-    }
-    if (password.length < 8) {
-      return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 })
-    }
+
+    const { name, email, password, phone, termsAccepted, organizationName, industry, referralCode } = parsed.data
 
     const existing = await prisma.user.findUnique({ where: { email } })
     if (existing) {
@@ -79,7 +88,6 @@ export async function POST(req: NextRequest) {
           termsAccepted: true,
           termsAcceptedAt: now,
           termsVersion: "1.0",
-          organizationId: "", // placeholder; reassigned below
           trialStartsAt: now,
           trialEndsAt: trialEnd,
           subscriptionStatus: "trial",
@@ -95,7 +103,7 @@ export async function POST(req: NextRequest) {
     })
 
     let referralValidation: { valid: boolean; partnerFound: boolean; referralTracked: boolean }
-    if (referralCode && typeof referralCode === "string" && referralCode.trim()) {
+    if (referralCode && referralCode.trim()) {
       try {
         const code = referralCode.trim()
         const partner = await prisma.partner.findUnique({ where: { referralCode: code } })
