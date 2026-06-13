@@ -59,7 +59,6 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
-# Build the test command
 if [ "$USE_DEV" = true ]; then
   echo "🔧 Using dev-mode setup (SQLite + hot reload)"
   COMPOSE_FILES="-f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.e2e.yml"
@@ -69,9 +68,15 @@ if [ "$USE_DEV" = true ]; then
 
   echo "⏳ Waiting for app to become healthy (Next.js compilation + health check may take 60-90s)..."
 
+  # Ensure SQLite schema is active for local/E2E runs
+  cp prisma/schema.sqlite.prisma prisma/schema.prisma
+
+  echo "🧱 Generating Prisma client + pushing schema + seeding database..."
+  docker compose $COMPOSE_FILES exec -T app sh -lc "npx prisma generate && npx prisma db push && npx tsx prisma/seed.ts"
+
   # Use NODE_ENV=development for dev-mode auto-verification
   # Override DATABASE_URL to point to the shared SQLite volume (dev.db in sqlite-data volume)
-  RUN_CMD="NODE_ENV=development DATABASE_URL=file:/app/data/dev.db npx playwright test ${TEST_SPEC:-}"
+  RUN_CMD="NODE_ENV=development DATABASE_URL=file:/app/data/dev.db pnpm exec playwright test ${TEST_SPEC:-}"
 else
   echo "🏗️  Building production app..."
   # Start PostgreSQL + app for production-mode tests
@@ -79,7 +84,7 @@ else
 
   echo "⏳ Waiting for app to become healthy (Docker healthcheck running)..."
 
-  RUN_CMD="npx playwright test ${TEST_SPEC:-}"
+  RUN_CMD="pnpm exec playwright test ${TEST_SPEC:-}"
 fi
 
 echo "🚀 Launching E2E test runner (Docker will wait for app healthcheck)..."
@@ -93,10 +98,6 @@ docker compose $COMPOSE_FILES run --rm e2e sh -c "$RUN_CMD"
 
 # Capture the exit code
 EXIT_CODE=$?
-
-# Cleanup (optional — uncomment to auto-stop)
-# echo "🛑 Stopping services..."
-# docker compose $COMPOSE_FILES down
 
 echo ""
 if [ $EXIT_CODE -eq 0 ]; then

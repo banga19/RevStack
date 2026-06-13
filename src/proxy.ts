@@ -1,34 +1,12 @@
 /**
- * Subscription Gate Middleware
+ * Edge middleware: auth, rate limiting, and security headers.
  *
- * Blocks access to protected API routes when the user's trial has expired
- * and they don't have an active subscription. Admin users bypass this gate.
+ * Current responsibilities:
+ *  - Fast-reject unauthenticated requests using ABAC `dashboard:read`
+ *  - Apply per-path rate limits from `getDefaultLimits()`
+ *  - Apply security headers to every response
  *
- * Protected API routes (non-public endpoints):
- *   - /api/god-mode
- *   - /api/subscription (POST/PATCH/DELETE — mutating operations)
- *   - /api/clients, /api/clients/*
- *   - /api/pipeline-actions, /api/pipeline-actions/*
- *   - /api/outreach, /api/outreach/*
- *   - /api/content, /api/content/*
- *   - /api/revenue, /api/revenue/*
- *   - /api/documents, /api/documents/*
- *   - /api/korea/*
- *   - /api/dashboard
- *   - /api/admin/*
- *   - /api/plan/*
- *   - /api/operations/*
- *
- * Public API routes (no subscription check needed):
- *   - /api/auth/*           — Auth endpoints
- *   - /api/cron/*            — Cron job endpoints
- *   - /api/health            — Health check
- *   - /api/csrf              — CSRF token
- *   - /api/subscribe         — Newsletter signup (public)
- *   - /api/pricing           — Public pricing data
- *   - /api/payments/*        — Payment webhooks (validated separately)
- *   - /api/push/*            — Push notification endpoints
- *   - /api/subscription (GET) — Read-only check
+ * Subscription gating for app routes is now owned by the app proxy handler.
  */
 
 import { NextResponse } from "next/server"

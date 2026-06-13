@@ -55,7 +55,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Check for audit vulnerabilities
-        run: npm audit --audit-level=high || echo "⚠️ Audit scan found high/critical vulnerabilities"
+        run: pnpm audit --audit-level=high || echo "Audit scan found high/critical vulnerabilities"
 
       - name: Generate Prisma client
         run: npx prisma generate
