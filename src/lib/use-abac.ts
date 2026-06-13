@@ -1,7 +1,7 @@
 /**
  * useAbac — Client-side hook for attribute-based access control.
  *
- * Provides reactive canAccess() checks based on the current session user.
+ * Provides reactive canAccess() checks based on the current Clerk user.
  *
  * Usage:
  *   const { canAccess, user } = useAbac()
@@ -11,61 +11,53 @@
 
 "use client"
 
-import { useSession } from "next-auth/react"
+import { useUser } from "@clerk/nextjs"
+import { useState, useEffect } from "react"
 import { checkAccess, type AbacAction, type AbacResource, type AbacDecision } from "@/lib/abac"
 
 export function useAbac() {
-  const { data: session, status } = useSession()
+  const { user, isLoaded, isSignedIn } = useUser()
+  const [role, setRole] = useState<string | null>(null)
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null)
+  const [subscriptionTier, setSubscriptionTier] = useState<string | null>(null)
 
-  const user = session?.user
+  useEffect(() => {
+    if (!isSignedIn || !user) {
+      setRole(null)
+      return
+    }
+    setRole((user.publicMetadata?.role as string | undefined) ?? "user")
+  }, [isSignedIn, user])
+
+  const dbUser = user
     ? {
-        id: (session.user.id as string) || "",
-        role: (session.user.role as string) || "user",
-        // On the client, we may not have the latest subscription data,
-        // so default to "trial" — the server will enforce the real gate
-        subscriptionStatus: "trial",
-        subscriptionTier: null,
+        id: user.id,
+        role: role ?? "user",
+        subscriptionStatus: subscriptionStatus ?? "trial",
+        subscriptionTier,
       }
     : null
 
-  /**
-   * Check if the current user can access a resource with a given action.
-   * Falls back gracefully if session is still loading.
-   */
-  function canAccess(
-    resource: AbacResource,
-    action: AbacAction = "read"
-  ): boolean {
-    if (status === "loading") return true // Don't flash-gate during load
-    if (!user) return false
-    // Admin always has full access on the client
-    if (user.role === "admin") return true
-    return checkAccess(user, resource, action).allowed
+  function canAccess(resource: AbacResource, action: AbacAction = "read"): boolean {
+    if (!isLoaded) return true
+    if (!dbUser) return false
+    if (dbUser.role === "admin") return true
+    return checkAccess(dbUser, resource, action).allowed
   }
 
-  /**
-   * Get the full ABAC decision for a resource/action.
-   */
-  function getAccessDecision(
-    resource: AbacResource,
-    action: AbacAction = "read"
-  ): AbacDecision {
-    if (!user) {
-      return { allowed: false, reason: "Not authenticated", grants: [] }
-    }
-    if (user.role === "admin") {
-      return { allowed: true, reason: "Admin bypass", grants: ["admin:full"] }
-    }
-    return checkAccess(user, resource, action)
+  function getAccessDecision(resource: AbacResource, action: AbacAction = "read"): AbacDecision {
+    if (!dbUser) return { allowed: false, reason: "Not authenticated", grants: [] }
+    if (dbUser.role === "admin") return { allowed: true, reason: "Admin bypass", grants: ["admin:full"] }
+    return checkAccess(dbUser, resource, action)
   }
 
   return {
     canAccess,
     getAccessDecision,
-    user,
-    isAdmin: user?.role === "admin",
-    isAuthenticated: status === "authenticated",
-    isLoading: status === "loading",
+    user: dbUser,
+    isAdmin: dbUser?.role === "admin",
+    isAuthenticated: isSignedIn,
+    isLoading: !isLoaded,
   }
 }
 

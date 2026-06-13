@@ -589,7 +589,7 @@ export default function PartnersPage() {
                   ) : (
                     <div className="p-3 rounded-lg bg-amber-500/10 text-amber-600 text-sm flex items-center gap-2">
                       <Award className="h-5 w-5 shrink-0" />
-                      You're at the top tier! Enjoy 30% commission on all referrals.
+                      You&apos;re at the top tier! Enjoy 30% commission on all referrals.
                     </div>
                   )}
                 </CardContent>

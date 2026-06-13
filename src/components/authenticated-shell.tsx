@@ -1,6 +1,7 @@
 "use client"
 
-import { useSession } from "next-auth/react"
+import { useUser, useAuth } from "@clerk/nextjs"
+import { useEffect, useState } from "react"
 import { Sidebar } from "@/components/sidebar"
 import { Navbar } from "@/components/navbar"
 import { PageWrapper } from "@/components/page-wrapper"
@@ -11,11 +12,9 @@ import { SubscriptionGate } from "@/components/subscription-gate"
 const PUBLIC_PATHS = ["/", "/login", "/signup", "/onboarding", "/needs-assessment", "/terms", "/privacy", "/pricing"]
 
 export function AuthenticatedShell({ children }: { children: React.ReactNode }) {
-  const { data: session, status } = useSession()
+  const { isSignedIn, isLoaded } = useAuth()
 
-  if (status === "loading") return <SiteLoading />
-
-  if (!session?.user) return <main className="min-h-screen">{children}</main>
+  if (!isLoaded) return <SiteLoading />
 
   return (
     <SubscriptionGate>

@@ -1,9 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
-import { SessionProvider, useSession } from "next-auth/react"
-
-// ── Organization context ─────────────────────────────────────────
+import { ClerkProvider, useAuth, useUser } from "@clerk/nextjs"
 
 export interface Organization {
   id: string
@@ -32,21 +30,21 @@ export function useOrganization() {
   return useContext(OrgContext)
 }
 
-// ── Org provider (lives inside the auth session) ─────────────────
-
 function OrgProviderInner({ children }: { children: ReactNode }) {
-  const { data: session } = useSession()
+  const { isSignedIn, userId } = useAuth()
+  const { user } = useUser()
   const [organization, setOrganization] = useState<Organization | null>(null)
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchOrgs = useCallback(async () => {
-    if (!session?.user) {
+    if (!isSignedIn || !userId) {
       setOrganization(null)
       setOrganizations([])
       setLoading(false)
       return
     }
+
     try {
       const res = await fetch("/api/organizations")
       const data = await res.json()
@@ -59,18 +57,18 @@ function OrgProviderInner({ children }: { children: ReactNode }) {
         setOrganization(active || data.organizations[0] || null)
       }
     } catch {
-      // Silently fail — org might not exist yet
+      // Org may not exist yet; leave state empty
     } finally {
       setLoading(false)
     }
-  }, [session])
+  }, [isSignedIn, userId])
 
   useEffect(() => {
     fetchOrgs()
   }, [fetchOrgs])
 
   const switchOrg = async (orgId: string) => {
-    const org = organizations.find((o) => o.id === orgId)
+    const org = organizations.find((o: Organization) => o.id === orgId)
     if (org) {
       setOrganization(org)
       localStorage.setItem("activeOrgId", orgId)
@@ -86,14 +84,12 @@ function OrgProviderInner({ children }: { children: ReactNode }) {
   )
 }
 
-// ── Combined Auth + Org provider ─────────────────────────────────
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   return (
-    <SessionProvider>
+    <ClerkProvider>
       <OrgProviderInner>
         {children}
       </OrgProviderInner>
-    </SessionProvider>
+    </ClerkProvider>
   )
 }

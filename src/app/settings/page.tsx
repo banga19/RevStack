@@ -45,7 +45,7 @@ export default function ClientSettingsPage() {
         if (!res.ok) throw new Error("Failed to load")
         const data = await res.json()
         setClientName(data.name || data.company || "")
-        setProfile(data.licenseProfile || profile)
+        setProfile((prev) => data.licenseProfile || prev)
       } catch (e) { setError("Unable to load client license profile.") } finally { setLoading(false) }
     })()
   }, [clientId])

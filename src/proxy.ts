@@ -1,79 +1,71 @@
 /**
- * Edge middleware: auth, rate limiting, and security headers.
+ * Edge-compatible proxy (Next.js 16 replaces "middleware" with "proxy").
  *
- * Current responsibilities:
- *  - Fast-reject unauthenticated requests using ABAC `dashboard:read`
- *  - Apply per-path rate limits from `getDefaultLimits()`
+ * Responsibilities:
  *  - Apply security headers to every response
- *
- * Subscription gating for app routes is now owned by the app proxy handler.
+ *  - Apply per-path rate limits before unnecessary backend work
  */
-
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { checkRateLimit, RateLimitError, getDefaultLimits, ipFromRequest } from "@/lib/rate-limiter"
 import { applySecurityHeaders } from "@/lib/security-headers"
-import { checkAccessFromSession } from "@/lib/abac"
 
-const PUBLIC_API_PREFIXES = [
-  "/api/auth/",
-  "/api/cron/",
-  "/api/health",
-  "/api/csrf",
-  "/api/subscribe",
-  "/api/pricing",
-  "/api/payments/webhook",
-  "/api/push/",
-]
+export default async function proxy(req: NextRequest) {
+  const { nextUrl } = req
+  const pathname = nextUrl.pathname
+  const method = req.method
 
-const ALWAYS_ALLOWED_API = [
-  "/api/subscription",
-  "/api/ers/snapshots",
-]
+  const isPublicApiRoute = (path: string) => {
+    const prefixes = [
+      "/api/auth/",
+      "/api/cron/",
+      "/api/health",
+      "/api/csrf",
+      "/api/subscribe",
+      "/api/pricing",
+      "/api/payments/webhook",
+      "/api/push/",
+    ]
+    if (prefixes.some((p) => path.startsWith(p))) return true
+    return false
+  }
 
-function isPublicApiRoute(pathname: string, method: string): boolean {
-  if (PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true
-  if (method === "GET" && ALWAYS_ALLOWED_API.some((p) => pathname.startsWith(p))) return true
-  return false
-}
+  const wrap = (response: Response) => applySecurityHeaders(response)
 
-export default function proxy() {
-  return async (req: NextRequest) => {
-    const { pathname, method } = req
-    const ip = ipFromRequest(req)
+  const ip = ipFromRequest(req)
+  const limits = getDefaultLimits()
 
-    if (!isPublicApiRoute(pathname, method || "GET")) {
+  for (const config of limits) {
+    if (pathname.startsWith(config.pathPrefix ?? "")) {
       try {
-        const limit = getDefaultLimits().find((c) => pathname.startsWith(c.pathPrefix))
-        const config = limit || { pathPrefix: "/api", max: 100, windowMs: 60_000 }
         checkRateLimit(ip, config)
       } catch (err) {
         if (err instanceof RateLimitError) {
-          const res = NextResponse.json(
-            { error: "Too many requests", retryAfter: err.retryAfter },
-            { status: 429 }
+          return wrap(
+            new NextResponse(
+              JSON.stringify({
+                error: "Too many requests. Please slow down.",
+                retryAfter: err.retryAfter,
+              }),
+              {
+                status: 429,
+                headers: {
+                  "Content-Type": "application/json",
+                  "Retry-After": String(err.retryAfter),
+                },
+              }
+            )
           )
-          res.headers.set("Retry-After", String(err.retryAfter))
-          return applySecurityHeaders(res)
         }
-        console.error("[RateLimiter] unexpected error", err)
       }
+      break
     }
-
-    try {
-      const { decision } = await checkAccessFromSession("dashboard", "read")
-      if (!decision.allowed) {
-        const blocked = NextResponse.json(
-          { error: decision.reason, code: "access_denied" },
-          { status: isPublicApiRoute(pathname, method || "GET") ? 403 : 401 }
-        )
-        return applySecurityHeaders(blocked)
-      }
-    } catch {
-      // Allow degraded mode when DB/ABAC is unavailable
-    }
-
-    const res = NextResponse.next()
-    return applySecurityHeaders(res)
   }
+
+  const staticExt = /\.(svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf|eot|css|js|json|xml|webmanifest)$/
+  if (staticExt.test(pathname)) {
+    return wrap(NextResponse.next())
+  }
+
+  return wrap(NextResponse.next())
 }

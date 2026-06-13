@@ -25,7 +25,15 @@ import {
   Activity,
   Send,
   FileText,
-  Globe, Sparkles, Ship, Loader2, ShieldCheck,
+  Globe,
+  Sparkles,
+  Ship,
+  Loader2,
+  ShieldCheck,
+  Puzzle,
+  BookOpen,
+  Clock,
+  CreditCard,
 } from "lucide-react"
 import {
   BarChart,
