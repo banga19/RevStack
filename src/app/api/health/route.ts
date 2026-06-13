@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server"
-import { getSystemHealth } from "@/lib/monitoring"
+import { getSystemHealth, evaluateAlerts } from "@/lib/monitoring"
 
 export async function GET() {
   const health = await getSystemHealth()
   const httpStatus = health.status === "error" ? 503 : health.status === "degraded" ? 200 : 200
+
+  if (httpStatus >= 500) {
+    evaluateAlerts(health).catch(() => {})
+  }
+
   return NextResponse.json(health, {
     status: httpStatus,
     headers: {

@@ -1242,6 +1242,72 @@ server {
 
 ---
 
+## 📊 Monitoring & Observability
+
+### Health Check
+
+`GET /api/health` returns a JSON health report covering database, Redis, and key integrations.
+
+```bash
+curl http://localhost:3000/api/health
+```
+
+Response shape:
+- `ok` — all systems healthy
+- `degraded` — one or more integrations degraded
+- `error` — database or critical dependency down
+
+Docker healthcheck is configured in `docker-compose.yml`:
+```yaml
+healthcheck:
+  test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+```
+
+### Sentry Error Tracking
+
+Sentry client + server configs are included but **disabled by default** until a DSN is provided.
+
+Enable by setting these in `.env` / `.env.local`:
+
+```bash
+SENTRY_DSN=https://<your-dsn>@sentry.io/<project>
+NEXT_PUBLIC_SENTRY_DSN=https://<your-dsn>@sentry.io/<project>
+SENTRY_ENVIRONMENT=production
+```
+
+Files:
+- `sentry.client.config.ts`
+- `sentry.server.config.ts`
+
+### Ops Alerting
+
+`src/lib/monitoring.ts` exposes:
+- `emitAlert({ severity, service, message, detail })` — emits structured alerts
+- `evaluateAlerts(health)` — triggers `warn` or `critical` alerts based on system health
+
+Alert delivery:
+- All alerts are logged
+- `critical` alerts are also sent to `ALERT_WEBHOOK_URL` if configured
+
+Set `ALERT_WEBHOOK_URL` to route alerts to Slack, Discord, email, etc.
+
+### CI / E2E
+
+GitHub Actions workflow: `.github/workflows/e2e-tests.yml`
+
+Jobs:
+1. `lint` — install, typecheck, lint, unit tests
+2. `build` — Docker production image build
+3. `e2e` — Playwright tests via Docker Compose
+
+Run E2E locally:
+```bash
+pnpm run test:e2e:docker
+pnpm run test:e2e:docker:dev
+```
+
+---
+
 ## 🌐 Key Integrations
 
 ## 🌐 Key Integrations
