@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { NextRequest } from "next/server"
+import fs from "node:fs"
+import path from "node:path"
+import os from "node:os"
 
 vi.mock("@/lib/auth", () => ({
   auth: vi.fn().mockResolvedValue({ user: { id: "test-user", role: "admin" } }),
@@ -18,15 +21,6 @@ vi.mock("@/lib/db", () => ({
   },
 }))
 
-vi.mock("fs", () => ({
-  default: {
-    existsSync: vi.fn(),
-    readFileSync: vi.fn(),
-  },
-  existsSync: vi.fn(),
-  readFileSync: vi.fn(),
-}))
-
 vi.mock("@/lib/abac", async () => {
   const actual = await vi.importActual("@/lib/abac")
   return {
@@ -39,9 +33,11 @@ vi.mock("@/lib/abac", async () => {
 })
 
 import { prisma } from "@/lib/db"
-import fs from "fs"
 import { GET as GET_LIST } from "./route"
 import { GET as GET_BY_ID } from "./[id]/route"
+
+const TMP_ROOT = path.join(os.tmpdir(), "revstack-doc-tests")
+const FIXTURE_CONTENT = "# 75-Day Plan\n\nThis is the content."
 
 const mockDocs = [
   {
@@ -55,6 +51,15 @@ const mockDocs = [
     createdAt: new Date("2026-01-01"),
   },
 ]
+
+beforeAll(() => {
+  fs.mkdirSync(TMP_ROOT, { recursive: true })
+  fs.writeFileSync(path.join(TMP_ROOT, "75-DAY-AI-BUSINESS-PLAN.md"), FIXTURE_CONTENT)
+})
+
+afterAll(() => {
+  try { fs.rmSync(TMP_ROOT, { recursive: true }) } catch {}
+})
 
 describe("GET /api/documents", () => {
   beforeEach(() => vi.clearAllMocks())
@@ -87,12 +92,16 @@ describe("GET /api/documents", () => {
 })
 
 describe("GET /api/documents/[id]", () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.spyOn(process, "cwd").mockReturnValue(TMP_ROOT)
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
 
   it("returns a document with file content", async () => {
     vi.mocked(prisma.document.findUnique).mockResolvedValue(mockDocs[0])
-    vi.mocked(fs.existsSync).mockReturnValue(true)
-    vi.mocked(fs.readFileSync).mockReturnValue("# 75-Day Plan\n\nThis is the content.")
 
     const req = new NextRequest("http://localhost:3000/api/documents/doc-1")
     const response = await GET_BY_ID(req, { params: Promise.resolve({ id: "doc-1" }) })
@@ -100,7 +109,7 @@ describe("GET /api/documents/[id]", () => {
 
     expect(response.status).toBe(200)
     expect(data.id).toBe("doc-1")
-    expect(data.content).toBe("# 75-Day Plan\n\nThis is the content.")
+    expect(data.content).toBe(FIXTURE_CONTENT)
   })
 
   it("returns 404 if document not found", async () => {
@@ -121,18 +130,20 @@ describe("GET /api/documents/[id]", () => {
     const data = await response.json()
 
     expect(response.status).toBe(200)
-    expect(fs.existsSync).not.toHaveBeenCalled()
     expect(data.content).toBe("")
   })
 
   it("returns empty content if file doesn't exist on disk", async () => {
-    vi.mocked(prisma.document.findUnique).mockResolvedValue(mockDocs[0])
-    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(prisma.document.findUnique).mockResolvedValue({
+      ...mockDocs[0],
+      filename: "missing-file.md",
+    })
 
     const req = new NextRequest("http://localhost:3000/api/documents/doc-1")
     const response = await GET_BY_ID(req, { params: Promise.resolve({ id: "doc-1" }) })
     const data = await response.json()
 
+    expect(response.status).toBe(200)
     expect(data.content).toBe("")
   })
 })
