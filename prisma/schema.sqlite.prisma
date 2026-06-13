@@ -42,8 +42,8 @@ model User {
   termsVersion   String?  @default("1.0")
 
   // Trial & Subscription fields
-  trialStartsAt  DateTime? // When the 14-day free trial started
-  trialEndsAt    DateTime? // When the trial ends (trialStartsAt + 14 days)
+  trialStartsAt  DateTime? // When the 3-day free trial started
+  trialEndsAt    DateTime? // When the trial ends (trialStartsAt + 3 days)
   subscriptionStatus String @default("trial") // trial, active, past_due, canceled, expired
   subscriptionTier String?  // starter, growth, enterprise — based on onboarding
   subscriptionPlan String   @default("monthly") // monthly, yearly
