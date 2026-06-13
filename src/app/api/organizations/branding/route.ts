@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { withAuth } from "@/lib/abac-middleware"
+import { PUBLIC_1H } from "@/lib/cache"
 
 export const GET = withAuth(async (req: NextRequest) => {
   const url = new URL(req.url)
@@ -14,7 +15,9 @@ export const GET = withAuth(async (req: NextRequest) => {
 
   if (!org) return NextResponse.json({ error: "Organization not found" }, { status: 404 })
 
-  return NextResponse.json({ organizationId: org.id, branding: org.branding || {} })
+  return NextResponse.json({ organizationId: org.id, branding: org.branding || {} }, {
+    headers: { "Cache-Control": PUBLIC_1H },
+  })
 })
 
 export const PUT = withAuth(async (req: NextRequest, { session }) => {
