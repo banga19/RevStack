@@ -261,7 +261,7 @@ export default function DashboardPage() {
               <Sparkles className="h-5 w-5 text-primary" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-base font-semibold">You&apos;re on a <span className="text-primary">14-day free trial</span>
+              <p className="text-base font-semibold">You&apos;re on a <span className="text-primary">3-day free trial</span>
                 {trialStatus.daysRemaining > 0 && (
                   <span> — <span className="font-bold">{trialStatus.daysRemaining} day{trialStatus.daysRemaining !== 1 ? "s" : ""} remaining</span></span>
                 )}

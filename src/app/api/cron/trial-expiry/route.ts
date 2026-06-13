@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth"
 import { expireTrials } from "@/lib/subscription-followups"
 
 /**
- * Cron endpoint to auto-expire free trials that have passed their 14-day window.
+ * Cron endpoint to auto-expire free trials that have passed their 3-day window.
  *
  * This should be called daily by an external cron service (cron-job.org,
  * GitHub Actions, Vercel Cron, etc.) at:

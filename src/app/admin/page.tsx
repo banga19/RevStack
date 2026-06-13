@@ -145,7 +145,9 @@ const AUDIT_ACTION_ICONS: Record<string, React.ReactNode> = {
 const STAGE_LABELS: Record<string, string> = {
   "day-10": "Day 10 (4 days left)",
   "day-13": "Day 13 (1 day left)",
-  "day-14": "Day 14 (last day)",
+  "day-1": "Day 1",
+  "day-2": "Day 2",
+  "day-3": "Day 3 (last day)",
   "d+3": "D+3 (expired)",
   "d+7": "D+7 (final offer)",
 }

@@ -1,14 +1,12 @@
 /**
- * Subscription Follow-up Automation
- *
- * Sends timed email + WhatsApp reminders to users as their 14-day free trial
+ * Sends timed email + WhatsApp reminders to users as their 3-day free trial
  * progresses and after it expires. The sequence is:
  *
- *   Day 10  → "Trial ending soon — 4 days left"
- *   Day 13  → "3 days remaining — pick a plan"
- *   Day 14  → "Last day of your trial!"
- *   D+3     → "Your trial has expired"
- *   D+7     → "Last chance — extended offer"
+ *   Day 1  → "Trial ending soon — 2 days left"
+ *   Day 2  → "1 day remaining — pick a plan"
+ *   Day 3  → "Last day of your trial!"
+ *   D+2     → "Your trial has expired"
+ *   D+5     → "Last chance — extended offer"
  *
  * Run via:  GET /api/cron/subscription-followups
  *           (or triggered manually from admin dashboard)
@@ -56,16 +54,16 @@ interface FollowUpStage {
 
 const FOLLOW_UP_STAGES: FollowUpStage[] = [
   {
-    id: "day-10",
-    dayOffset: -4,
-    subject: "Your Mapato trial ends in 4 days",
+    id: "day-1",
+    dayOffset: -2,
+    subject: "Your Mapato trial ends in 2 days",
     emailBody: (u) =>
-      `Hi ${u.name},\n\nQuick heads-up — your 14-day Mapato trial is almost up. You have 4 days left to pick a plan and keep your automation running.\n\n👉 Subscribe now: ${process.env.NEXT_PUBLIC_APP_URL || "https://mapato.app"}/pricing\n\nYour pipeline, outreach sequences, and all client data will be preserved as soon as you subscribe.\n\nAny questions? Just reply to this email.\n\n— The Mapato Team`,
+      `Hi ${u.name},\n\nQuick heads-up — your 3-day Mapato trial is almost up. You have 2 days left to pick a plan and keep your automation running.\n\n👉 Subscribe now: ${process.env.NEXT_PUBLIC_APP_URL || "https://mapato.app"}/pricing\n\nYour pipeline, outreach sequences, and all client data will be preserved as soon as you subscribe.\n\nAny questions? Just reply to this email.\n\n— The Mapato Team`,
     whatsappBody: (u) =>
-      `Hi ${u.name} 👋\n\nYour 14-day Mapato free trial ends in 4 days! Choose a plan to keep your automation pipeline, outreach sequences, and client data active.\n\n👉 Select your plan: ${process.env.NEXT_PUBLIC_APP_URL || "https://mapato.app"}/pricing`,
+      `Hi ${u.name} 👋\n\nYour 3-day Mapato free trial ends in 2 days! Choose a plan to keep your automation pipeline, outreach sequences, and client data active.\n\n👉 Select your plan: ${process.env.NEXT_PUBLIC_APP_URL || "https://mapato.app"}/pricing`,
   },
   {
-    id: "day-13",
+    id: "day-2",
     dayOffset: -1,
     subject: "⚠️ 1 day left — your trial ends tomorrow",
     emailBody: (u) =>
@@ -74,7 +72,7 @@ const FOLLOW_UP_STAGES: FollowUpStage[] = [
       `⚠️ Hi ${u.name} — your Mapato trial ends TOMORROW!\n\nSubscribe now to keep your automations, pipeline, and data active.\n\n✅ Plans from $50/mo: ${process.env.NEXT_PUBLIC_APP_URL || "https://mapato.app"}/pricing`,
   },
   {
-    id: "day-14",
+    id: "day-3",
     dayOffset: 0,
     subject: "🚨 Last day! Your Mapato trial ends today",
     emailBody: (u) =>
@@ -83,8 +81,8 @@ const FOLLOW_UP_STAGES: FollowUpStage[] = [
       `🚨 Hi ${u.name} — TODAY is the last day of your Mapato trial!\n\nDon't lose your data and automations. Subscribe now to keep everything running.\n\n👉 ${process.env.NEXT_PUBLIC_APP_URL || "https://mapato.app"}/pricing`,
   },
   {
-    id: "d+3",
-    dayOffset: 3,
+    id: "d+2",
+    dayOffset: 2,
     subject: "Your trial has ended — here's how to reactivate",
     emailBody: (u) =>
       `Hi ${u.name},\n\nYour Mapato trial has ended and your account is currently paused.\n\nGood news: all your data is still here. Subscribe to any plan and everything will be instantly reactivated — your pipeline, automations, and client history.\n\n👉 Reactivate now: ${process.env.NEXT_PUBLIC_APP_URL || "https://mapato.app"}/pricing\n\nWe'd love to have you back.\n\n— The Mapato Team`,
@@ -92,13 +90,13 @@ const FOLLOW_UP_STAGES: FollowUpStage[] = [
       `Hi ${u.name} 👋\n\nYour Mapato trial has ended, but all your data is safe. Subscribe to any plan to instantly reactivate your account and automations.\n\n👉 Reactivate here: ${process.env.NEXT_PUBLIC_APP_URL || "https://mapato.app"}/pricing`,
   },
   {
-    id: "d+7",
-    dayOffset: 7,
-    subject: "🎁 Extended offer — 7 more days free",
+    id: "d+5",
+    dayOffset: 5,
+    subject: "🎁 Extended offer — 5 more days free",
     emailBody: (u) =>
-      `Hi ${u.name},\n\nWe noticed you didn't subscribe after your trial ended. We'd love to have you experience the full power of Mapato.\n\n🎁 Here's a special offer: get 7 MORE DAYS free on any plan. No commitment.\n\n👉 Claim your extension: ${process.env.NEXT_PUBLIC_APP_URL || "https://mapato.app"}/pricing?extended=7\n\nIf you have questions or need help choosing the right plan, just reply to this email — we're happy to help.\n\n— The Mapato Team`,
+      `Hi ${u.name},\n\nWe noticed you didn't subscribe after your trial ended. We'd love to have you experience the full power of Mapato.\n\n🎁 Here's a special offer: get 5 MORE DAYS free on any plan. No commitment.\n\n👉 Claim your extension: ${process.env.NEXT_PUBLIC_APP_URL || "https://mapato.app"}/pricing?extended=5\n\nIf you have questions or need help choosing the right plan, just reply to this email — we're happy to help.\n\n— The Mapato Team`,
     whatsappBody: (u) =>
-      `🎁 Hi ${u.name} — special offer! Get 7 extra days free on any Mapato plan. No commitment, no risk.\n\n👉 Claim now: ${process.env.NEXT_PUBLIC_APP_URL || "https://mapato.app"}/pricing?extended=7`,
+      `🎁 Hi ${u.name} — special offer! Get 5 extra days free on any Mapato plan. No commitment, no risk.\n\n👉 Claim now: ${process.env.NEXT_PUBLIC_APP_URL || "https://mapato.app"}/pricing?extended=5`,
   },
 ]
 

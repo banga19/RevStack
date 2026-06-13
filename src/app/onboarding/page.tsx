@@ -179,12 +179,12 @@ export default function OnboardingPage() {
             </div>
 
             <div className="p-4 rounded-lg bg-gradient-to-r from-primary/5 via-primary/[0.02] to-emerald-500/5 border border-primary/10">
-              <div className="flex items-center gap-2 text-sm font-medium mb-1">
-                <Clock className="h-4 w-4 text-primary" />
-                Your 14-day trial starts now
-              </div>
-              <p className="text-xs text-muted-foreground">
-                If you choose the free trial, your 14-day countdown begins today with full Enterprise access.
+                 <div className="flex items-center gap-2 text-sm font-medium mb-1">
+                 <Clock className="h-4 w-4 text-primary" />
+                 Your 3-day trial starts now
+               </div>
+               <p className="text-xs text-muted-foreground">
+                 If you choose the free trial, your 3-day countdown begins today with full Enterprise access.
                 Subscribe before it ends to keep your pipelines, automations, and data running.
               </p>
             </div>

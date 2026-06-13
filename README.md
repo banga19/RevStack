@@ -121,7 +121,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 1. Go to `/signup` — fill in name, email, password (min 8 chars)
 2. Auto-login after signup, or sign in at `/login`
-3. New users get a **14-day free trial**
+3. New users get a **3-day free trial**
 
 ### Google Sign-In
 
