@@ -105,3 +105,59 @@ export function metricsSnapshot() {
     },
   }
 }
+
+type AlertChannel = "log" | "webhook" | "seer"
+
+export interface AlertPayload {
+  severity: "info" | "warn" | "critical"
+  service: string
+  message: string
+  detail?: Record<string, unknown>
+}
+
+export async function emitAlert(payload: AlertPayload): Promise<void> {
+  const entry = {
+    ...payload,
+    emittedAt: new Date().toISOString(),
+  }
+
+  if (payload.severity === "critical") {
+    console.error("[ALERT]", JSON.stringify(entry))
+
+    const webhook = process.env.ALERT_WEBHOOK_URL
+    if (webhook) {
+      try {
+        await fetch(webhook, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(entry),
+        })
+      } catch (err) {
+        console.error("[Alert] webhook delivery failed", err)
+      }
+    }
+  } else {
+    console.warn("[ALERT]", JSON.stringify(entry))
+  }
+}
+
+export async function evaluateAlerts(health: HealthStatus): Promise<void> {
+  if (health.status === "error") {
+    await emitAlert({
+      severity: "critical",
+      service: "revstack",
+      message: "system health check failed",
+      detail: { status: health.status, timestamp: health.timestamp },
+    })
+    return
+  }
+
+  if (health.status === "degraded") {
+    await emitAlert({
+      severity: "warn",
+      service: "revstack",
+      message: "system health degraded",
+      detail: { checks: health.checks, timestamp: health.timestamp },
+    })
+  }
+}

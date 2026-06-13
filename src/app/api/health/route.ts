@@ -3,7 +3,6 @@ import { getSystemHealth } from "@/lib/monitoring"
 
 export async function GET() {
   const health = await getSystemHealth()
-  const status = health.status === "error" ? 503 : health.status === "degraded" ? 200 : 200
   const httpStatus = health.status === "error" ? 503 : health.status === "degraded" ? 200 : 200
   return NextResponse.json(health, {
     status: httpStatus,

@@ -4,7 +4,26 @@
 - Next.js 16 on Docker/Fly.io
 - SQLite dev / PostgreSQL planned prod
 - BullMQ + Redis for queues
-- Sentinl + health endpoint for observability
+- Sentry + health endpoint for observability
+
+## Monitoring & Alerting
+
+### Health checks
+- `GET /api/health` returns DB, Redis, and integration status
+- Docker healthcheck: `wget --quiet --tries=1 --spider http://localhost:3000/api/health`
+
+### Sentry
+- Client + server configs: `sentry.client.config.ts`, `sentry.server.config.ts`
+- Enabled only when `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` is set
+- Set in `.env`:
+  - `SENTRY_DSN=https://...`
+  - `NEXT_PUBLIC_SENTRY_DSN=https://...`
+  - `SENTRY_ENVIRONMENT=production`
+
+### Alerting
+- `src/lib/monitoring.ts` exposes `emitAlert()` and `evaluateAlerts()`
+- Critical alerts are logged and optionally posted to `ALERT_WEBHOOK_URL`
+- Integrate with Slack/Discord/email by setting `ALERT_WEBHOOK_URL`
 
 ## Scaling Layers
 
